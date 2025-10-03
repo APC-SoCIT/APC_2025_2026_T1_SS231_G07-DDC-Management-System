@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Book Appointment</h2>
+<form method="post">
+    {% csrf_token %}
+    <label>Patient</label>
+    <select name="patient" required>
+        {% for p in patients %}
+            <option value="{{ p.id }}">{{ p }}</option>
+        {% endfor %}
+    </select>
+    <br>
+    <label>Dentist</label>
+    <select name="dentist" required>
+        {% for d in dentists %}
+            <option value="{{ d.id }}">{{ d }}</option>
+        {% endfor %}
+    </select>
+    <br>
+    <label>Treatment</label>
+    <select name="treatment">
+        <option value="">-- Optional --</option>
+        {% for t in treatments %}
+            <option value="{{ t.id }}">{{ t.name }} - ${{ t.price }}</option>
+        {% endfor %}
+    </select>
+    <br>
+    <label>Start time</label>
+    <input type="datetime-local" name="start_time" required>
+    <br>
+    <label>End time</label>
+    <input type="datetime-local" name="end_time" required>
+    <br>
+    <label>Notes</label>
+    <textarea name="notes" rows="3"></textarea>
+    <br>
+    <button type="submit">Create</button>
+</form>
+{% endblock %}
+
