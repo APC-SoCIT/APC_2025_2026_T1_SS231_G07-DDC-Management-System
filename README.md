@@ -8,12 +8,13 @@ A comprehensive, web-based Dental Clinic Management System integrated with a sta
 ---
 
 ## 📖 Table of Contents
+
 - [Introduction](#-introduction)
 - [System Features](#-system-features)
 - [Limitations](#️-limitations)
-- [Technology Stack](#-technology-stack)
+- [Technology Stack](#️-technology-stack)
 - [Repository Structure](#-repository-structure)
-- [Getting Started](#-getting-started)
+- [Project Documentation](#-project-documentation)
 - [Our Team](#-our-team)
 
 ---
@@ -50,8 +51,8 @@ This project proposes a transformative solution: a web-based management system i
 
 This project leverages a modern, robust technology stack to deliver a seamless and intelligent user experience.
 
-| Category                | Technology                                                              |
-| ----------------------- | ----------------------------------------------------------------------- |
+| Category             | Technology                                                              |
+| -------------------- | ----------------------------------------------------------------------- |
 | **Frontend** | **React**, **TypeScript**, **Tailwind CSS** |
 | **Backend** | **Node.js** with **Express.js** / **NestJS** (TypeScript)               |
 | **Databases** | **PostgreSQL** (Transactional), **Pinecone** (Vector Search for RAG)      |
@@ -64,22 +65,37 @@ This project leverages a modern, robust technology stack to deliver a seamless a
 ## 📁 Repository Structure
 
 This project is organized into a monorepo-like structure with distinct folders for each part of the application.
+
+```plaintext
 .
 ├── 📂 backend/         # Contains the Node.js (TypeScript) backend server and API
 ├── 📂 docs/            # All project documentation, analysis, and design files
 ├── 📂 frontend/        # The React (TypeScript) single-page application
 └── 📄 README.md         # You are here
+```
+
 ---
 
-## 🚀 Getting Started
+## 📚 Project Documentation
 
-Follow these instructions to set up and run the project on your local machine.
+For detailed information about the project's design, architecture, and deliverables, please refer to the documents within the `/docs` directory.
 
-### Prerequisites
+- **01 Analysis and Design Documents**  
+  Contains all planning documents, including diagrams (Use Case, ERD), user stories, and test cases.  
+  🔗 [View Documentation](https://github.com/APC-SoCIT/APC_2025_2026_T1_SS231_G07-DDC-Management-System/tree/main/docs/MSYADD1/01%20Analysis%20and%20design%20documents)
 
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [Python](https://www.python.org/) (v3.9 or later)
-- [Git](https://git-scm.com/)
+- **02 Technology Stack Definition and Implementation**  
+  In-depth documentation for each component of the technology stack.  
+  🔗 [View Documentation](https://github.com/APC-SoCIT/APC_2025_2026_T1_SS231_G07-DDC-Management-System/tree/main/docs/MSYADD1/02%20Technology%20Stack%20Definition%20and%20Implementation)
+
+- **03 Midterm Deliverables**  
+  Contains all project artifacts and reports submitted for midterm evaluation.  
+  🔗 [View Documentation](https://github.com/APC-SoCIT/APC_2025_2026_T1_SS231_G07-DDC-Management-System/tree/main/docs/MSYADD1/03%20Midterm%20Deliverables)
+  
+- **04 Finals Deliverables**  
+  Contains all project artifacts and reports submitted for finals evaluation.  
+  🔗 [View Documentation](https://github.com/APC-SoCIT/APC_2025_2026_T1_SS231_G07-DDC-Management-System/tree/main/docs/MSYADD1/04%20Finals%20Deliverables)
+  
 
 ---
 
