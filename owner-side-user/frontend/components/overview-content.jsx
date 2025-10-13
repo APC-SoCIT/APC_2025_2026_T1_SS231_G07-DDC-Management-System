@@ -431,10 +431,21 @@ export default function OverviewContent({ setActiveTab }) {
                   )
                 }
 
+                // Capitalize first letter of each word for better formatting
+                const formatItemName = (name) => {
+                  if (!name) return ''
+                  return name
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ')
+                }
+
                 return (
                   <div key={item.id} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-[#1a4d2e] font-medium">{item.name}</p>
+                      <p className="text-sm text-[#1a4d2e] font-medium">
+                        {formatItemName(item.name)}
+                      </p>
                       <p className="text-xs text-gray-500">
                         {item.quantity} {item.unit} remaining
                       </p>
