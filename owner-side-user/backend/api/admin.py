@@ -1,8 +1,7 @@
 from django.contrib import admin
-from django.contrib.auth.models import User
 from .models import (
-    # NEW MODELS
-    UserProfile, PatientMedicalHistory, Service, Invoice, Appointment,
+    # CUSTOM SCHEMA MODELS
+    User, PatientMedicalHistory, Service, Invoice, Appointment,
     AppointmentService, InsuranceDetail, TreatmentRecord, Payment, Role,
     # LEGACY MODELS
     Patient, LegacyAppointment, InventoryItem, BillingRecord, FinancialRecord
@@ -13,20 +12,16 @@ from .models import (
 # NEW MODEL ADMIN CLASSES
 # =============================================================================
 
-@admin.register(UserProfile)
-class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ['id', 'get_full_name', 'get_user_email', 'date_of_creation']
-    search_fields = ['f_name', 'l_name', 'user__email']
-    list_filter = ['date_of_creation']
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    list_display = ['id', 'get_full_name', 'email', 'is_active', 'date_of_creation']
+    search_fields = ['f_name', 'l_name', 'email']
+    list_filter = ['is_active', 'date_of_creation']
     readonly_fields = ['date_of_creation']
     
     def get_full_name(self, obj):
         return obj.get_full_name()
     get_full_name.short_description = 'Full Name'
-    
-    def get_user_email(self, obj):
-        return obj.user.email if obj.user else 'N/A'
-    get_user_email.short_description = 'Email'
 
 
 @admin.register(PatientMedicalHistory)

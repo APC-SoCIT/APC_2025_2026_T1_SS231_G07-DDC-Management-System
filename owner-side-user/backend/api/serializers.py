@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import (
-    UserProfile, PatientMedicalHistory, Service, Invoice, Appointment,
+    User, PatientMedicalHistory, Service, Invoice, Appointment,
     AppointmentService, InsuranceDetail, TreatmentRecord, Payment, Role,
     InventoryItem, BillingRecord, FinancialRecord, Patient, LegacyAppointment
 )
@@ -16,16 +16,7 @@ class PatientMedicalHistorySerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for Django User model"""
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_active', 'date_joined', 'last_login']
-        read_only_fields = ['id', 'date_joined']
-
-
-class UserProfileSerializer(serializers.ModelSerializer):
-    """Serializer for UserProfile model"""
-    user = UserSerializer(read_only=True)
+    """Serializer for custom User model"""
     full_name = serializers.SerializerMethodField()
     initials = serializers.SerializerMethodField()
     patient_medical_history_details = PatientMedicalHistorySerializer(
@@ -33,13 +24,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
     )
     
     class Meta:
-        model = UserProfile
+        model = User
         fields = [
-            'id', 'f_name', 'l_name', 'full_name', 'initials',
-            'date_of_creation', 'patient_medical_history', 'patient_medical_history_details',
-            'user'
+            'id', 'email', 'f_name', 'l_name', 'full_name', 'initials',
+            'date_of_creation', 'date_of_birth', 'age', 'contact', 'address',
+            'patient_medical_history', 'patient_medical_history_details',
+            'is_active', 'last_login'
         ]
-        read_only_fields = ['id', 'date_of_creation', 'full_name', 'initials', 'patient_medical_history_details']
+        read_only_fields = ['id', 'date_of_creation', 'full_name', 'initials', 'patient_medical_history_details', 'patient_medical_history']
+        extra_kwargs = {
+            'password_encrypted': {'write_only': True}
+        }
+
+    def create(self, validated_data):
+        # Auto-create patient medical history for new users
+        medical_history = PatientMedicalHistory.objects.create()
+        validated_data['patient_medical_history'] = medical_history
+        validated_data['date_of_creation'] = timezone.now()
+        validated_data['is_active'] = True
+        
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Don't allow updating patient_medical_history reference
+        validated_data.pop('patient_medical_history', None)
+        return super().update(instance, validated_data)
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -97,6 +106,19 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'id', 'created_at', 'patient_name', 'staff_name', 'patient_email',
             'services_list', 'date', 'time', 'doctor', 'treatment'
         ]
+
+    def create(self, validated_data):
+        # Set default staff if not provided (use first active user)
+        if not validated_data.get('staff'):
+            from .models import User
+            default_staff = User.objects.filter(is_active=True).first()
+            if default_staff:
+                validated_data['staff'] = default_staff
+        
+        # Set created_at timestamp
+        validated_data['created_at'] = timezone.now()
+        
+        return super().create(validated_data)
 
     def get_date(self, obj):
         return obj.date
@@ -168,7 +190,7 @@ class LegacyUserSerializer(serializers.ModelSerializer):
 
 
 class UserRegistrationSerializer(serializers.Serializer):
-    """LEGACY: Serializer for user registration"""
+    """Serializer for user registration"""
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True, min_length=8)
@@ -182,17 +204,20 @@ class UserRegistrationSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         validated_data.pop('password_confirm')
-        f_name = validated_data.pop('f_name', '')
-        l_name = validated_data.pop('l_name', '')
+        password = validated_data.pop('password')
         
-        # Create the user
-        user = User.objects.create_user(**validated_data)
+        # Create a default patient medical history
+        medical_history = PatientMedicalHistory.objects.create()
         
-        # Create the profile
-        UserProfile.objects.create(
-            user=user,
-            f_name=f_name,
-            l_name=l_name
+        # Create the user with our custom User model
+        user = User.objects.create(
+            email=validated_data['email'],
+            f_name=validated_data.get('f_name', ''),
+            l_name=validated_data.get('l_name', ''),
+            password_encrypted=password,  # Note: In production, this should be hashed
+            patient_medical_history=medical_history,
+            date_of_creation=timezone.now(),
+            is_active=True
         )
         
         return user

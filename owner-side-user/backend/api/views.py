@@ -4,14 +4,13 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db.models import Count, Sum, Q, F
 from datetime import datetime, timedelta
-from django.contrib.auth.models import User
 from .models import (
-    UserProfile, PatientMedicalHistory, Service, Invoice, Appointment,
+    User, PatientMedicalHistory, Service, Invoice, Appointment,
     AppointmentService, InsuranceDetail, TreatmentRecord, Payment, Role,
     InventoryItem, BillingRecord, FinancialRecord, Patient, LegacyAppointment
 )
 from .serializers import (
-    UserProfileSerializer, PatientMedicalHistorySerializer, ServiceSerializer,
+    UserSerializer, PatientMedicalHistorySerializer, ServiceSerializer,
     InvoiceSerializer, AppointmentSerializer, AppointmentServiceSerializer,
     InsuranceDetailSerializer, TreatmentRecordSerializer, PaymentSerializer,
     RoleSerializer, UserSerializer, UserRegistrationSerializer,
@@ -25,26 +24,27 @@ from .serializers import (
 # NEW MODEL VIEWSETS
 # =============================================================================
 
-class UserProfileViewSet(viewsets.ModelViewSet):
-    """ViewSet for UserProfile (patients/staff) CRUD operations"""
-    queryset = UserProfile.objects.all()
-    serializer_class = UserProfileSerializer
+class UserViewSet(viewsets.ModelViewSet):
+    """ViewSet for User (patients/staff) CRUD operations - using custom User model"""
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
     permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['f_name', 'l_name', 'user__email']
+    search_fields = ['f_name', 'l_name', 'email']
     ordering_fields = ['f_name', 'l_name', 'date_of_creation']
     ordering = ['-date_of_creation']
 
     @action(detail=False, methods=['get'])
     def statistics(self, request):
         """Get user statistics"""
-        total_users = UserProfile.objects.count()
+        total_users = User.objects.count()
         today = datetime.now().date()
         week_ago = today - timedelta(days=7)
         month_ago = today - timedelta(days=30)
         
-        users_this_week = UserProfile.objects.filter(date_of_creation__gte=week_ago).count()
-        users_this_month = UserProfile.objects.filter(date_of_creation__gte=month_ago).count()
+        active_users = User.objects.filter(is_active=True).count()
+        users_this_week = User.objects.filter(date_of_creation__gte=week_ago).count()
+        users_this_month = User.objects.filter(date_of_creation__gte=month_ago).count()
         
         return Response({
             'total': total_users,
@@ -167,8 +167,7 @@ def register_user(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        profile = getattr(user, 'userprofile', None)
-        user_data = UserProfileSerializer(profile).data if profile else {'id': user.id, 'email': user.email}
+        user_data = UserSerializer(user).data
         return Response({
             'user': user_data,
             'message': 'User registered successfully'

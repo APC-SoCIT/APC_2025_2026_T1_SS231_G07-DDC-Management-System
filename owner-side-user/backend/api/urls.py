@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     register_user, dashboard_overview,
     # NEW MODEL VIEWSETS
-    UserProfileViewSet, ServiceViewSet, InvoiceViewSet, AppointmentViewSet,
+    UserViewSet, ServiceViewSet, InvoiceViewSet, AppointmentViewSet,
     TreatmentRecordViewSet, PaymentViewSet,
     # LEGACY VIEWSETS
     PatientViewSet, LegacyAppointmentViewSet,
@@ -17,7 +17,7 @@ from .authentication import CustomTokenObtainPairView
 router = DefaultRouter()
 
 # NEW API ENDPOINTS (matching PostgreSQL schema)
-router.register(r'users', UserProfileViewSet, basename='user')
+router.register(r'users', UserViewSet, basename='user')
 router.register(r'services', ServiceViewSet, basename='service')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'appointments', AppointmentViewSet, basename='appointment')

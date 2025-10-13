@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
@@ -9,7 +8,7 @@ class PatientMedicalHistory(models.Model):
     allergies = models.TextField(null=True, blank=True)
     medications = models.TextField(null=True, blank=True)
     conditions = models.TextField(null=True, blank=True)
-    last_updated = models.DateTimeField(auto_now=True)
+    last_updated = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'patient_medical_history'
@@ -20,23 +19,32 @@ class PatientMedicalHistory(models.Model):
         return f"Medical History {self.id}"
 
 
-class UserProfile(models.Model):
-    """User profile to extend Django's default User model"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+class User(models.Model):
+    """Custom User model matching the PostgreSQL schema from hey.md"""
     f_name = models.CharField(max_length=45, null=True, blank=True)
     l_name = models.CharField(max_length=45, null=True, blank=True)
-    date_of_creation = models.DateTimeField(auto_now_add=True)
+    email = models.CharField(max_length=45, unique=True)
+    password_encrypted = models.CharField(max_length=255, null=True, blank=True)
+    date_of_creation = models.DateTimeField(null=True, blank=True)
+    last_login = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(null=True, blank=True, default=True)
+    
+    # Additional patient fields that the frontend expects
+    date_of_birth = models.DateField(null=True, blank=True)
+    age = models.IntegerField(null=True, blank=True) 
+    contact = models.CharField(max_length=20, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    
     patient_medical_history = models.ForeignKey(
         PatientMedicalHistory, 
-        on_delete=models.CASCADE,
-        null=True, blank=True
+        on_delete=models.CASCADE
     )
 
     class Meta:
-        db_table = 'user_profile'
+        db_table = 'user'
 
     def __str__(self):
-        return f"{self.f_name or ''} {self.l_name or ''}".strip() or self.user.email
+        return f"{self.f_name or ''} {self.l_name or ''}".strip() or self.email
 
     def get_full_name(self):
         """Return full name"""
@@ -49,11 +57,11 @@ class UserProfile(models.Model):
             initials += self.f_name[0].upper()
         if self.l_name:
             initials += self.l_name[0].upper()
-        return initials or self.user.email[0].upper()
+        return initials or self.email[0].upper()
 
 
 class Service(models.Model):
-    """Services offered by the clinic"""
+    """Services offered by the clinic - matching hey.md schema"""
     SERVICE_CATEGORIES = [
         ('Preventive', 'Preventive'),
         ('Restorative', 'Restorative'),
@@ -75,7 +83,7 @@ class Service(models.Model):
 
 
 class Invoice(models.Model):
-    """Invoice model"""
+    """Invoice model matching PostgreSQL schema from hey.md"""
     invoice_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -91,7 +99,7 @@ class Invoice(models.Model):
 
 
 class Appointment(models.Model):
-    """Updated appointment model matching PostgreSQL schema"""
+    """Appointment model matching PostgreSQL schema from hey.md"""
     APPOINTMENT_STATUSES = [
         ('Scheduled', 'Scheduled'),
         ('Completed', 'Completed'),
@@ -104,10 +112,10 @@ class Appointment(models.Model):
     status = models.CharField(max_length=20, choices=APPOINTMENT_STATUSES, default='Scheduled')
     reason_for_visit = models.TextField(null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='patient_appointments', null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='patient_appointments')
     staff = models.ForeignKey(User, on_delete=models.CASCADE, related_name='staff_appointments', null=True, blank=True)
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, null=True, blank=True)
+    invoice = models.ForeignKey('Invoice', on_delete=models.CASCADE, null=True, blank=True)
     services = models.ManyToManyField(Service, through='AppointmentService')
 
     class Meta:
@@ -139,7 +147,7 @@ class Appointment(models.Model):
 
 
 class AppointmentService(models.Model):
-    """Junction table for appointment and services"""
+    """Junction table for appointment and services - matching hey.md schema"""
     appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
 
@@ -151,7 +159,7 @@ class AppointmentService(models.Model):
 
 
 class InsuranceDetail(models.Model):
-    """Insurance details for users"""
+    """Insurance details for users - matching hey.md schema"""
     provider_name = models.CharField(max_length=45)
     policy_number = models.CharField(max_length=45)
     group_number = models.CharField(max_length=45, null=True, blank=True)
@@ -162,10 +170,7 @@ class InsuranceDetail(models.Model):
         db_table = 'insurance_detail'
 
     def __str__(self):
-        profile = getattr(self.user, 'userprofile', None)
-        if profile:
-            return f"{self.provider_name} - {profile.get_full_name()}"
-        return f"{self.provider_name} - {self.user.email}"
+        return f"{self.provider_name} - {self.user.get_full_name()}"
 
 
 class TreatmentRecord(models.Model):
@@ -186,7 +191,7 @@ class TreatmentRecord(models.Model):
 
 
 class Payment(models.Model):
-    """Payment model"""
+    """Payment model - matching hey.md schema"""
     payment_date = models.DateTimeField(null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     payment_method = models.CharField(max_length=45, null=True, blank=True)
@@ -201,7 +206,7 @@ class Payment(models.Model):
 
 
 class Role(models.Model):
-    """User roles"""
+    """User roles - matching hey.md schema"""
     title = models.CharField(max_length=45, null=True, blank=True)
     description = models.CharField(max_length=45, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -210,10 +215,7 @@ class Role(models.Model):
         db_table = 'role'
 
     def __str__(self):
-        profile = getattr(self.user, 'userprofile', None)
-        if profile:
-            return f"{self.title} - {profile.get_full_name()}"
-        return f"{self.title} - {self.user.email}"
+        return f"{self.title} - {self.user.get_full_name()}"
 
 
 # ============================================================
