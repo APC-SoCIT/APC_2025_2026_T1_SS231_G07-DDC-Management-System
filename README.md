@@ -54,9 +54,9 @@ This project leverages a modern, robust technology stack to deliver a seamless a
 | Category             | Technology                                                              |
 | -------------------- | ----------------------------------------------------------------------- |
 | **Frontend** | **React**, **TypeScript**, **Tailwind CSS** |
-| **Backend** | **Node.js** with **Express.js** / **NestJS** (TypeScript)               |
+| **Backend** | **Django REST Framework** (Python)                                      |
 | **Databases** | **PostgreSQL** (Transactional), **Pinecone** (Vector Search for RAG)      |
-| **AI & Orchestration** | **Python**, **LangChain**, **OpenAI API** (GPT Models)                    |
+| **AI & Orchestration** | **LangChain**, **OpenAI API** (GPT Models)                              |
 | **Speech Recognition** | **ASR API** (e.g., OpenAI's Whisper)                                    |
 | **Communication** | **REST API** |
 
