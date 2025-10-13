@@ -34,6 +34,50 @@ class UserViewSet(viewsets.ModelViewSet):
     ordering_fields = ['f_name', 'l_name', 'date_of_creation']
     ordering = ['-date_of_creation']
 
+    def destroy(self, request, *args, **kwargs):
+        """Custom delete to handle related records cleanup"""
+        instance = self.get_object()
+        
+        try:
+            # Store references before deletion
+            medical_history = instance.patient_medical_history
+            
+            # Manually delete related records to avoid foreign key constraint violations
+            # This is needed because database constraints might not match Django's on_delete settings
+            
+            # Delete appointments where user is patient
+            Appointment.objects.filter(patient=instance).delete()
+            
+            # Delete appointments where user is staff
+            Appointment.objects.filter(staff=instance).delete()
+            
+            # Delete insurance details
+            InsuranceDetail.objects.filter(user=instance).delete()
+            
+            # Delete roles
+            Role.objects.filter(user=instance).delete()
+            
+            # Now delete the user
+            instance.delete()
+            
+            # Delete the orphaned medical history if it exists and has no other references
+            if medical_history:
+                try:
+                    # Check if any other users reference this medical history
+                    if not User.objects.filter(patient_medical_history=medical_history).exists():
+                        medical_history.delete()
+                except Exception as e:
+                    # Log but don't fail if medical history deletion fails
+                    print(f"Warning: Could not delete medical history: {e}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to delete user: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['get'])
     def statistics(self, request):
         """Get user statistics"""
