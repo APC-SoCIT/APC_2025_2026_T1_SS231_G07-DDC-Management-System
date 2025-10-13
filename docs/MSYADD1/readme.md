@@ -1,17 +1,46 @@
-# Documentation folder for MSYADD1
-- To all groups: Copy the folder structure in this directory to your respective APC-SoCIT Github repository.
-- Begin uploading / making commits into the respective folders of the documents that you are working on.
-- From now onward, all work done for your project whether for documentation or coding, should have a corresponding commit to your APC-SoCIT Github repository.
-- Each task for your project should have a corresponding Openproject work package created for the task.
+# MSYADD1 - Project Documentation
 
-## Openproject Work Package update
-- After working on a task:
-- Update the number of actual hours spent in your assigned Openproject work package.
-- In the Activity Tab, Add a new comment showing your Github commit message and a link to your github commit in your  APC-SoCIT Github project repository.  
-- Sample link: 
-https://openproject2025.apc.edu.ph/projects/apc-2025-2026-t1-g00-sample-test-project-site/work_packages/1394/activity
-- Screenshot:
-   
-<img width="1690" height="935" alt="image" src="https://github.com/user-attachments/assets/1611594b-dcbf-4277-9794-604122adf915" />
+This directory serves as the central repository for all official documentation for the **Dental Clinic Management System** project, as required for the MSYADD1 course.
 
-  
+---
+
+## 📂 Documentation Index
+
+This folder is organized into the major deliverable categories for the project.
+
+- **[01 Analysis and Design Documents](./01%20Analysis%20and%20design%20documents/)**
+  - Contains all foundational planning documents, including diagrams (Use Case, ERD), fully-dressed use cases, user stories, and test cases.
+
+- **[02 Technology Stack Definition and Implementation](./02%20Technology%20Stack%20Definition%20and%20Implementation/)**
+  - Provides a detailed breakdown and justification for every component of the technology stack, from the frontend framework to the database architecture.
+
+- **[03 Midterm Deliverables](./03%20Midterm%20Deliverables/)**
+  - A collection of all artifacts, reports, and outputs required for the midterm evaluation.
+
+- **[04 Finals Deliverables](./04%20Finals%20Deliverables/)**
+  - A collection of all artifacts, reports, and the final system output required for the final evaluation.
+
+---
+
+##  workflow Contributor Workflow
+
+To maintain project organization, all team members must follow the procedures below.
+
+### Committing to the Repository
+- All new work, whether for documentation or coding, must have a corresponding commit in this APC-SoCIT GitHub repository.
+- Each task for your project should have a corresponding OpenProject work package created for that task.
+
+### Updating OpenProject Work Packages
+- After working on a task, update the number of actual hours spent in your assigned OpenProject work package.
+- In the **Activity** tab, add a new comment describing the work completed and link to your specific commit in this repository. This provides a clear audit trail connecting tasks to tangible outputs.
+
+
+---
+
+## 👨‍💻 Project Team (G07)
+
+- Gabriel Villanueva (Team Leader)
+- Aiiro Ravinera
+- Michael Orenze
+- Jasper Valdez
+- Ezekiel Galauran
