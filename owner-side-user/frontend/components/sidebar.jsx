@@ -15,10 +15,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   return (
     <div className="w-64 bg-[#1a4d3a] text-white flex flex-col">
       {/* Logo */}
-      <div className="p-6">
-        <div className="w-12 h-12 bg-[#d4af37] rounded-full flex items-center justify-center overflow-hidden">
-          <img src="/dental-clinic-logo.png" alt="Dental Clinic Logo" className="w-full h-full object-cover" />
-        </div>
+      <div className="p-6 flex items-center justify-center">
+        <img 
+          src="/Logo.png" 
+          alt="Dental Clinic Logo" 
+          className="max-h-16 object-contain"
+        />
       </div>
 
       {/* Navigation */}
