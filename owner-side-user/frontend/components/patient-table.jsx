@@ -105,11 +105,11 @@ export default function PatientTable() {
     setEditPatient({
       f_name: patient.f_name || patient.name?.split(' ')[0] || '',
       l_name: patient.l_name || patient.name?.split(' ').slice(1).join(' ') || '',
-      name: patient.name || patient.full_name, // Backward compatibility
-      email: patient.email,
+      name: patient.name || patient.full_name || '', // Backward compatibility
+      email: patient.email || '',
       date_of_birth: patient.date_of_birth || "",
-      age: patient.age,
-      contact: patient.contact,
+      age: patient.age || '',
+      contact: patient.contact || '',
       address: patient.address || "",
     })
     setIsEditPatientOpen(true)
@@ -117,6 +117,17 @@ export default function PatientTable() {
 
   const handleUpdatePatient = async () => {
     try {
+      // Validate required fields
+      if (!editPatient.email) {
+        toast({
+          title: "Validation Error",
+          description: "Email is required.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      console.log("Updating patient with data:", editPatient)
       await patientAPI.update(selectedPatient.id, editPatient)
       toast({
         title: "Success",
@@ -155,18 +166,20 @@ export default function PatientTable() {
     }
   }
 
-  const getInitials = (name) =>
-    name
+  const getInitials = (name) => {
+    if (!name) return "?"
+    return name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
+  }
 
   const filteredPatients = patients.filter(
     (patient) =>
       patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.patient_id?.toLowerCase().includes(searchQuery.toLowerCase()),
+      patient.patient_id?.toString().toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   return (

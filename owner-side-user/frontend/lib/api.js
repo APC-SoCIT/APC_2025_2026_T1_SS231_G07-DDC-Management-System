@@ -35,30 +35,42 @@ async function apiRequest(endpoint, options = {}) {
 }
 
 // Data transformation helpers
-const transformUserForDisplay = (user) => ({
-  ...user,
-  // Map new fields to old field names for backward compatibility
-  name: user.full_name || `${user.f_name || ''} ${user.l_name || ''}`.trim(),
-  patient_id: user.id, // Use id as patient_id
-  initials: user.initials,
-  created_at: user.date_of_creation,
-  // Keep new fields as well
-  f_name: user.f_name,
-  l_name: user.l_name,
-  full_name: user.full_name,
-  date_of_creation: user.date_of_creation
-})
+const transformUserForDisplay = (user) => {
+  const fullName = user.full_name || `${user.f_name || ''} ${user.l_name || ''}`.trim()
+  return {
+    ...user,
+    // Map new fields to old field names for backward compatibility
+    name: fullName || user.email || 'Unknown',
+    patient_id: user.id, // Use id as patient_id
+    initials: user.initials || (fullName ? fullName.split(' ').map(n => n[0]).join('').toUpperCase() : '?'),
+    created_at: user.date_of_creation,
+    // Keep new fields as well
+    f_name: user.f_name,
+    l_name: user.l_name,
+    full_name: user.full_name,
+    date_of_creation: user.date_of_creation,
+    date_of_birth: user.date_of_birth,
+    age: user.age,
+    contact: user.contact,
+    address: user.address
+  }
+}
 
-const transformUserForBackend = (user) => ({
-  f_name: user.f_name || user.name?.split(' ')[0] || '',
-  l_name: user.l_name || user.name?.split(' ').slice(1).join(' ') || '',
-  email: user.email,
-  // Map other fields as needed
-  date_of_birth: user.date_of_birth,
-  age: user.age,
-  contact: user.contact,
-  address: user.address
-})
+const transformUserForBackend = (user) => {
+  const data = {
+    f_name: user.f_name || user.name?.split(' ')[0] || '',
+    l_name: user.l_name || user.name?.split(' ').slice(1).join(' ') || '',
+    email: user.email || '', // Email is required
+  }
+  
+  // Only include optional fields if they have values
+  if (user.date_of_birth) data.date_of_birth = user.date_of_birth
+  if (user.age !== null && user.age !== undefined && user.age !== '') data.age = user.age
+  if (user.contact) data.contact = user.contact
+  if (user.address) data.address = user.address
+  
+  return data
+}
 
 const transformAppointmentForDisplay = (appointment) => ({
   ...appointment,
@@ -84,28 +96,41 @@ const transformAppointmentForBackend = (appointment) => {
   let startTime = appointment.appointment_start_time
   
   if (!startTime && appointment.date && appointment.time) {
-    startTime = `${appointment.date}T${appointment.time}:00`
+    // Ensure proper datetime format: YYYY-MM-DDTHH:MM:SS
+    const timeParts = appointment.time.split(':')
+    const hours = timeParts[0].padStart(2, '0')
+    const minutes = timeParts[1]?.padStart(2, '0') || '00'
+    startTime = `${appointment.date}T${hours}:${minutes}:00`
+  }
+  
+  // Calculate end time (1 hour after start by default)
+  let endTime = appointment.appointment_end_time
+  if (!endTime && startTime) {
+    const startDate = new Date(startTime)
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Add 1 hour
+    endTime = endDate.toISOString().slice(0, 19) // Format: YYYY-MM-DDTHH:MM:SS
   }
   
   return {
     appointment_start_time: startTime,
-    appointment_end_time: appointment.appointment_end_time,
+    appointment_end_time: endTime,
     status: appointment.status === 'scheduled' ? 'Scheduled' : 
            appointment.status === 'completed' ? 'Completed' :
            appointment.status === 'cancelled' ? 'Cancelled' :
            appointment.status || 'Scheduled',
-    reason_for_visit: appointment.reason_for_visit || appointment.treatment,
-    notes: appointment.notes,
+    reason_for_visit: appointment.reason_for_visit || appointment.treatment || 'General Checkup',
+    notes: appointment.notes || (appointment.doctor ? `Doctor: ${appointment.doctor}` : ''),
     patient: appointment.patient,
-    staff: appointment.staff || appointment.doctor_id, // Handle doctor field
-    invoice: appointment.invoice || 1 // Default invoice ID if not provided
+    staff: appointment.staff || null, // Will be handled by backend with default
+    invoice: null // Make invoice optional
   }
 }
 
 // NEW API: Users (patients/staff) - replaces patientAPI
 export const userAPI = {
   getAll: async () => {
-    const users = await apiRequest("/users/")
+    const response = await apiRequest("/users/")
+    const users = Array.isArray(response) ? response : response.results || []
     return users.map(transformUserForDisplay)
   },
   getById: async (id) => {
@@ -123,7 +148,7 @@ export const userAPI = {
   update: async (id, data) => {
     const transformedData = transformUserForBackend(data)
     const user = await apiRequest(`/users/${id}/`, {
-      method: "PUT",
+      method: "PATCH",
       body: JSON.stringify(transformedData),
     })
     return transformUserForDisplay(user)
@@ -223,7 +248,8 @@ export const patientAPI = {
 // Appointment API (updated for new schema)
 export const appointmentAPI = {
   getAll: async () => {
-    const appointments = await apiRequest("/appointments/")
+    const response = await apiRequest("/appointments/")
+    const appointments = Array.isArray(response) ? response : response.results || []
     return appointments.map(transformAppointmentForDisplay)
   },
   getById: async (id) => {
@@ -256,18 +282,37 @@ export const appointmentAPI = {
 
 // Inventory API
 export const inventoryAPI = {
-  getAll: () => apiRequest("/inventory/"),
+  getAll: async () => {
+    const response = await apiRequest("/inventory/")
+    return Array.isArray(response) ? response : response.results || []
+  },
   getById: (id) => apiRequest(`/inventory/${id}/`),
-  create: (data) =>
-    apiRequest("/inventory/", {
+  create: (data) => {
+    // Convert string values to proper number types
+    const transformedData = {
+      ...data,
+      quantity: parseInt(data.quantity, 10),
+      min_stock: parseInt(data.min_stock, 10),
+      cost_per_unit: parseFloat(data.cost_per_unit),
+    }
+    return apiRequest("/inventory/", {
       method: "POST",
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    apiRequest(`/inventory/${id}/`, {
+      body: JSON.stringify(transformedData),
+    })
+  },
+  update: (id, data) => {
+    // Convert string values to proper number types
+    const transformedData = {
+      ...data,
+      quantity: parseInt(data.quantity, 10),
+      min_stock: parseInt(data.min_stock, 10),
+      cost_per_unit: parseFloat(data.cost_per_unit),
+    }
+    return apiRequest(`/inventory/${id}/`, {
       method: "PUT",
-      body: JSON.stringify(data),
-    }),
+      body: JSON.stringify(transformedData),
+    })
+  },
   delete: (id) =>
     apiRequest(`/inventory/${id}/`, {
       method: "DELETE",
@@ -283,7 +328,10 @@ export const inventoryAPI = {
 
 // Billing API
 export const billingAPI = {
-  getAll: () => apiRequest("/billing/"),
+  getAll: async () => {
+    const response = await apiRequest("/billing/")
+    return Array.isArray(response) ? response : response.results || []
+  },
   getById: (id) => apiRequest(`/billing/${id}/`),
   create: (data) =>
     apiRequest("/billing/", {
@@ -304,7 +352,10 @@ export const billingAPI = {
 
 // Financial API
 export const financialAPI = {
-  getAll: () => apiRequest("/financial/"),
+  getAll: async () => {
+    const response = await apiRequest("/financial/")
+    return Array.isArray(response) ? response : response.results || []
+  },
   getRevenue: () => apiRequest("/financial/revenue/"),
   getExpenses: () => apiRequest("/financial/expenses/"),
 }
