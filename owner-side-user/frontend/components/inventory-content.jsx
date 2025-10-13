@@ -49,6 +49,15 @@ export default function InventoryContent() {
     fetchItems()
   }, [categoryFilter])
 
+  // Capitalize first letter of each word for consistent formatting
+  const formatItemName = (name) => {
+    if (!name) return ''
+    return name
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
   const fetchItems = async () => {
     try {
       setLoading(true)
@@ -501,7 +510,7 @@ export default function InventoryContent() {
             <tbody>
               {filteredItems.map((item) => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4 font-medium text-[#1a4d2e]">{item.name}</td>
+                  <td className="p-4 font-medium text-[#1a4d2e]">{formatItemName(item.name)}</td>
                   <td className="p-4 text-sm text-gray-600 capitalize">{item.category}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
