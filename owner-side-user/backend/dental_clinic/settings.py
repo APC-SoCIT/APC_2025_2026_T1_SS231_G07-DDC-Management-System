@@ -13,7 +13,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,*.vercel.app').split(',')
+
+# Parse ALLOWED_HOSTS and handle wildcards
+allowed_hosts_str = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.vercel.app')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_str.split(',')]
 
 # Application definition
 INSTALLED_APPS = [
