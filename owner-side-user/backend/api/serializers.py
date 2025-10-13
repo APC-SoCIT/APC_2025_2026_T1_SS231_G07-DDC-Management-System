@@ -1,25 +1,201 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from django.contrib.auth.models import User
-from .models import Patient, Appointment, InventoryItem, BillingRecord, FinancialRecord
+from django.utils import timezone
+from .models import (
+    User, PatientMedicalHistory, Service, Invoice, Appointment,
+    AppointmentService, InsuranceDetail, TreatmentRecord, Payment, Role,
+    InventoryItem, BillingRecord, FinancialRecord, Patient, LegacyAppointment
+)
+
+
+class PatientMedicalHistorySerializer(serializers.ModelSerializer):
+    """Serializer for PatientMedicalHistory model"""
+    class Meta:
+        model = PatientMedicalHistory
+        fields = '__all__'
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for User model"""
+    """Serializer for custom User model"""
+    full_name = serializers.SerializerMethodField()
+    initials = serializers.SerializerMethodField()
+    patient_medical_history_details = PatientMedicalHistorySerializer(
+        source='patient_medical_history', read_only=True
+    )
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        fields = [
+            'id', 'email', 'f_name', 'l_name', 'full_name', 'initials',
+            'date_of_creation', 'date_of_birth', 'age', 'contact', 'address',
+            'patient_medical_history', 'patient_medical_history_details',
+            'is_active', 'last_login'
+        ]
+        read_only_fields = ['id', 'date_of_creation', 'full_name', 'initials', 'patient_medical_history_details', 'patient_medical_history']
+        extra_kwargs = {
+            'password_encrypted': {'write_only': True}
+        }
+
+    def create(self, validated_data):
+        # Auto-create patient medical history for new users
+        medical_history = PatientMedicalHistory.objects.create()
+        validated_data['patient_medical_history'] = medical_history
+        validated_data['date_of_creation'] = timezone.now()
+        validated_data['is_active'] = True
+        
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Don't allow updating patient_medical_history reference
+        validated_data.pop('patient_medical_history', None)
+        return super().update(instance, validated_data)
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+    def get_initials(self, obj):
+        return obj.get_initials()
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    """Serializer for Service model"""
+    class Meta:
+        model = Service
+        fields = '__all__'
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    """Serializer for Invoice model"""
+    class Meta:
+        model = Invoice
+        fields = '__all__'
+
+
+class AppointmentServiceSerializer(serializers.ModelSerializer):
+    """Serializer for AppointmentService model"""
+    service_details = ServiceSerializer(source='service', read_only=True)
+    
+    class Meta:
+        model = AppointmentService
+        fields = ['id', 'service', 'service_details']
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    """Serializer for Appointment model"""
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+    staff_name = serializers.CharField(source='staff.get_full_name', read_only=True)
+    patient_email = serializers.CharField(source='patient.email', read_only=True)
+    services_list = AppointmentServiceSerializer(source='appointmentservice_set', many=True, read_only=True)
+    
+    # Backward compatibility properties
+    date = serializers.SerializerMethodField()
+    time = serializers.SerializerMethodField()
+    doctor = serializers.SerializerMethodField()
+    treatment = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Appointment
+        fields = [
+            'id', 'appointment_start_time', 'appointment_end_time', 'status',
+            'reason_for_visit', 'notes', 'created_at', 'patient', 'staff', 'invoice',
+            'patient_name', 'staff_name', 'patient_email', 'services_list',
+            # Backward compatibility fields
+            'date', 'time', 'doctor', 'treatment'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'patient_name', 'staff_name', 'patient_email',
+            'services_list', 'date', 'time', 'doctor', 'treatment'
+        ]
+
+    def create(self, validated_data):
+        # Set default staff if not provided (use first active user)
+        if not validated_data.get('staff'):
+            from .models import User
+            default_staff = User.objects.filter(is_active=True).first()
+            if default_staff:
+                validated_data['staff'] = default_staff
+        
+        # Set created_at timestamp
+        validated_data['created_at'] = timezone.now()
+        
+        return super().create(validated_data)
+
+    def get_date(self, obj):
+        return obj.date
+
+    def get_time(self, obj):
+        return obj.time
+
+    def get_doctor(self, obj):
+        return obj.doctor
+
+    def get_treatment(self, obj):
+        return obj.treatment
+
+
+class InsuranceDetailSerializer(serializers.ModelSerializer):
+    """Serializer for InsuranceDetail model"""
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = InsuranceDetail
+        fields = '__all__'
+        read_only_fields = ['user_name']
+
+
+class TreatmentRecordSerializer(serializers.ModelSerializer):
+    """Serializer for TreatmentRecord model"""
+    appointment_details = AppointmentSerializer(source='appointment', read_only=True)
+    
+    class Meta:
+        model = TreatmentRecord
+        fields = '__all__'
+        read_only_fields = ['appointment_details']
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Serializer for Payment model"""
+    invoice_details = InvoiceSerializer(source='invoice', read_only=True)
+    
+    class Meta:
+        model = Payment
+        fields = '__all__'
+        read_only_fields = ['invoice_details']
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    """Serializer for Role model"""
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Role
+        fields = '__all__'
+        read_only_fields = ['user_name']
+
+
+# =============================================================================
+# LEGACY SERIALIZERS - Keep for backward compatibility
+# =============================================================================
+
+
+class LegacyUserSerializer(serializers.ModelSerializer):
+    """LEGACY: Serializer for User model - Use UserProfileSerializer instead"""
+    f_name = serializers.CharField(source='userprofile.f_name', read_only=True)
+    l_name = serializers.CharField(source='userprofile.l_name', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'f_name', 'l_name']
         read_only_fields = ['id']
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(serializers.Serializer):
     """Serializer for user registration"""
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True, min_length=8)
-
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'password', 'password_confirm', 'first_name', 'last_name']
+    f_name = serializers.CharField(max_length=45, required=False)
+    l_name = serializers.CharField(max_length=45, required=False)
 
     def validate(self, data):
         if data['password'] != data['password_confirm']:
@@ -28,12 +204,27 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password_confirm')
-        user = User.objects.create_user(**validated_data)
+        password = validated_data.pop('password')
+        
+        # Create a default patient medical history
+        medical_history = PatientMedicalHistory.objects.create()
+        
+        # Create the user with our custom User model
+        user = User.objects.create(
+            email=validated_data['email'],
+            f_name=validated_data.get('f_name', ''),
+            l_name=validated_data.get('l_name', ''),
+            password_encrypted=password,  # Note: In production, this should be hashed
+            patient_medical_history=medical_history,
+            date_of_creation=timezone.now(),
+            is_active=True
+        )
+        
         return user
 
 
 class PatientSerializer(serializers.ModelSerializer):
-    """Serializer for Patient model"""
+    """LEGACY: Serializer for Patient model - Use UserProfileSerializer instead"""
     initials = serializers.SerializerMethodField()
     email = serializers.EmailField(
         validators=[UniqueValidator(queryset=Patient.objects.all())]
@@ -51,13 +242,13 @@ class PatientSerializer(serializers.ModelSerializer):
         return obj.get_initials()
 
 
-class AppointmentSerializer(serializers.ModelSerializer):
-    """Serializer for Appointment model"""
+class LegacyAppointmentSerializer(serializers.ModelSerializer):
+    """LEGACY: Serializer for Appointment model - Use AppointmentSerializer instead"""
     patient_name = serializers.CharField(source='patient.name', read_only=True)
     patient_email = serializers.CharField(source='patient.email', read_only=True)
 
     class Meta:
-        model = Appointment
+        model = LegacyAppointment
         fields = [
             'id', 'appointment_id', 'patient', 'patient_name', 'patient_email',
             'date', 'time', 'doctor', 'status', 'treatment', 'notes',

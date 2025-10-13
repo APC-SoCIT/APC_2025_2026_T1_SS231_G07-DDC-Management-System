@@ -1,0 +1,11 @@
+venv
+.venv
+.env
+.env.local
+__pycache__
+*.pyc
+.DS_Store
+.git
+README.md
+db.sqlite3
+media/

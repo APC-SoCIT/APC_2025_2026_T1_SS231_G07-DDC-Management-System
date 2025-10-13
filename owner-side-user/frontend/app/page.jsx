@@ -35,7 +35,7 @@ export default function Dashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case "overview":
-        return <OverviewContent />
+        return <OverviewContent setActiveTab={setActiveTab} />
       case "appointments":
         return <AppointmentContent />
       case "patients":
@@ -47,7 +47,7 @@ export default function Dashboard() {
       case "billing":
         return <BillingContent />
       default:
-        return <OverviewContent />
+        return <OverviewContent setActiveTab={setActiveTab} />
     }
   }
 
