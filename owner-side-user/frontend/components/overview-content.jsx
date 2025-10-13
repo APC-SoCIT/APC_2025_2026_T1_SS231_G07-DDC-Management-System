@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
@@ -17,7 +18,7 @@ const patientTrendsData = [
 ]
 
 // Custom calendar component with proper design and sizing
-function CustomCalendar() {
+function CustomCalendar({ onDateClick }) {
   const [currentDate, setCurrentDate] = useState(new Date())
 
   const monthNames = [
@@ -52,6 +53,7 @@ function CustomCalendar() {
         day: daysInPrevMonth - i,
         isCurrentMonth: false,
         isToday: false,
+        date: new Date(year, month - 1, daysInPrevMonth - i),
       })
     }
 
@@ -64,6 +66,7 @@ function CustomCalendar() {
         day: i,
         isCurrentMonth: true,
         isToday,
+        date: new Date(year, month, i),
       })
     }
 
@@ -74,6 +77,7 @@ function CustomCalendar() {
         day: i,
         isCurrentMonth: false,
         isToday: false,
+        date: new Date(year, month + 1, i),
       })
     }
 
@@ -130,11 +134,13 @@ function CustomCalendar() {
           {days.map((dateObj, index) => (
             <button
               key={index}
+              onClick={() => dateObj.isCurrentMonth && onDateClick && onDateClick(dateObj.date)}
               className={`
                 flex items-center justify-center rounded-lg text-base font-medium transition-all
-                ${dateObj.isCurrentMonth ? "text-gray-900 hover:bg-gray-100" : "text-gray-500"}
-                ${dateObj.isToday ? "bg-[#1a4d2e] text-white hover:bg-[#1a4d2e]" : ""}
+                ${dateObj.isCurrentMonth ? "text-gray-900 hover:bg-gray-100 cursor-pointer" : "text-gray-500 cursor-default"}
+                ${dateObj.isToday ? "bg-[#1a4d2e] text-white hover:bg-[#1a4d2e]/90" : ""}
               `}
+              disabled={!dateObj.isCurrentMonth}
             >
               {dateObj.day}
             </button>
@@ -160,6 +166,12 @@ export default function OverviewContent({ setActiveTab }) {
   const [upcomingAppointments, setUpcomingAppointments] = useState([])
   const [stockAlerts, setStockAlerts] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  // Modal state for calendar date clicks
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(null)
+  const [selectedDateAppointments, setSelectedDateAppointments] = useState([])
+  const [loadingAppointments, setLoadingAppointments] = useState(false)
 
   useEffect(() => {
     fetchDashboardData()
@@ -200,6 +212,50 @@ export default function OverviewContent({ setActiveTab }) {
     }
   }
 
+  // Handle calendar date click
+  const handleDateClick = async (date) => {
+    setSelectedDate(date)
+    setIsModalOpen(true)
+    setLoadingAppointments(true)
+    
+    try {
+      // Fetch all appointments
+      const allAppointments = await appointmentAPI.getAll()
+      
+      // Filter appointments for the selected date (timezone-safe)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const dateString = `${year}-${month}-${day}`
+      
+      const filteredAppointments = allAppointments.filter(apt => {
+        return apt.date === dateString
+      })
+      
+      setSelectedDateAppointments(filteredAppointments)
+    } catch (error) {
+      console.error("Failed to fetch appointments for date:", error)
+      setSelectedDateAppointments([])
+    } finally {
+      setLoadingAppointments(false)
+    }
+  }
+
+  const formatSelectedDate = (date) => {
+    if (!date) return ""
+    
+    // Format without timezone conversion
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    
+    const dayName = days[date.getDay()]
+    const monthName = months[date.getMonth()]
+    const day = date.getDate()
+    const year = date.getFullYear()
+    
+    return `${dayName}, ${monthName} ${day}, ${year}`
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Section: Calendar and Stats */}
@@ -208,7 +264,7 @@ export default function OverviewContent({ setActiveTab }) {
         <div className="lg:col-span-2">
           <Card className="bg-[#c8e6c9] border-none h-full">
             <CardContent className="p-6 h-full">
-              <CustomCalendar />
+              <CustomCalendar onDateClick={handleDateClick} />
             </CardContent>
           </Card>
         </div>
@@ -328,6 +384,9 @@ export default function OverviewContent({ setActiveTab }) {
                     <p className="font-medium text-[#1a4d2e]">
                       {appointment.reason_for_visit || appointment.treatment || "Appointment"}
                     </p>
+                    <p className="text-sm text-gray-500">
+                      {appointment.patient_name || `Patient ID: ${appointment.patient}`}
+                    </p>
                     <p className="text-sm text-gray-600">
                       {formatDateTime(appointment.date, appointment.time)}
                       {appointment.end_time && ` - ${appointment.end_time}`}
@@ -436,6 +495,88 @@ export default function OverviewContent({ setActiveTab }) {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Appointment Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-[#1a4d2e]">
+              Appointments for {formatSelectedDate(selectedDate)}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            {loadingAppointments ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-gray-600">Loading appointments...</p>
+              </div>
+            ) : selectedDateAppointments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <p className="text-gray-600 mb-4">No appointments scheduled for this date</p>
+                <button
+                  onClick={() => {
+                    setIsModalOpen(false)
+                    setActiveTab && setActiveTab("appointments")
+                  }}
+                  className="px-4 py-2 bg-[#1a4d2e] text-white rounded-lg hover:bg-[#1a4d2e]/90 transition-colors"
+                >
+                  Schedule an Appointment
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {selectedDateAppointments.map((appointment) => (
+                  <Card key={appointment.id} className="border-l-4 border-l-[#1a4d2e]">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="font-semibold text-lg text-[#1a4d2e]">
+                            {appointment.reason_for_visit || appointment.treatment || "Appointment"}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Patient: {appointment.patient_name || `ID: ${appointment.patient}`}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          appointment.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
+                          appointment.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                          appointment.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {appointment.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                        <div>
+                          <p className="text-gray-500">Time</p>
+                          <p className="font-medium">
+                            {appointment.time || "Not set"}
+                            {appointment.end_time && ` - ${appointment.end_time}`}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Staff</p>
+                          <p className="font-medium">
+                            {appointment.staff_name || "Not assigned"}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {appointment.notes && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded">
+                          <p className="text-xs text-gray-500 mb-1">Notes</p>
+                          <p className="text-sm">{appointment.notes}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
