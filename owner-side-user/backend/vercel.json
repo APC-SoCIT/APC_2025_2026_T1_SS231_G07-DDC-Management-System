@@ -26,5 +26,8 @@
       "src": "/(.*)",
       "dest": "dental_clinic/wsgi.py"
     }
-  ]
+  ],
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  }
 }
