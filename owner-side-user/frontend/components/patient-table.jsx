@@ -17,7 +17,9 @@ export default function PatientTable() {
   const [isEditPatientOpen, setIsEditPatientOpen] = useState(false)
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [newPatient, setNewPatient] = useState({
-    name: "",
+    f_name: "",
+    l_name: "",
+    name: "", // Keep for backward compatibility
     date_of_birth: "",
     age: "",
     email: "",
@@ -25,7 +27,9 @@ export default function PatientTable() {
     address: "",
   })
   const [editPatient, setEditPatient] = useState({
-    name: "",
+    f_name: "",
+    l_name: "",
+    name: "", // Keep for backward compatibility
     date_of_birth: "",
     age: "",
     email: "",
@@ -60,13 +64,23 @@ export default function PatientTable() {
   const handleAddPatient = async (e) => {
     e.preventDefault()
     try {
-      await patientAPI.create(newPatient)
+      // Prepare data for new backend structure
+      const patientData = {
+        ...newPatient,
+        // Support both old and new field names
+        f_name: newPatient.f_name || newPatient.name?.split(' ')[0] || '',
+        l_name: newPatient.l_name || newPatient.name?.split(' ').slice(1).join(' ') || '',
+      }
+      
+      await patientAPI.create(patientData)
       toast({
         title: "Success",
         description: "Patient added successfully!",
       })
       setIsAddPatientOpen(false)
       setNewPatient({
+        f_name: "",
+        l_name: "",
         name: "",
         date_of_birth: "",
         age: "",
@@ -89,7 +103,9 @@ export default function PatientTable() {
   const handleEditPatient = (patient) => {
     setSelectedPatient(patient)
     setEditPatient({
-      name: patient.name,
+      f_name: patient.f_name || patient.name?.split(' ')[0] || '',
+      l_name: patient.l_name || patient.name?.split(' ').slice(1).join(' ') || '',
+      name: patient.name || patient.full_name, // Backward compatibility
       email: patient.email,
       date_of_birth: patient.date_of_birth || "",
       age: patient.age,
@@ -175,15 +191,39 @@ export default function PatientTable() {
                   </p>
                 </DialogHeader>
                 <form onSubmit={handleAddPatient} className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      placeholder="Ex. Michael Orenze"
-                      value={newPatient.name}
-                      onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })}
-                      required
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        placeholder="Ex. Michael"
+                        value={newPatient.f_name}
+                        onChange={(e) => {
+                          setNewPatient({ 
+                            ...newPatient, 
+                            f_name: e.target.value,
+                            name: `${e.target.value} ${newPatient.l_name}`.trim() // Update full name for backward compatibility
+                          })
+                        }}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        placeholder="Ex. Orenze"
+                        value={newPatient.l_name}
+                        onChange={(e) => {
+                          setNewPatient({ 
+                            ...newPatient, 
+                            l_name: e.target.value,
+                            name: `${newPatient.f_name} ${e.target.value}`.trim() // Update full name for backward compatibility
+                          })
+                        }}
+                        required
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="dateOfBirth">Date of Birth</Label>
@@ -285,8 +325,40 @@ export default function PatientTable() {
                 {/* Personal Details */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium text-gray-600">Personal Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editFirstName">First Name</Label>
+                      <Input
+                        id="editFirstName"
+                        value={editPatient.f_name}
+                        onChange={(e) => {
+                          setEditPatient({ 
+                            ...editPatient, 
+                            f_name: e.target.value,
+                            name: `${e.target.value} ${editPatient.l_name}`.trim()
+                          })
+                        }}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="editLastName">Last Name</Label>
+                      <Input
+                        id="editLastName"
+                        value={editPatient.l_name}
+                        onChange={(e) => {
+                          setEditPatient({ 
+                            ...editPatient, 
+                            l_name: e.target.value,
+                            name: `${editPatient.f_name} ${e.target.value}`.trim()
+                          })
+                        }}
+                        required
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-2">
-                    <Label htmlFor="editName">Name</Label>
+                    <Label htmlFor="editFullName">Full Name (Display)</Label>
                     <Input
                       id="editName"
                       value={editPatient.name}

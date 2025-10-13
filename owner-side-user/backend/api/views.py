@@ -2,16 +2,162 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Q, F
 from datetime import datetime, timedelta
-from .models import Patient, Appointment, InventoryItem, BillingRecord, FinancialRecord
+from django.contrib.auth.models import User
+from .models import (
+    UserProfile, PatientMedicalHistory, Service, Invoice, Appointment,
+    AppointmentService, InsuranceDetail, TreatmentRecord, Payment, Role,
+    InventoryItem, BillingRecord, FinancialRecord, Patient, LegacyAppointment
+)
 from .serializers import (
-    UserSerializer, UserRegistrationSerializer,
-    PatientSerializer, AppointmentSerializer,
+    UserProfileSerializer, PatientMedicalHistorySerializer, ServiceSerializer,
+    InvoiceSerializer, AppointmentSerializer, AppointmentServiceSerializer,
+    InsuranceDetailSerializer, TreatmentRecordSerializer, PaymentSerializer,
+    RoleSerializer, UserSerializer, UserRegistrationSerializer,
+    PatientSerializer, LegacyAppointmentSerializer,
     InventoryItemSerializer, BillingRecordSerializer,
     FinancialRecordSerializer
 )
+
+
+# =============================================================================
+# NEW MODEL VIEWSETS
+# =============================================================================
+
+class UserProfileViewSet(viewsets.ModelViewSet):
+    """ViewSet for UserProfile (patients/staff) CRUD operations"""
+    queryset = UserProfile.objects.all()
+    serializer_class = UserProfileSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['f_name', 'l_name', 'user__email']
+    ordering_fields = ['f_name', 'l_name', 'date_of_creation']
+    ordering = ['-date_of_creation']
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get user statistics"""
+        total_users = UserProfile.objects.count()
+        today = datetime.now().date()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+        
+        users_this_week = UserProfile.objects.filter(date_of_creation__gte=week_ago).count()
+        users_this_month = UserProfile.objects.filter(date_of_creation__gte=month_ago).count()
+        
+        return Response({
+            'total': total_users,
+            'this_week': users_this_week,
+            'this_month': users_this_month
+        })
+
+
+class ServiceViewSet(viewsets.ModelViewSet):
+    """ViewSet for Service CRUD operations"""
+    queryset = Service.objects.all()
+    serializer_class = ServiceSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['servicename', 'category', 'servicedesc']
+    ordering_fields = ['servicename', 'category', 'standard_price']
+    ordering = ['servicename']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        category_filter = self.request.query_params.get('category', None)
+        
+        if category_filter and category_filter != 'all':
+            queryset = queryset.filter(category=category_filter)
+            
+        return queryset
+
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    """ViewSet for Invoice CRUD operations"""
+    queryset = Invoice.objects.all()
+    serializer_class = InvoiceSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['id', 'status']
+    ordering_fields = ['invoice_date', 'due_date', 'total_amount']
+    ordering = ['-invoice_date']
+
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for NEW Appointment CRUD operations"""
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['patient__f_name', 'patient__l_name', 'staff__f_name', 'staff__l_name', 'status']
+    ordering_fields = ['appointment_start_time', 'created_at']
+    ordering = ['-appointment_start_time']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_filter = self.request.query_params.get('status', None)
+        date_filter = self.request.query_params.get('date', None)
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if date_filter:
+            queryset = queryset.filter(appointment_start_time__date=date_filter)
+            
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get appointment statistics"""
+        today = datetime.now().date()
+        
+        total_appointments = Appointment.objects.count()
+        today_appointments = Appointment.objects.filter(appointment_start_time__date=today).count()
+        scheduled = Appointment.objects.filter(status='Scheduled').count()
+        completed = Appointment.objects.filter(status='Completed').count()
+        cancelled = Appointment.objects.filter(status='Cancelled').count()
+        
+        return Response({
+            'total': total_appointments,
+            'today': today_appointments,
+            'scheduled': scheduled,
+            'completed': completed,
+            'cancelled': cancelled
+        })
+
+    @action(detail=False, methods=['get'])
+    def upcoming(self, request):
+        """Get upcoming appointments"""
+        today = datetime.now()
+        upcoming = Appointment.objects.filter(
+            appointment_start_time__gte=today,
+            status='Scheduled'
+        ).order_by('appointment_start_time')[:5]
+        
+        serializer = self.get_serializer(upcoming, many=True)
+        return Response(serializer.data)
+
+
+class TreatmentRecordViewSet(viewsets.ModelViewSet):
+    """ViewSet for TreatmentRecord CRUD operations"""
+    queryset = TreatmentRecord.objects.all()
+    serializer_class = TreatmentRecordSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['diagnosis', 'treatment_performed']
+    ordering_fields = ['record_date']
+    ordering = ['-record_date']
+
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    """ViewSet for Payment CRUD operations"""
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['payment_method', 'transaction_id']
+    ordering_fields = ['payment_date', 'amount']
+    ordering = ['-payment_date']
 
 
 @api_view(['POST'])
@@ -21,15 +167,22 @@ def register_user(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        profile = getattr(user, 'userprofile', None)
+        user_data = UserProfileSerializer(profile).data if profile else {'id': user.id, 'email': user.email}
         return Response({
-            'user': UserSerializer(user).data,
+            'user': user_data,
             'message': 'User registered successfully'
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# =============================================================================
+# LEGACY VIEWSETS - Keep for backward compatibility
+# =============================================================================
+
+
 class PatientViewSet(viewsets.ModelViewSet):
-    """ViewSet for Patient CRUD operations"""
+    """DEPRECATED: ViewSet for Patient CRUD operations - Use UserProfileViewSet instead"""
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [AllowAny]
@@ -56,10 +209,10 @@ class PatientViewSet(viewsets.ModelViewSet):
         })
 
 
-class AppointmentViewSet(viewsets.ModelViewSet):
-    """ViewSet for Appointment CRUD operations"""
-    queryset = Appointment.objects.all()
-    serializer_class = AppointmentSerializer
+class LegacyAppointmentViewSet(viewsets.ModelViewSet):
+    """DEPRECATED: ViewSet for Appointment CRUD operations - Use AppointmentViewSet instead"""
+    queryset = LegacyAppointment.objects.all()
+    serializer_class = LegacyAppointmentSerializer
     permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['appointment_id', 'patient__name', 'doctor', 'status']
@@ -83,11 +236,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         """Get appointment statistics"""
         today = datetime.now().date()
         
-        total_appointments = Appointment.objects.count()
-        today_appointments = Appointment.objects.filter(date=today).count()
-        scheduled = Appointment.objects.filter(status='scheduled').count()
-        completed = Appointment.objects.filter(status='completed').count()
-        cancelled = Appointment.objects.filter(status='cancelled').count()
+        total_appointments = LegacyAppointment.objects.count()
+        today_appointments = LegacyAppointment.objects.filter(date=today).count()
+        scheduled = LegacyAppointment.objects.filter(status='scheduled').count()
+        completed = LegacyAppointment.objects.filter(status='completed').count()
+        cancelled = LegacyAppointment.objects.filter(status='cancelled').count()
         
         return Response({
             'total': total_appointments,
@@ -101,7 +254,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     def upcoming(self, request):
         """Get upcoming appointments"""
         today = datetime.now().date()
-        upcoming = Appointment.objects.filter(
+        upcoming = LegacyAppointment.objects.filter(
             date__gte=today,
             status='scheduled'
         ).order_by('date', 'time')[:5]
@@ -269,11 +422,20 @@ def dashboard_overview(request):
     ).count()
     total_patients = Patient.objects.count()
     
-    # Upcoming appointments
-    upcoming_appointments = Appointment.objects.filter(
-        date__gte=today,
-        status='scheduled'
-    ).order_by('date', 'time')[:3]
+    # Upcoming appointments (use new Appointment model if available, fallback to legacy)
+    try:
+        upcoming_appointments = Appointment.objects.filter(
+            appointment_start_time__gte=datetime.now(),
+            status='Scheduled'
+        ).order_by('appointment_start_time')[:3]
+        upcoming_serializer = AppointmentSerializer
+    except:
+        # Fallback to legacy appointments
+        upcoming_appointments = LegacyAppointment.objects.filter(
+            date__gte=today,
+            status='scheduled'
+        ).order_by('date', 'time')[:3]
+        upcoming_serializer = LegacyAppointmentSerializer
     
     # Stock alerts
     stock_alerts = InventoryItem.objects.filter(
@@ -287,6 +449,6 @@ def dashboard_overview(request):
         'patients_this_week': patients_this_week,
         'patients_this_month': patients_this_month,
         'total_patients': total_patients,
-        'upcoming_appointments': AppointmentSerializer(upcoming_appointments, many=True).data,
+        'upcoming_appointments': upcoming_serializer(upcoming_appointments, many=True).data,
         'stock_alerts': InventoryItemSerializer(stock_alerts, many=True).data
     })

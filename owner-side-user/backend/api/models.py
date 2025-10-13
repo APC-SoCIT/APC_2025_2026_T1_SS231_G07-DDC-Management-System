@@ -4,8 +4,225 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 
 
+class PatientMedicalHistory(models.Model):
+    """Medical history for patients"""
+    allergies = models.TextField(null=True, blank=True)
+    medications = models.TextField(null=True, blank=True)
+    conditions = models.TextField(null=True, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'patient_medical_history'
+        verbose_name = 'Patient Medical History'
+        verbose_name_plural = 'Patient Medical Histories'
+
+    def __str__(self):
+        return f"Medical History {self.id}"
+
+
+class UserProfile(models.Model):
+    """User profile to extend Django's default User model"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    f_name = models.CharField(max_length=45, null=True, blank=True)
+    l_name = models.CharField(max_length=45, null=True, blank=True)
+    date_of_creation = models.DateTimeField(auto_now_add=True)
+    patient_medical_history = models.ForeignKey(
+        PatientMedicalHistory, 
+        on_delete=models.CASCADE,
+        null=True, blank=True
+    )
+
+    class Meta:
+        db_table = 'user_profile'
+
+    def __str__(self):
+        return f"{self.f_name or ''} {self.l_name or ''}".strip() or self.user.email
+
+    def get_full_name(self):
+        """Return full name"""
+        return f"{self.f_name or ''} {self.l_name or ''}".strip()
+
+    def get_initials(self):
+        """Generate initials from user name"""
+        initials = ''
+        if self.f_name:
+            initials += self.f_name[0].upper()
+        if self.l_name:
+            initials += self.l_name[0].upper()
+        return initials or self.user.email[0].upper()
+
+
+class Service(models.Model):
+    """Services offered by the clinic"""
+    SERVICE_CATEGORIES = [
+        ('Preventive', 'Preventive'),
+        ('Restorative', 'Restorative'),
+        ('Cosmetic', 'Cosmetic'),
+        ('Orthodontics', 'Orthodontics'),
+    ]
+    
+    servicename = models.TextField(null=True, blank=True)
+    servicedesc = models.TextField(null=True, blank=True)
+    category = models.CharField(max_length=20, choices=SERVICE_CATEGORIES, null=True, blank=True)
+    standard_duration_mins = models.IntegerField(null=True, blank=True)
+    standard_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        db_table = 'service'
+
+    def __str__(self):
+        return self.servicename or f"Service {self.id}"
+
+
+class Invoice(models.Model):
+    """Invoice model"""
+    invoice_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    insurance_billed_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    patient_due_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=45, null=True, blank=True)
+
+    class Meta:
+        db_table = 'invoices'
+
+    def __str__(self):
+        return f"Invoice {self.id} - {self.total_amount or 'N/A'}"
+
+
+class Appointment(models.Model):
+    """Updated appointment model matching PostgreSQL schema"""
+    APPOINTMENT_STATUSES = [
+        ('Scheduled', 'Scheduled'),
+        ('Completed', 'Completed'),
+        ('Cancelled', 'Cancelled'),
+        ('No-Show', 'No-Show'),
+    ]
+    
+    appointment_start_time = models.DateTimeField(null=True, blank=True)
+    appointment_end_time = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=APPOINTMENT_STATUSES, default='Scheduled')
+    reason_for_visit = models.TextField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='patient_appointments', null=True, blank=True)
+    staff = models.ForeignKey(User, on_delete=models.CASCADE, related_name='staff_appointments', null=True, blank=True)
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, null=True, blank=True)
+    services = models.ManyToManyField(Service, through='AppointmentService')
+
+    class Meta:
+        db_table = 'appointment'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Appointment {self.id} - {self.patient.get_full_name() if self.patient else 'N/A'}"
+
+    @property
+    def date(self):
+        """Extract date from appointment_start_time for backward compatibility"""
+        return self.appointment_start_time.date() if self.appointment_start_time else None
+
+    @property
+    def time(self):
+        """Extract time from appointment_start_time for backward compatibility"""
+        return self.appointment_start_time.time() if self.appointment_start_time else None
+
+    @property
+    def doctor(self):
+        """Return staff name for backward compatibility"""
+        return self.staff.get_full_name() if self.staff else None
+
+    @property
+    def treatment(self):
+        """Return reason_for_visit for backward compatibility"""
+        return self.reason_for_visit
+
+
+class AppointmentService(models.Model):
+    """Junction table for appointment and services"""
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE)
+    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'appointment_has_service'
+
+    def __str__(self):
+        return f"{self.appointment} - {self.service}"
+
+
+class InsuranceDetail(models.Model):
+    """Insurance details for users"""
+    provider_name = models.CharField(max_length=45)
+    policy_number = models.CharField(max_length=45)
+    group_number = models.CharField(max_length=45, null=True, blank=True)
+    is_primary = models.BooleanField(null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'insurance_detail'
+
+    def __str__(self):
+        profile = getattr(self.user, 'userprofile', None)
+        if profile:
+            return f"{self.provider_name} - {profile.get_full_name()}"
+        return f"{self.provider_name} - {self.user.email}"
+
+
+class TreatmentRecord(models.Model):
+    """Treatment records"""
+    diagnosis = models.TextField(null=True, blank=True)
+    treatment_performed = models.TextField(null=True, blank=True)
+    tooth_numbers = models.CharField(max_length=45, null=True, blank=True)
+    prescriptions = models.TextField(null=True, blank=True)
+    follow_up_notes = models.TextField(null=True, blank=True)
+    record_date = models.DateTimeField(null=True, blank=True)
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'treatment_records'
+
+    def __str__(self):
+        return f"Treatment {self.id} - {self.appointment}"
+
+
+class Payment(models.Model):
+    """Payment model"""
+    payment_date = models.DateTimeField(null=True, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    payment_method = models.CharField(max_length=45, null=True, blank=True)
+    transaction_id = models.CharField(max_length=45, null=True, blank=True)
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'payment'
+
+    def __str__(self):
+        return f"Payment {self.id} - {self.amount or 'N/A'}"
+
+
+class Role(models.Model):
+    """User roles"""
+    title = models.CharField(max_length=45, null=True, blank=True)
+    description = models.CharField(max_length=45, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'role'
+
+    def __str__(self):
+        profile = getattr(self.user, 'userprofile', None)
+        if profile:
+            return f"{self.title} - {profile.get_full_name()}"
+        return f"{self.title} - {self.user.email}"
+
+
+# ============================================================
+# LEGACY MODELS - Keep for backward compatibility during migration
+# ============================================================
+
+
 class Patient(models.Model):
-    """Patient model for storing patient information"""
+    """LEGACY: Patient model for storing patient information - DEPRECATED"""
     patient_id = models.CharField(max_length=20, unique=True, editable=False)
     name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
@@ -40,8 +257,8 @@ class Patient(models.Model):
         return ''.join([word[0].upper() for word in self.name.split()])
 
 
-class Appointment(models.Model):
-    """Appointment model for managing patient appointments"""
+class LegacyAppointment(models.Model):
+    """LEGACY: Appointment model - DEPRECATED"""
     STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
         ('completed', 'Completed'),
@@ -69,7 +286,7 @@ class Appointment(models.Model):
     def save(self, *args, **kwargs):
         if not self.appointment_id:
             # Generate appointment ID in format DD - 00001
-            last_appointment = Appointment.objects.all().order_by('id').last()
+            last_appointment = LegacyAppointment.objects.all().order_by('id').last()
             if last_appointment:
                 last_id = int(last_appointment.appointment_id.split(' - ')[1])
                 new_id = last_id + 1
