@@ -7,7 +7,15 @@ export default function Header({ title }) {
       <div className="flex items-center space-x-4">
         <Bell className="w-6 h-6 text-gray-600" />
         <div className="flex items-center space-x-2">
-          <img src="/caring-doctor.png" alt="Marvin Dorotheo" className="w-8 h-8 rounded-full object-cover" />
+          <img 
+            src="/caring-doctor.jpg" 
+            alt="Marvin Dorotheo" 
+            className="w-8 h-8 rounded-full object-cover bg-gray-200"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = '/placeholder-user.jpg';
+            }}
+          />
           <span className="text-gray-700 font-medium">Marvin Dorotheo</span>
         </div>
       </div>
