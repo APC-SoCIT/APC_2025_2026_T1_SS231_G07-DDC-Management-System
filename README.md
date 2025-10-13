@@ -68,7 +68,7 @@ This project is organized into a monorepo-like structure with distinct folders f
 
 ```plaintext
 .
-├── 📂 backend/         # Contains the Node.js (TypeScript) backend server and API
+├── 📂 backend/         # Contains the Python (Django) backend server and API
 ├── 📂 docs/            # All project documentation, analysis, and design files
 ├── 📂 frontend/        # The React (TypeScript) single-page application
 └── 📄 README.md         # You are here
