@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { patientAPI, appointmentAPI } from "@/lib/api"
+import { patientAPI, appointmentAPI, inventoryAPI } from "@/lib/api"
 
 const patientTrendsData = [
   { day: "D1", patients: 10 },
@@ -158,6 +158,7 @@ export default function OverviewContent({ setActiveTab }) {
     walkIns: 0
   })
   const [upcomingAppointments, setUpcomingAppointments] = useState([])
+  const [stockAlerts, setStockAlerts] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -187,6 +188,10 @@ export default function OverviewContent({ setActiveTab }) {
       // Fetch upcoming appointments
       const upcomingResponse = await appointmentAPI.getUpcoming()
       setUpcomingAppointments(upcomingResponse.slice(0, 3)) // Get first 3
+      
+      // Fetch stock alerts (low stock items)
+      const stockAlertsResponse = await inventoryAPI.getLowStock()
+      setStockAlerts(stockAlertsResponse.slice(0, 3)) // Get first 3 alerts
       
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error)
@@ -298,18 +303,39 @@ export default function OverviewContent({ setActiveTab }) {
             <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1">
-              <p className="font-medium text-[#1a4d2e]">Root Canal</p>
-              <p className="text-sm text-gray-600">Today 9:00 AM - 10:00 AM</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-[#1a4d2e]">Crown Prep</p>
-              <p className="text-sm text-gray-600">May 24, 12:00 PM - 2:00 PM</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-[#1a4d2e]">Cleaning</p>
-              <p className="text-sm text-gray-600">June 16, 12:00 PM - 2:00 PM</p>
-            </div>
+            {loading ? (
+              <p className="text-sm text-gray-600">Loading...</p>
+            ) : upcomingAppointments.length === 0 ? (
+              <p className="text-sm text-gray-600">No upcoming appointments</p>
+            ) : (
+              upcomingAppointments.map((appointment) => {
+                const formatDateTime = (dateStr, timeStr) => {
+                  if (!dateStr || !timeStr) return "N/A"
+                  
+                  const date = new Date(dateStr)
+                  const today = new Date()
+                  const isToday = date.toDateString() === today.toDateString()
+                  
+                  const dateFormat = isToday 
+                    ? "Today" 
+                    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  
+                  return `${dateFormat} ${timeStr}`
+                }
+
+                return (
+                  <div key={appointment.id} className="space-y-1">
+                    <p className="font-medium text-[#1a4d2e]">
+                      {appointment.reason_for_visit || appointment.treatment || "Appointment"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {formatDateTime(appointment.date, appointment.time)}
+                      {appointment.end_time && ` - ${appointment.end_time}`}
+                    </p>
+                  </div>
+                )
+              })
+            )}
           </CardContent>
         </Card>
 
@@ -319,18 +345,46 @@ export default function OverviewContent({ setActiveTab }) {
             <CardTitle className="text-lg">Stock Alerts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-[#1a4d2e]">Dental Floss</p>
-              <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Low</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-[#1a4d2e]">Anesthetic</p>
-              <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">Critical</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-[#1a4d2e]">Gloves</p>
-              <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Low</span>
-            </div>
+            {loading ? (
+              <p className="text-sm text-gray-600">Loading...</p>
+            ) : stockAlerts.length === 0 ? (
+              <p className="text-sm text-gray-600">No stock alerts</p>
+            ) : (
+              stockAlerts.map((item) => {
+                const getStatusBadge = (status) => {
+                  if (status === 'Critical') {
+                    return (
+                      <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">
+                        Critical
+                      </span>
+                    )
+                  } else if (status === 'Low Stock' || status === 'Low') {
+                    return (
+                      <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
+                        Low
+                      </span>
+                    )
+                  }
+                  return (
+                    <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded">
+                      {status}
+                    </span>
+                  )
+                }
+
+                return (
+                  <div key={item.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[#1a4d2e] font-medium">{item.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {item.quantity} {item.unit} remaining
+                      </p>
+                    </div>
+                    {getStatusBadge(item.status)}
+                  </div>
+                )
+              })
+            )}
           </CardContent>
         </Card>
       </div>
