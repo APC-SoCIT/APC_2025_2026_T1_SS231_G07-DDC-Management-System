@@ -1,14 +1,7 @@
+012 Fully dressed Use Cases
 # 🦷 Dorotheo Dental Clinic System - Use Case Documentation
 
-Welcome to the official use case documentation for the Dorotheo Dental Clinic System. This repository provides a detailed overview of the system's functionalities from the perspective of its users. It serves as a blueprint for developers, stakeholders, and project managers to understand the intended behavior and features of the application.
-
----
-
-## 📄 Full Use Case Document
-
-For a detailed, fully dressed description of every use case, please refer to the official documentation linked below.
-
-* **[View the Full Use Case Documentation](https://docs.google.com/document/d/1-4n2-5-u2-0-3-4-5-6-7-8-9-0-a-b-c-d-e-f-g-h/edit?usp=sharing)**
+Welcome to the official use case documentation for the Dorotheo Dental Clinic System. This document provides a detailed overview of the system's functionalities from the perspective of its users. It serves as a blueprint for developers, stakeholders, and project managers to understand the intended behavior and features of the application.
 
 ---
 
@@ -26,7 +19,7 @@ The system is designed to be used by several key actors, each with specific role
 
 ## Summary of Use Cases
 
-Below is a summary of the system's use cases, organized by functional module.
+Below is a complete list of the system's use cases, organized by functional module.
 
 ### 👤 Account & Profile Management
 | ID | Use Case Name | Brief Purpose |
@@ -84,3 +77,7 @@ Below is a summary of the system's use cases, organized by functional module.
 | :-- | :--- | :--- |
 | UC-21 | AI Agent Appointment Assistance | To allow patients to manage appointments and inquire about services via an AI agent. |
 | UC-22 | Generate Reports | To allow the Owner to generate and download financial, appointment, and inventory reports. |
+
+---
+
+> This documentation provides the foundation for the system's development. Each use case contains a full description, including actors, pre/post-conditions, and detailed action flows, in its respective file.
