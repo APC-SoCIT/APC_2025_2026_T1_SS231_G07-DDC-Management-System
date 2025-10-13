@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt
-
 # Build the project
 echo "Creating migration..."
 python3.9 manage.py makemigrations --noinput
