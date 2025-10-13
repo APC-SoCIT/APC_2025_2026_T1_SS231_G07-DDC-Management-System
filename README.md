@@ -106,7 +106,7 @@ This project is brought to you by the talented members of G07.
 | Name                   | Role            |
 | --------------------   | --------------- |
 | **Gabriel Villanueva** | **Team Leader** |
-| Aiiro Ravinera         | Member          |
+| Airo Ravinera         | Member          |
 | Michael Orenze         | Member          |
 | Jasper Valdez          | Member          |
 | Ezekiel   Galauran     | Member          |
