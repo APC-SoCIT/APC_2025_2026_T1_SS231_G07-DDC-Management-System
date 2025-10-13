@@ -24,23 +24,31 @@ export default function AppointmentTable() {
   // Form state for adding appointment
   const [newAppointment, setNewAppointment] = useState({
     patient: "",
+    staff: "", // NEW: staff field for new schema
     date: "",
     time: "",
-    doctor: "",
+    doctor: "", // Keep for backward compatibility
     treatment: "",
+    reason_for_visit: "", // NEW: reason_for_visit field
     notes: "",
-    status: "scheduled",
+    status: "Scheduled", // Updated to match new enum values
+    appointment_start_time: "", // NEW: combined datetime field
+    appointment_end_time: "", // NEW: end time field
   })
 
   // Form state for editing appointment
   const [editAppointment, setEditAppointment] = useState({
     patient: "",
+    staff: "", // NEW: staff field for new schema
     date: "",
     time: "",
-    doctor: "",
+    doctor: "", // Keep for backward compatibility
     treatment: "",
+    reason_for_visit: "", // NEW: reason_for_visit field
     notes: "",
-    status: "scheduled",
+    status: "Scheduled", // Updated to match new enum values
+    appointment_start_time: "", // NEW: combined datetime field
+    appointment_end_time: "", // NEW: end time field
   })
 
   useEffect(() => {
@@ -105,13 +113,13 @@ export default function AppointmentTable() {
   const handleEditAppointment = (appointment) => {
     setSelectedAppointment(appointment)
     setEditAppointment({
-      patient: appointment.patient,
-      date: appointment.date,
-      time: appointment.time,
-      doctor: appointment.doctor,
+      patient: appointment.patient || "",
+      date: appointment.date || "",
+      time: appointment.time || "",
+      doctor: appointment.doctor || "",
       treatment: appointment.treatment || "",
       notes: appointment.notes || "",
-      status: appointment.status,
+      status: appointment.status || "Scheduled",
     })
     setIsEditAppointmentOpen(true)
   }

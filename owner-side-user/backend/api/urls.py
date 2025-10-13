@@ -3,7 +3,11 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     register_user, dashboard_overview,
-    PatientViewSet, AppointmentViewSet,
+    # NEW MODEL VIEWSETS
+    UserViewSet, ServiceViewSet, InvoiceViewSet, AppointmentViewSet,
+    TreatmentRecordViewSet, PaymentViewSet,
+    # LEGACY VIEWSETS
+    PatientViewSet, LegacyAppointmentViewSet,
     InventoryItemViewSet, BillingRecordViewSet,
     FinancialRecordViewSet
 )
@@ -11,8 +15,20 @@ from .authentication import CustomTokenObtainPairView
 
 # Create router and register viewsets
 router = DefaultRouter()
-router.register(r'patients', PatientViewSet, basename='patient')
+
+# NEW API ENDPOINTS (matching PostgreSQL schema)
+router.register(r'users', UserViewSet, basename='user')
+router.register(r'services', ServiceViewSet, basename='service')
+router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'appointments', AppointmentViewSet, basename='appointment')
+router.register(r'treatments', TreatmentRecordViewSet, basename='treatment')
+router.register(r'payments', PaymentViewSet, basename='payment')
+
+# LEGACY API ENDPOINTS (for backward compatibility)
+router.register(r'patients', PatientViewSet, basename='patient')
+router.register(r'legacy-appointments', LegacyAppointmentViewSet, basename='legacy-appointment')
+
+# EXISTING ENDPOINTS (unchanged)
 router.register(r'inventory', InventoryItemViewSet, basename='inventory')
 router.register(r'billing', BillingRecordViewSet, basename='billing')
 router.register(r'financial', FinancialRecordViewSet, basename='financial')
