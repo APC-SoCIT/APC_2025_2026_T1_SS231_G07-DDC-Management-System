@@ -2,8 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { patientAPI, appointmentAPI } from "@/lib/api"
 
 const patientTrendsData = [
   { day: "D1", patients: 10 },
@@ -144,8 +145,55 @@ function CustomCalendar() {
   )
 }
 
-export default function OverviewContent() {
+export default function OverviewContent({ setActiveTab }) {
   const [trendView, setTrendView] = useState("weekly")
+  const [patientStats, setPatientStats] = useState({
+    thisWeek: 0,
+    thisMonth: 0,
+    total: 0
+  })
+  const [appointmentCounts, setAppointmentCounts] = useState({
+    today: 0,
+    patientsToday: 0,
+    walkIns: 0
+  })
+  const [upcomingAppointments, setUpcomingAppointments] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch patient statistics
+      const patientStatsResponse = await patientAPI.getStatistics()
+      setPatientStats({
+        thisWeek: patientStatsResponse.this_week || 0,
+        thisMonth: patientStatsResponse.this_month || 0,
+        total: patientStatsResponse.total || 0
+      })
+
+      // Fetch appointment statistics
+      const appointmentStatsResponse = await appointmentAPI.getStatistics()
+      setAppointmentCounts({
+        today: appointmentStatsResponse.today || 0,
+        patientsToday: appointmentStatsResponse.today || 0, // Can be refined if you have separate patient count
+        walkIns: 0 // You can calculate this if you have a status field for walk-ins
+      })
+
+      // Fetch upcoming appointments
+      const upcomingResponse = await appointmentAPI.getUpcoming()
+      setUpcomingAppointments(upcomingResponse.slice(0, 3)) // Get first 3
+      
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -166,9 +214,16 @@ export default function OverviewContent() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-[#1a4d2e]">Appointments Today</p>
-                <button className="text-xs text-[#1a4d2e] hover:underline">View all</button>
+                <button 
+                  onClick={() => setActiveTab("appointments")}
+                  className="text-xs text-[#1a4d2e] hover:underline"
+                >
+                  View all
+                </button>
               </div>
-              <p className="text-4xl font-bold text-[#1a4d2e]">5</p>
+              <p className="text-4xl font-bold text-[#1a4d2e]">
+                {loading ? "..." : appointmentCounts.today}
+              </p>
             </CardContent>
           </Card>
 
@@ -176,9 +231,16 @@ export default function OverviewContent() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-[#1a4d2e]">Patients Today</p>
-                <button className="text-xs text-[#1a4d2e] hover:underline">View all</button>
+                <button 
+                  onClick={() => setActiveTab("patients")}
+                  className="text-xs text-[#1a4d2e] hover:underline"
+                >
+                  View all
+                </button>
               </div>
-              <p className="text-4xl font-bold text-[#1a4d2e]">7</p>
+              <p className="text-4xl font-bold text-[#1a4d2e]">
+                {loading ? "..." : patientStats.total}
+              </p>
             </CardContent>
           </Card>
 
@@ -186,9 +248,16 @@ export default function OverviewContent() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-[#1a4d2e]">Walk-ins</p>
-                <button className="text-xs text-[#1a4d2e] hover:underline">View all</button>
+                <button 
+                  onClick={() => setActiveTab("appointments")}
+                  className="text-xs text-[#1a4d2e] hover:underline"
+                >
+                  View all
+                </button>
               </div>
-              <p className="text-4xl font-bold text-[#1a4d2e]">2</p>
+              <p className="text-4xl font-bold text-[#1a4d2e]">
+                {loading ? "..." : appointmentCounts.walkIns}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -203,15 +272,21 @@ export default function OverviewContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-3xl font-bold text-[#1a4d2e]">45</p>
+              <p className="text-3xl font-bold text-[#1a4d2e]">
+                {loading ? "..." : patientStats.thisWeek}
+              </p>
               <p className="text-sm text-gray-600">This Week</p>
             </div>
             <div>
-              <p className="text-3xl font-bold text-[#1a4d2e]">187</p>
+              <p className="text-3xl font-bold text-[#1a4d2e]">
+                {loading ? "..." : patientStats.thisMonth}
+              </p>
               <p className="text-sm text-gray-600">This Month</p>
             </div>
             <div>
-              <p className="text-3xl font-bold text-[#1a4d2e]">2847</p>
+              <p className="text-3xl font-bold text-[#1a4d2e]">
+                {loading ? "..." : patientStats.total}
+              </p>
               <p className="text-sm text-gray-600">All Time</p>
             </div>
           </CardContent>

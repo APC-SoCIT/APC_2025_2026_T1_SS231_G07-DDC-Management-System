@@ -72,24 +72,35 @@ const transformUserForBackend = (user) => {
   return data
 }
 
-const transformAppointmentForDisplay = (appointment) => ({
-  ...appointment,
-  // Extract date and time from appointment_start_time for backward compatibility
-  date: appointment.appointment_start_time ? 
-    new Date(appointment.appointment_start_time).toISOString().split('T')[0] : 
-    appointment.date,
-  time: appointment.appointment_start_time ? 
-    new Date(appointment.appointment_start_time).toTimeString().slice(0, 5) : 
-    appointment.time,
-  doctor: appointment.staff_name || appointment.doctor,
-  treatment: appointment.reason_for_visit || appointment.treatment,
-  patient_name: appointment.patient_name,
-  // Keep new fields
-  appointment_start_time: appointment.appointment_start_time,
-  appointment_end_time: appointment.appointment_end_time,
-  reason_for_visit: appointment.reason_for_visit,
-  staff_name: appointment.staff_name
-})
+const transformAppointmentForDisplay = (appointment) => {
+  // Extract time without timezone conversion
+  let displayTime = appointment.time
+  let displayDate = appointment.date
+  
+  if (appointment.appointment_start_time) {
+    // Parse the ISO datetime string directly without timezone conversion
+    // Format: "2025-10-14T03:40:00" or "2025-10-14T03:40:00Z"
+    const dateTimeStr = appointment.appointment_start_time.replace('Z', '')
+    const [datePart, timePart] = dateTimeStr.split('T')
+    displayDate = datePart
+    displayTime = timePart ? timePart.slice(0, 5) : appointment.time // HH:MM format
+  }
+  
+  return {
+    ...appointment,
+    // Extract date and time from appointment_start_time for backward compatibility
+    date: displayDate,
+    time: displayTime,
+    doctor: appointment.staff_name || appointment.doctor,
+    treatment: appointment.reason_for_visit || appointment.treatment,
+    patient_name: appointment.patient_name,
+    // Keep new fields
+    appointment_start_time: appointment.appointment_start_time,
+    appointment_end_time: appointment.appointment_end_time,
+    reason_for_visit: appointment.reason_for_visit,
+    staff_name: appointment.staff_name
+  }
+}
 
 const transformAppointmentForBackend = (appointment) => {
   // Handle both old and new format

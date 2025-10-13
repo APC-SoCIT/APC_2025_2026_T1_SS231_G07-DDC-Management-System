@@ -113,13 +113,13 @@ export default function AppointmentTable() {
   const handleEditAppointment = (appointment) => {
     setSelectedAppointment(appointment)
     setEditAppointment({
-      patient: appointment.patient,
-      date: appointment.date,
-      time: appointment.time,
-      doctor: appointment.doctor,
+      patient: appointment.patient || "",
+      date: appointment.date || "",
+      time: appointment.time || "",
+      doctor: appointment.doctor || "",
       treatment: appointment.treatment || "",
       notes: appointment.notes || "",
-      status: appointment.status,
+      status: appointment.status || "Scheduled",
     })
     setIsEditAppointmentOpen(true)
   }
