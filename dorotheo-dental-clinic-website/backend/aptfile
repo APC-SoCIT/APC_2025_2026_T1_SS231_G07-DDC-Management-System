@@ -1,2 +1,1 @@
-libsqlite3-0
-libsqlite3-dev
+# No system packages needed - using PostgreSQL via DATABASE_URL
