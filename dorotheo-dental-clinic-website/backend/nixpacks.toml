@@ -1,11 +1,14 @@
 [phases.setup]
-nixPkgs = ["python311", "sqlite"]
+aptPkgs = ["libsqlite3-0", "libsqlite3-dev"]
 
 [phases.install]
-cmds = ["python3 -m pip install --upgrade pip", "python3 -m pip install -r requirements.txt"]
+cmds = [
+  "python3 -m pip install --upgrade pip",
+  "python3 -m pip install -r requirements.txt"
+]
 
 [phases.build]
 cmds = ["python3 manage.py collectstatic --noinput"]
 
 [start]
-cmd = "python3 manage.py migrate && gunicorn dental_clinic.wsgi"
+cmd = "python3 manage.py migrate && gunicorn dental_clinic.wsgi --bind 0.0.0.0:$PORT"
