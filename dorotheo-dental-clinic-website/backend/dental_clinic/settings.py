@@ -1,6 +1,10 @@
 from pathlib import Path
 import os
 import dj_database_url
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -55,6 +59,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'dental_clinic.wsgi.application'
 
+# Database Configuration
+# Default to Supabase PostgreSQL if DATABASE_URL is set, otherwise use SQLite for local development
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
