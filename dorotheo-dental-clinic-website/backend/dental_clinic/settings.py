@@ -108,3 +108,21 @@ CORS_ALLOW_CREDENTIALS = True
 # If you want to specify allowed origins in production, use:
 # CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
 # For now, allowing all origins for easier setup
+
+# CSRF Settings for Railway deployment
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.railway.app',
+    'https://*.vercel.app',
+]
+
+# Add any custom domains from environment variable
+custom_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if custom_origins:
+    CSRF_TRUSTED_ORIGINS.extend(custom_origins.split(','))
+
+# Security settings for production
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = False  # Railway handles this
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
