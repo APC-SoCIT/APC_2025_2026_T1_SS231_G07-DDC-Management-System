@@ -98,7 +98,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',  # Changed from IsAuthenticated to allow browsing
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
     ],
 }
 
@@ -113,6 +117,8 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     'https://*.railway.app',
     'https://*.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:8000',
 ]
 
 # Add any custom domains from environment variable
@@ -120,9 +126,18 @@ custom_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 if custom_origins:
     CSRF_TRUSTED_ORIGINS.extend(custom_origins.split(','))
 
+# More permissive CSRF settings for development
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 # Security settings for production
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = False  # Railway handles this
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+else:
+    # Development settings
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
