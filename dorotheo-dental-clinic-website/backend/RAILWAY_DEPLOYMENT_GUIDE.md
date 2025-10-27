@@ -46,7 +46,9 @@ Since your backend is in `dorotheo-dental-clinic-website/backend/`:
 4. Set it to: `dorotheo-dental-clinic-website/backend`
 5. Click **"Save"**
 
-## Step 5: Add a PostgreSQL Database (Recommended)
+## Step 5: Add a PostgreSQL Database (REQUIRED)
+
+⚠️ **IMPORTANT:** SQLite will NOT work on Railway due to missing system libraries and ephemeral filesystem.
 
 Railway offers a free PostgreSQL database:
 
@@ -54,8 +56,12 @@ Railway offers a free PostgreSQL database:
 2. Select **"Database"** → **"Add PostgreSQL"**
 3. Railway will automatically create a `DATABASE_URL` environment variable
 4. Your Django app will automatically use it!
+5. The app will restart automatically after adding the database
 
-**Note:** SQLite won't persist data on Railway (filesystem is ephemeral). PostgreSQL is strongly recommended.
+**Without PostgreSQL, you will get this error:**
+```
+ImportError: libsqlite3.so.0: cannot open shared object file: No such file or directory
+```
 
 ## Step 6: Set Environment Variables
 
@@ -151,6 +157,13 @@ NEXT_PUBLIC_API_URL=https://your-app-name.railway.app/api
 3. Check admin panel: `https://your-app-name.railway.app/admin/`
 
 ## Common Issues & Solutions
+
+### Issue: "libsqlite3.so.0: cannot open shared object file"
+**Solution:** You MUST add a PostgreSQL database. SQLite is not supported on Railway.
+1. Go to your Railway project
+2. Click "+ New" → "Database" → "Add PostgreSQL"
+3. Wait for the database to provision
+4. Your app will automatically restart and use PostgreSQL
 
 ### Issue: "Application Error" or 500 Error
 **Solution:** Check the logs in Railway dashboard for detailed errors
