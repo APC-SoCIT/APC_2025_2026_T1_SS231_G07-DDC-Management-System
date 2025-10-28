@@ -158,35 +158,35 @@ The Level 1 DFD decomposes the system into its 7 primary processes. The flows li
 **Process 3.0:** Manage Records
 **Description:** Handles the creation, modification, retrieval, and exportation of patient dental records.
 
-* **Entities: Dentist, Owner, Receptionist, Patient
+**Entities:** Dentist, Owner, Receptionist, Patient
 
 ## Data Store: Patient Records
 
 **Process 4.0:** Manage Billing
 **Description:** Handles invoice generation, payment processing, and billing retrieval.
 
-* **Entities: Patient, Receptionist, Owner
+**Entities:** Patient, Receptionist, Owner
 
 ## Data Stores: Billing & Invoices, Appointment
 
 **Process 5.0:** Manage Inventory
-**Description:**** Manages stock depletion, replenishment, and reporting.
+**Description:** Manages stock depletion, replenishment, and reporting.
 
-* **Entities: Receptionist, Dentist, Owner
+**Entities:** Receptionist, Dentist, Owner
 
 ## Data Stores: Inventory, Services
 
 **Process 6.0:** Manage Services
 **Description:** Handles the administration and publication of clinic services.
 
-* **Entities: Owner, Receptionist, Dentist, Patient, AI Agent
+**Entities:** Owner, Receptionist, Dentist, Patient, AI Agent
 
 ## Data Store: Services
 
 **Process 7.0:** Generate Reports
 **Description:** Generates financial and inventory reports for the owner.
 
-Entities: Owner
+**Entities:** Owner
 
 ## Data Stores: Billing & Invoices, Inventory
 
