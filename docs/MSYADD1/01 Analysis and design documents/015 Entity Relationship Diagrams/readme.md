@@ -570,3 +570,24 @@ CREATE TABLE IF NOT EXISTS `mydb`.`authtoken_token` (
   CONSTRAINT ``
     FOREIGN KEY (`user_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_admin_log`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_admin_log` (
+  `id` INT NULL DEFAULT NULL,
+  `action_time` TIMESTAMP NOT NULL,
+  `object_id` TEXT NULL DEFAULT NULL,
+  `object_repr` VARCHAR(255) NULL DEFAULT NULL,
+  `action_flag` INT NULL DEFAULT NULL,
+  `change_message` TEXT NULL DEFAULT NULL,
+  `content_type_id` INT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`content_type_id` ASC) VISIBLE,
+  INDEX (`user_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`content_type_id`)
+    REFERENCES `mydb`.`django_content_type` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
