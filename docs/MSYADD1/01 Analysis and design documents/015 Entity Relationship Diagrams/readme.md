@@ -148,3 +148,23 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_appointment` (
   CONSTRAINT ``
     FOREIGN KEY (`reschedule_service_id`)
     REFERENCES `mydb`.`api_service` (`id`));
+    -- -----------------------------------------------------
+-- Table `mydb`.`api_appointmentnotification`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_appointmentnotification` (
+  `id` INT NULL DEFAULT NULL,
+  `notification_type` VARCHAR(255) NULL DEFAULT NULL,
+  `message` TEXT NULL DEFAULT NULL,
+  `is_read` TINYINT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `appointment_id` INT NULL DEFAULT NULL,
+  `recipient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`appointment_id` ASC) VISIBLE,
+  INDEX (`recipient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`appointment_id`)
+    REFERENCES `mydb`.`api_appointment` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`recipient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
