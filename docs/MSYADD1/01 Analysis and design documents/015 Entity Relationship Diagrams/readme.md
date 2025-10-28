@@ -332,3 +332,64 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_inventoryitem` (
   `cost` DECIMAL NULL DEFAULT NULL,
   `updated_at` TIMESTAMP NOT NULL,
   PRIMARY KEY (`id`));
+  -- -----------------------------------------------------
+-- Table `mydb`.`api_passwordresettoken`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_passwordresettoken` (
+  `id` INT NULL DEFAULT NULL,
+  `token` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `expires_at` TIMESTAMP NOT NULL,
+  `is_used` TINYINT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`user_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_patientintakeform`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_patientintakeform` (
+  `id` INT NULL DEFAULT NULL,
+  `allergies` TEXT NULL DEFAULT NULL,
+  `current_medications` TEXT NULL DEFAULT NULL,
+  `medical_conditions` TEXT NULL DEFAULT NULL,
+  `previous_dental_treatments` TEXT NULL DEFAULT NULL,
+  `emergency_contact_name` VARCHAR(255) NULL DEFAULT NULL,
+  `emergency_contact_phone` VARCHAR(255) NULL DEFAULT NULL,
+  `emergency_contact_relationship` VARCHAR(255) NULL DEFAULT NULL,
+  `insurance_provider` VARCHAR(255) NULL DEFAULT NULL,
+  `insurance_policy_number` VARCHAR(255) NULL DEFAULT NULL,
+  `dental_concerns` TEXT NULL DEFAULT NULL,
+  `preferred_dentist` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `filled_by_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`filled_by_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`filled_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_staffavailability`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_staffavailability` (
+  `id` INT NULL DEFAULT NULL,
+  `day_of_week` INT NULL DEFAULT NULL,
+  `is_available` TINYINT NULL DEFAULT NULL,
+  `start_time` TIME NULL DEFAULT NULL,
+  `end_time` TIME NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `staff_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`staff_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`staff_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
