@@ -35,6 +35,14 @@ POST   /api/appointments/{id}/reject_reschedule/
 GET    /api/dental-records/    - List dental records
 POST   /api/dental-records/    - Add record
 
+GET    /api/tooth-charts/      - Get tooth chart
+PUT    /api/tooth-charts/      - Update tooth chart
+
+GET    /api/billing/           - List bills
+POST   /api/billing/           - Create bill
+
+GET    /api/inventory/         - List inventory
+POST   /api/inventory/         - Add item
 
 - JWT-based authentication
 - Pagination and error handling
