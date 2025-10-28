@@ -195,4 +195,28 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_billing` (
     REFERENCES `mydb`.`api_user` (`id`),
   CONSTRAINT ``
     FOREIGN KEY (`patient_id`)
-    REFERENCES `mydb`.`api_user` (`id`));   
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_clinicalnote`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_clinicalnote` (
+  `id` INT NULL DEFAULT NULL,
+  `content` TEXT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `appointment_id` INT NULL DEFAULT NULL,
+  `author_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`appointment_id` ASC) VISIBLE,
+  INDEX (`author_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`appointment_id`)
+    REFERENCES `mydb`.`api_appointment` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`author_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`)); 
