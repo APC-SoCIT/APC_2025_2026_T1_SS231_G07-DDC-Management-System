@@ -484,3 +484,38 @@ The system queries the (Patient Records) data store for the patient's record.
 The system generates a file (PDF) from the record data.
 
 The system sends the "Downloadable Record File," initiating the download for the patient.
+
+UC-14: Invoice Generation
+Author: Airo Ravinera Priority: High
+
+Purpose
+To generate a new invoice based on completed appointment details and send it directly to the patient.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-45: The system must allow generation of invoices for services.
+
+BR-46: The system must generate a unique invoice number for each transaction.
+
+BR-32: Patients must be able to view and download their invoice.
+
+Preconditions
+The Owner is logged into the system.
+
+A patient has a completed appointment with services that are ready to be billed.
+
+Postconditions
+A new invoice is generated and stored in the (Billing & Invoices) data store.
+
+The Patient receives the new invoice.
+
+Basic Flow
+The Owner submits a "Generate Invoice Request" for a specific appointment.
+
+The system queries the (Appointments) data store for the appointment details (services, charges).
+
+The system generates a new invoice (with a unique ID) and sends it to the Patient.
+
+(Implicit: The system saves this invoice to the Billing & Invoices data store).
