@@ -95,3 +95,14 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_user` (
   `role` VARCHAR(255) NULL DEFAULT NULL,
   `is_archived` TINYINT NULL DEFAULT NULL,
   PRIMARY KEY (`id`));
+  -- -----------------------------------------------------
+-- Table `mydb`.`api_service`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_service` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `category` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `image` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`id`));
