@@ -60,76 +60,78 @@ Inventory: Stores data on all consumable stock, supplies, and equipment.
 
 Services: Stores a list of all available dental services offered by the clinic.
 
-## 1.3. Processes
+## Processes
+
+1.3. Processes
 Level 1 Processes
-1.0 Manage User Accounts
+* 1.0 Manage User Accounts
 
-2.0 Manage Appointments
+* 2.0 Manage Appointments
 
-3.0 Manage Records
+* 3.0 Manage Records
 
-4.0 Manage Billing
+* 4.0 Manage Billing
 
-5.0 Manage Inventory
+* 5.0 Manage Inventory
 
-6.0 Manage Services
+* 6.0 Manage Services
 
-7.0 Generate Reports
+* 7.0 Generate Reports
 
 Level 2 Sub-Processes
-1.1 Register
+* 1.1 Register
 
-1.2 Login
+* 1.2 Login
 
-1.3 Manage Staff Roles
+* 1.3 Manage Staff Roles
 
-2.1 Appointment Creation
+* 2.1 Appointment Creation
 
-2.2 Schedule Retrieval
+* 2.2 Schedule Retrieval
 
-2.3 Confirm Appointments
+* 2.3 Confirm Appointments
 
-2.4 Update Appointments
+* 2.4 Update Appointments
 
-2.5 Billing Data Transfer
+* 2.5 Billing Data Transfer
 
-3.1 Record Creation
+* 3.1 Record Creation
 
-3.2 Record Modification
+* 3.2 Record Modification
 
-3.3 Staff Record Retrieval
+* 3.3 Staff Record Retrieval
 
-3.4 Patient Record Viewing
+* 3.4 Patient Record Viewing
 
-3.5 Record Exportation
+* 3.5 Record Exportation
 
-4.1 Invoice Generation
+* 4.1 Invoice Generation
 
-4.2 Payment Application
+* 4.2 Payment Application
 
-4.3 Billing Retrieval
+* 4.3 Billing Retrieval
 
-4.4 Report Data Provision
+* 4.4 Report Data Provision
 
-5.1 Service Consumable Depletion
+* 5.1 Service Consumable Depletion
 
-5.2 Stock Replenishment
+* 5.2 Stock Replenishment
 
-5.3 Inventory Management Retrieval
+* 5.3 Inventory Management Retrieval
 
-5.4 Inventory Report Provision
+* 5.4 Inventory Report Provision
 
-5.5 Service List Synchronization
+* 5.5 Service List Synchronization
 
-6.1 Service Administration
+* 6.1 Service Administration
 
-6.2 Service Publication
+* 6.2 Service Publication
 
-7.1 Financial Report Generation
+* 7.1 Financial Report Generation
 
-7.2 Inventory Report Generation
+* 7.2 Inventory Report Generation
 
-2. Level 0: Context Diagram
+## 2. Level 0: Context Diagram
 The Context Diagram shows the entire Dental Clinic System as a single process (0.0). It illustrates all high-level data flows between the system and the external entities.
 
 External Entities: Patient, Receptionist, Dentist, Owner, AI Agent.
@@ -139,59 +141,59 @@ Data Flows: The system exchanges all data (appointment requests, user informatio
 3. Level 1 DFD
 The Level 1 DFD decomposes the system into its 7 primary processes. The flows listed here are the balanced sum of all flows from your Level 2 diagrams.
 
-Process 1.0: Manage User Accounts
-Description: Handles user registration, login, and staff role management.
+**Process 1.0:** Manage User Accounts
+**Description:** Handles user registration, login, and staff role management.
 
-Entities: Patient, Owner, Dentist, Receptionist
+* **Entities:** Patient, Owner, Dentist, Receptionist
 
-Data Store: User Accounts
+## Data Store: User Accounts
 
-Process 2.0: Manage Appointments
-Description: Handles the creation, retrieval, confirmation, and updating of appointments.
+**Process 2.0:** Manage Appointments
+**Description:** Handles the creation, retrieval, confirmation, and updating of appointments.
 
-Entities: Patient, Receptionist, Owner, Dentist, AI Agent
+**Entities:** Patient, Receptionist, Owner, Dentist, AI Agent
 
-Data Store: Appointments
+## Data Store: Appointments
 
-Process 3.0: Manage Records
-Description: Handles the creation, modification, retrieval, and exportation of patient dental records.
+**Process 3.0:** Manage Records
+**Description:** Handles the creation, modification, retrieval, and exportation of patient dental records.
 
-Entities: Dentist, Owner, Receptionist, Patient
+* **Entities: Dentist, Owner, Receptionist, Patient
 
-Data Store: Patient Records
+## Data Store: Patient Records
 
-Process 4.0: Manage Billing
-Description: Handles invoice generation, payment processing, and billing retrieval.
+**Process 4.0:** Manage Billing
+**Description:** Handles invoice generation, payment processing, and billing retrieval.
 
-Entities: Patient, Receptionist, Owner
+* **Entities: Patient, Receptionist, Owner
 
-Data Stores: Billing & Invoices, Appointment
+## Data Stores: Billing & Invoices, Appointment
 
-Process 5.0: Manage Inventory
-Description: Manages stock depletion, replenishment, and reporting.
+**Process 5.0:** Manage Inventory
+**Description:**** Manages stock depletion, replenishment, and reporting.
 
-Entities: Receptionist, Dentist, Owner
+* **Entities: Receptionist, Dentist, Owner
 
-Data Stores: Inventory, Services
+## Data Stores: Inventory, Services
 
-Process 6.0: Manage Services
-Description: Handles the administration and publication of clinic services.
+**Process 6.0:** Manage Services
+**Description:** Handles the administration and publication of clinic services.
 
-Entities: Owner, Receptionist, Dentist, Patient, AI Agent
+* **Entities: Owner, Receptionist, Dentist, Patient, AI Agent
 
-Data Store: Services
+## Data Store: Services
 
-Process 7.0: Generate Reports
-Description: Generates financial and inventory reports for the owner.
+**Process 7.0:** Generate Reports
+**Description:** Generates financial and inventory reports for the owner.
 
 Entities: Owner
 
-Data Stores: Billing & Invoices, Inventory
+## Data Stores: Billing & Invoices, Inventory
 
 4. Level 2 DFDs (Process Decompositions)
 This section details the internal workings of each Level 1 process.
 
-4.1. Process 1.0: Manage User Accounts
+**4.1. Process 1.0:** Manage User Accounts
 Patient -> (New Patient Details) -> 1.1 Register
 
 1.1 Register -> (Registration Confirmation) -> Patient
@@ -230,7 +232,7 @@ Owner -> (Update Staff List) -> 1.3 Manage Staff Roles
 
 User Accounts -> (Updated Staff List) -> 1.3 Manage Staff Roles
 
-4.2. Process 2.0: Manage Appointments
+**4.2. Process 2.0:** Manage Appointments
 Patient -> (New Appointment Request) -> 2.1 Appointment Creation
 
 2.1 Appointment Creation -> (New Appointment Notification) -> Patient
@@ -360,7 +362,7 @@ Patient -> (Download Record Request) -> 3.5 Record Exportation
 
 Patient Records -> (Specific Patient Record) -> 3.5 Record Exportation
 
-4.4. Process 4.0: Manage Billing
+**4.4. Process 4.0:** Manage Billing
 Patient -> (New Invoice) -> 4.1 Invoice Generation
 
 4.1 Invoice Generation -> (New Invoice Data) -> Billing & Invoices
@@ -393,7 +395,7 @@ Owner -> (Billing Report Request) -> 4.4 Report Data Provision
 
 Billing & Invoices -> (Invoice Data) -> 4.4 Report Data Provision
 
-4.5. Process 5.0: Manage Inventory
+**4.5. Process 5.0:** Manage Inventory
 Receptionist -> (Service Usage Report) -> 5.1 Service Consumable Depletion
 
 5.1 Service Consumable Depletion -> (Usage Acknowledgement) -> Receptionist
@@ -434,7 +436,7 @@ Owner -> (Service List Request) -> 5.5 Service List Synchronization
 
 Services -> (Available Service List) -> 5.5 Service List Synchronization
 
-4.6. Process 6.0: Manage Services
+**4.6. Process 6.0:** Manage Services
 Owner -> (Service Create/Update Data) -> 6.1 Service Administration
 
 Owner -> (Service Delete Request) -> 6.1 Service Administration
@@ -469,7 +471,7 @@ AI Agent -> (View Available Services Request) -> 6.2 Service Publication
 
 Services -> (Service Data) -> 6.2 Service Publication
 
-4.7. Process 7.0: Generate Reports
+**4.7. Process 7.0:** Generate Reports
 Owner -> (Financial Report Request) -> 7.1 Financial Report Generation
 
 7.1 Financial Report Generation -> (Financial Report) -> Owner
