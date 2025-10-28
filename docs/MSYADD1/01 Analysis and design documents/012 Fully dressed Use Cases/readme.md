@@ -234,3 +234,53 @@ The system locates the appointment record in the (Appointments) data store.
 The system updates the record's status to "Confirmed."
 
 The system sends an "Appointment Notification/Confirmation" to relevant parties.
+
+UC-07: Update Appointments
+Author: Ezekiel Galauran Priority: High
+
+Purpose
+To allow a Patient (or the AI Agent on their behalf) to submit a request to modify an existing appointment. This request must then be manually approved or denied by staff (Receptionist, Dentist, or Owner).
+
+Actors
+Users (Owner, Dentist, Receptionist, Patient, AI Agent)
+
+Requirement Traceability
+BR-07: Patients must be able to request to update an appointment.
+
+BR-12: The Owner, Dentist, and Receptionist must be able to reschedule appointments.
+
+BR-13: Patients must be able to request appointment rescheduling through the built-in AI-Agent.
+
+BR-53: The system must allow the AI Agent to assist patients in... rescheduling... appointments.
+
+Preconditions
+The Patient has an existing appointment.
+
+The Patient is logged in or is interacting with the AI Agent.
+
+The Staff (Receptionist, Dentist, or Owner) is logged in to review requests.
+
+Postconditions
+On Success (Approval): The appointment details are updated in the (Appointments) data store.
+
+On Failure (Denial): The original appointment remains unchanged.
+
+Basic Flow (Approval)
+The Patient (or AI) submits a "Modification Request."
+
+The system forwards the request to staff for manual confirmation.
+
+The Staff reviews the request and decides to "Approve Request."
+
+The Staff submits the "Approve" decision.
+
+The system updates the appointment data in the (Appointments) data store.
+
+The system sends a "Modification Acknowledgment (Success)" to the Patient.
+
+Alternative Flow (Denial)
+5a1: The Staff reviews the request and decides to "Approve Request" (No).
+
+5a2: The Staff submits the "Deny" decision.
+
+5a3: The system sends a "Modification Acknowledgment (Failed! Reschedule Again)" to the Patient.
