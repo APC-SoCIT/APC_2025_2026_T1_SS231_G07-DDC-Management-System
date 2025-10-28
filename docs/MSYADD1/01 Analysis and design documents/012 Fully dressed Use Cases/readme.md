@@ -319,3 +319,36 @@ The system retrieves the appointment details from the (Appointments) data store.
 The system sends these "Appointment Details" to the (4.1 Invoice Generation) process.
 
 The system sends a "Billing Report" to the Owner and Staff.
+
+UC-09: Record Creation
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow authorized staff (Owner, Dentist, or Receptionist) to create and submit a new dental record for a patient.
+
+Actors
+User (Owner, Dentist, Receptionist)
+
+Requirement Traceability
+BR-26: The Owner, Dentist, and Receptionist must be able to create patient records.
+
+BR-18: The Dentist must assign treatments to a patient’s record only after a consultation has been completed.
+
+Preconditions
+The user (Owner, Dentist, or Receptionist) is logged into the system.
+
+The user has selected a patient and navigated to the "Add New Record" section.
+
+Postconditions
+A new dental record is successfully saved in the (Patient Records) data store.
+
+The user receives an acknowledgment of the successful creation.
+
+Basic Flow
+The staff user fills out the required information in the new dental record form.
+
+The user submits the "New Dental Record."
+
+The system receives the data and writes it to the (Patient Records) data store.
+
+The system sends a "Record Acknowledgment" to the user.
