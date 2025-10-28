@@ -393,3 +393,59 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_staffavailability` (
   CONSTRAINT ``
     FOREIGN KEY (`staff_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_teethimage`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_teethimage` (
+  `id` INT NULL DEFAULT NULL,
+  `image` VARCHAR(255) NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `is_latest` TINYINT NULL DEFAULT NULL,
+  `uploaded_at` TIMESTAMP NOT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `uploaded_by_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`patient_id` ASC) VISIBLE,
+  INDEX (`uploaded_by_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`uploaded_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_toothchart`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_toothchart` (
+  `id` INT NULL DEFAULT NULL,
+  `chart_data` TEXT NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_treatmentplan`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_treatmentplan` (
+  `id` INT NULL DEFAULT NULL,
+  `title` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `start_date` DATE NULL DEFAULT NULL,
+  `end_date` DATE NULL DEFAULT NULL,
+  `status` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `created_by_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`created_by_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`created_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
