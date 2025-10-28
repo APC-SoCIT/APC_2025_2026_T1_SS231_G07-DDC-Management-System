@@ -80,3 +80,40 @@ Alternative Flow (Login Failure)
 7a2: The system sends a "Login Status (Failed)" message.
 
 7a3: The user is shown an error message (e.g., "Invalid username or password.").
+
+UC-03: Manage Staff Roles
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow the Owner to view, update, and delete the list of staff accounts (Dentists, Receptionists) and their details in the system.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-49: The Owner can view staff and patient accounts details and list of all accounts.
+
+BR-50: The Owner can edit or update existing dentists, receptionist, and patient account information.
+
+BR-51: The Owner can delete dentist and receptionist accounts when necessary.
+
+Preconditions
+The Owner is logged into the system and has administrative privileges.
+
+Postconditions
+The "User Accounts" data store is updated with any changes (edits, deletions) submitted by the Owner.
+
+The Owner has viewed the most current list of staff.
+
+Basic Flow
+The Owner navigates to the staff management section and requests to "View Staff List."
+
+The system retrieves the staff list from the (User Accounts) data store and displays it.
+
+The Owner reviews the list and makes necessary changes (e.g., updates a role, deactivates an account).
+
+The Owner submits the updated staff list.
+
+The system receives the update and writes the changes to the (User Accounts) data store.
+
+The Owner receives confirmation that the list was updated.
