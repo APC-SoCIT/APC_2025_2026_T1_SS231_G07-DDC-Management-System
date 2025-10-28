@@ -519,3 +519,40 @@ The system queries the (Appointments) data store for the appointment details (se
 The system generates a new invoice (with a unique ID) and sends it to the Patient.
 
 (Implicit: The system saves this invoice to the Billing & Invoices data store).
+
+UC-15: Payment Application
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow a Receptionist (or Owner/Dentist) to receive and apply a patient's payment information to an existing invoice, update the billing record, and issue a receipt.
+
+Actors
+Owner, Dentist, Receptionist
+
+Requirement Traceability
+BR-43: The Owner and Receptionist must be able to accept and post payments (bank transfer, e-wallet, or insurance).
+
+BR-44: The Owner and Receptionist must be able to clear balances once payments are fully settled.
+
+Preconditions
+The Receptionist (or other staff) is logged into the system.
+
+An outstanding invoice for a patient exists in the (Billing & Invoices) data store.
+
+The Receptionist has received payment details from the patient.
+
+Postconditions
+A new payment record is created and applied to the invoice in the (Billing & Invoices) data store.
+
+The patient's balance is updated.
+
+A payment receipt is generated and sent/given to the patient.
+
+Basic Flow
+The staff user locates the patient's invoice and submits "Payment Information" (e.g., amount, method).
+
+The system retrieves the invoice details from the (Billing & Invoices) data store.
+
+The system writes the new payment record to the (Billing & Invoices) data store, associating it with the invoice.
+
+The system sends/generates a "Payment Receipt."
