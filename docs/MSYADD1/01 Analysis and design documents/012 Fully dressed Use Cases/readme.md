@@ -798,3 +798,34 @@ The system queries the (Inventory) data store.
 The system receives the inventory data.
 
 The system generates and sends the "Inventory Report" to the Owner.
+
+UC-23: Service List Synchronization
+Author: Jasper Valdez Priority: High
+
+Purpose
+To allow the Owner to query and retrieve the current list of available clinic services, typically for administrative purposes.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-05: All users (Owner, Patient, Dentist, Receptionist) must be able to view available services offered by the clinic.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Manage Services" section.
+
+Postconditions
+The system displays the "Service List View" to the Owner.
+
+Basic Flow
+The Owner submits a "Service List Request."
+
+The system receives the request.
+
+The system queries the (Services) data store.
+
+The system receives the "Available Service List."
+
+The system displays the "Service List View" to the Owner.
