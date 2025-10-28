@@ -106,3 +106,45 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_service` (
   `image` VARCHAR(255) NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL,
   PRIMARY KEY (`id`));
+  -- -----------------------------------------------------
+-- Table `mydb`.`api_appointment`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_appointment` (
+  `id` INT NULL DEFAULT NULL,
+  `date` DATE NULL DEFAULT NULL,
+  `time` TIME NULL DEFAULT NULL,
+  `status` VARCHAR(255) NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `dentist_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `service_id` INT NULL DEFAULT NULL,
+  `reschedule_date` DATE NULL DEFAULT NULL,
+  `reschedule_dentist_id` INT NULL DEFAULT NULL,
+  `reschedule_notes` TEXT NULL DEFAULT NULL,
+  `reschedule_service_id` INT NULL DEFAULT NULL,
+  `reschedule_time` TIME NULL DEFAULT NULL,
+  `cancel_reason` TEXT NULL DEFAULT NULL,
+  `cancel_requested_at` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`dentist_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  INDEX (`service_id` ASC) VISIBLE,
+  INDEX (`reschedule_dentist_id` ASC) VISIBLE,
+  INDEX (`reschedule_service_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`dentist_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`service_id`)
+    REFERENCES `mydb`.`api_service` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`reschedule_dentist_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`reschedule_service_id`)
+    REFERENCES `mydb`.`api_service` (`id`));
