@@ -697,3 +697,36 @@ The system receives the data.
 The system writes the stock addition/update to the (Inventory) data store.
 
 The system sends a "New Stock Acknowledgment" to the Owner.
+
+UC-20: Inventory Management Retrieval
+Author: Michael Orenze Priority: Medium
+
+Purpose
+To allow the Owner to query and retrieve the current stock list and view inventory details.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-33: The Owner and Receptionist must be able to view the clinic’s inventory.
+
+BR-35: The Owner, Dentist, and Receptionist must be able to view inventory items.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the inventory management section.
+
+Postconditions
+The system displays the "Current Stock List View" to the Owner.
+
+Basic Flow
+The Owner submits a "Current Stock List Request."
+
+The system receives the request.
+
+The system queries the (Inventory) data store.
+
+The system receives the inventory data.
+
+The system displays the "Current Stock List View" to the Owner.
