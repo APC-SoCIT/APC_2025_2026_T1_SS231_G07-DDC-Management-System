@@ -385,3 +385,36 @@ The user submits the "Updated Record Data."
 The system receives the update and writes the changes to the (Patient Records) data store.
 
 The system sends a "Modification Acknowledgment" to the user.
+
+UC-11: Staff Record Retrieval
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow authorized staff (Owner, Dentist, or Receptionist) to query and retrieve a list of patient records or a specific patient's full record from the system.
+
+Actors
+User (Owner, Dentist, Receptionist)
+
+Requirement Traceability
+BR-25: Owner, Dentist, and Receptionist must be able to view a patient's medical records and tooth chart.
+
+BR-27: All users must be able to view patient records.
+
+Preconditions
+The user (Owner, Dentist, or Receptionist) is logged into the system.
+
+The user has the necessary permissions to access patient records.
+
+Postconditions
+The system displays the requested patient record data (as a list or a full view) to the user.
+
+Basic Flow
+The staff user submits a "View Record Request" (e.g., by searching for a patient or selecting "View All").
+
+The system receives the request.
+
+The system queries the (Patient Records) data store.
+
+The system receives the record data.
+
+The system displays the "Record/Patient List View" to the user.
