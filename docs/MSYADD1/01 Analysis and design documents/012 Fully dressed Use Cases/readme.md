@@ -860,3 +860,42 @@ The system receives the request.
 The system writes or deletes the service data in the (Services) data store.
 
 The system sends a "Service Acknowledgment" to the Owner.
+
+UC-25: Service Publication
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow any user (Patient, Staff) or the AI Agent to query and view the list of available services offered by the clinic.
+
+Actors
+Owner
+
+Dentist
+
+Receptionist
+
+Patient
+
+AI Agent
+
+Requirement Traceability
+BR-05: All users (Owner, Patient, Dentist, Receptionist, AI Agent) must be able to view available services offered by the clinic.
+
+BR-52: The patient must converse with an AI-Agent that enables them to inquire about the clinic's services.
+
+Preconditions
+Any user or the AI agent is accessing the system.
+
+Postconditions
+The system displays the "Available Services List" to the user/agent.
+
+Basic Flow
+The user or AI Agent submits a "View Available Services Request."
+
+The system receives the request.
+
+The system queries the (Services) data store.
+
+The system receives the service data.
+
+The system displays the "Available Services List."
