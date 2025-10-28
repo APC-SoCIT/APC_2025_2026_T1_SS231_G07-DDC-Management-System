@@ -591,3 +591,12 @@ CREATE TABLE IF NOT EXISTS `mydb`.`django_admin_log` (
   CONSTRAINT ``
     FOREIGN KEY (`user_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_migrations`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_migrations` (
+  `id` INT NULL DEFAULT NULL,
+  `app` VARCHAR(255) NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `applied` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`id`));
