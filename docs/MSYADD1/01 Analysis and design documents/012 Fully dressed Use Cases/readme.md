@@ -451,3 +451,36 @@ The system queries the (Patient Records) data store for that specific record.
 The system receives the specific patient record.
 
 The system displays the "Patient Record View" to the user.
+
+UC-13: Record Exportation
+Author: Ezekiel Galauran Priority: High
+
+Purpose
+To allow a Patient to request and securely download a file (PDF) containing their personal records from the system.
+
+Actors
+Patient
+
+Requirement Traceability
+BR-30: Patients must be able to download their personal records.
+
+Preconditions
+The Patient is logged into their account.
+
+The Patient has navigated to the section where their records are viewable.
+
+Postconditions
+The Patient successfully receives a downloadable file (PDF) of their record.
+
+No data is altered in the (Patient Records) data store.
+
+Basic Flow
+The Patient submits a "Download Record Request."
+
+The system receives the request.
+
+The system queries the (Patient Records) data store for the patient's record.
+
+The system generates a file (PDF) from the record data.
+
+The system sends the "Downloadable Record File," initiating the download for the patient.
