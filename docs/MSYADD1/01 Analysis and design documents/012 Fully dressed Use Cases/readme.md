@@ -160,3 +160,44 @@ The user confirms the new appointment information.
 The system writes the new appointment data to the (Appointments) data store.
 
 The system sends an "Appointment Confirmation/Acknowledgment" to the user.
+
+UC-05: Schedule Retrieval
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow users (including the AI Agent) to query and view the clinic's appointment schedules or find available slots.
+
+Actors
+User (Owner, Receptionist, Dentist)
+
+AI Agent
+
+Requirement Traceability
+BR-08: All users (Owner, Patient, Dentist, Receptionist) must be able to view clinic appointment schedules.
+
+BR-10: All users must be able to view the appointment schedule.
+
+BR-17: Patients must be able to view their appointment history and upcoming appointments.
+
+BR-24: Dentists should be able to view their individual schedules.
+
+BR-54: ...system must ensure that the AI Agent validates appointment requests against dentist availability.
+
+Preconditions
+A user (Patient, Owner, Dentist, Receptionist) is logged into the system.
+
+OR: The AI Agent has been activated to perform a schedule-related query.
+
+Postconditions
+The requested schedule information (full view or available slots) is displayed to the user or provided to the AI Agent.
+
+Basic Flow
+The user or AI Agent submits a "View/Available Slot Request."
+
+The system receives the request.
+
+The system sends a "Schedule Query" to the (Appointments) data store.
+
+The system receives the schedule data.
+
+The system sends the "Full Schedule View / Available Slot Info" back to the actor.
