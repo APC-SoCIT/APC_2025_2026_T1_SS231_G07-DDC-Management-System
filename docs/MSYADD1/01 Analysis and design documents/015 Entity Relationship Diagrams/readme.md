@@ -600,3 +600,16 @@ CREATE TABLE IF NOT EXISTS `mydb`.`django_migrations` (
   `name` VARCHAR(255) NULL DEFAULT NULL,
   `applied` TIMESTAMP NOT NULL,
   PRIMARY KEY (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_session`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_session` (
+  `session_key` VARCHAR(255) NULL DEFAULT NULL,
+  `session_data` TEXT NULL DEFAULT NULL,
+  `expire_date` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`session_key`));
+
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
