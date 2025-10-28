@@ -63,6 +63,8 @@ This is the backend API for our Clinic Management System, built using **Django**
 * POST   /api/inventory/         - Add item
 
 
-- JWT-based authentication
-- Pagination and error handling
-- CORS and environment variable support via `python-decouple`
+JWT-based authentication
+
+Pagination and error handling
+
+CORS and environment variable support via `python-decouple`
