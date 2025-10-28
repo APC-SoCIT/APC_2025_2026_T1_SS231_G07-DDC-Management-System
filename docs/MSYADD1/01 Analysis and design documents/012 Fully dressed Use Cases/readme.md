@@ -34,3 +34,49 @@ The user enters "New Patient Details" or "New Staff Details".
 The user submits the form.
 
 The system receives the details and writes the new account record to the (User Accounts) data store.
+
+UC-02: Login
+Author: Gabriel Villanueva Priority: High
+
+Purpose
+To allow registered users (Patient, Owner, Dentist, Receptionist) to securely access the system using their credentials.
+
+Actors
+Owner
+
+Dentist
+
+Receptionist
+
+Patient
+
+Requirement Traceability
+BR-02: All users (Owner, Patient, Dentist, Receptionist) must be able to log in to the system.
+
+Preconditions
+The user is accessing the clinic system's login page.
+
+The user has an existing account in the "User Accounts" data store.
+
+Postconditions
+On Success: The user is authenticated, a session is created, and the system grants them access based on their role.
+
+On Failure: The user remains unauthenticated and is notified of the login failure.
+
+Basic Flow
+The user navigates to the login page.
+
+The system displays the login form.
+
+The user submits their "Login Credentials" (username and password).
+
+The system queries the (User Accounts) data store to find a matching record.
+
+If credentials are valid, the system grants access.
+
+Alternative Flow (Login Failure)
+7a1: The system validates credentials and finds they are "If Invalid".
+
+7a2: The system sends a "Login Status (Failed)" message.
+
+7a3: The user is shown an error message (e.g., "Invalid username or password.").
