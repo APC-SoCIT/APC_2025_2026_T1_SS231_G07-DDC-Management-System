@@ -589,3 +589,36 @@ The system queries the (Billing & Invoices) data store.
 The system receives the billing records.
 
 The system displays the "List of Bills View" to the Owner.
+
+UC-17: Report Data Provision
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow the Owner to generate a billing report. The system retrieves the necessary data, sends the report to the Owner, and simultaneously forwards the data to the "7.1 Financial Report Generation" subsystem.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the reporting section.
+
+Postconditions
+The Owner receives the requested "Billing Report."
+
+The "Invoice & Payment Data" is successfully sent to the "7.1 Financial Report Generation" process.
+
+Basic Flow
+The Owner submits a "Billing Report Request."
+
+The system receives the request.
+
+The system queries the (Billing & Invoices) data store for invoice data.
+
+The system performs two actions in parallel: a. Sends "Invoice & Payment Data" to (7.1 Financial Report Generation). b. Sends the "Billing Report" to the Owner.
+
+The Owner receives the Billing Report.
