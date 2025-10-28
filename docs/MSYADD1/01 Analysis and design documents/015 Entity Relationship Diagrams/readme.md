@@ -449,3 +449,36 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_treatmentplan` (
   CONSTRAINT ``
     FOREIGN KEY (`patient_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_treatmentassignment`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_treatmentassignment` (
+  `id` INT NULL DEFAULT NULL,
+  `treatment_name` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `status` VARCHAR(255) NULL DEFAULT NULL,
+  `date_assigned` TIMESTAMP NOT NULL,
+  `scheduled_date` DATE NULL DEFAULT NULL,
+  `completed_date` DATE NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `assigned_by_id` INT NULL DEFAULT NULL,
+  `assigned_dentist_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `treatment_plan_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`assigned_by_id` ASC) VISIBLE,
+  INDEX (`assigned_dentist_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  INDEX (`treatment_plan_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`assigned_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`assigned_dentist_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`treatment_plan_id`)
+    REFERENCES `mydb`.`api_treatmentplan` (`id`));
