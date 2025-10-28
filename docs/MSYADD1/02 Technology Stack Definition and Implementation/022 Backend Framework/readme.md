@@ -16,51 +16,51 @@ This is the backend API for our Clinic Management System, built using **Django**
 
 ## 📁 Key Features
 
-- RESTful API endpoints:
+**RESTful API endpoints:**
 
-POST   /api/register/          - User registration
+* POST   /api/register/          - User registration
 
-POST   /api/login/             - User login
+* POST   /api/login/             - User login
 
-GET    /api/user/              - Current user details
+* GET    /api/user/              - Current user details
 
-PATCH  /api/user/              - Update profile
-
-
-GET    /api/services/          - List services
-
-GET    /api/services/by_category/ - Filter by category
+* PATCH  /api/user/              - Update profile
 
 
-GET    /api/appointments/      - List appointments
+* GET    /api/services/          - List services
 
-POST   /api/appointments/      - Create appointment
-
-PATCH  /api/appointments/{id}/ - Update appointment
-
-POST   /api/appointments/{id}/approve_reschedule/
-
-POST   /api/appointments/{id}/reject_reschedule/
+* GET    /api/services/by_category/ - Filter by category
 
 
-GET    /api/dental-records/    - List dental records
+* GET    /api/appointments/      - List appointments
 
-POST   /api/dental-records/    - Add record
+* POST   /api/appointments/      - Create appointment
 
+* PATCH  /api/appointments/{id}/ - Update appointment
 
-GET    /api/tooth-charts/      - Get tooth chart
+* POST   /api/appointments/{id}/approve_reschedule/
 
-PUT    /api/tooth-charts/      - Update tooth chart
-
-
-GET    /api/billing/           - List bills
-
-POST   /api/billing/           - Create bill
+* POST   /api/appointments/{id}/reject_reschedule/
 
 
-GET    /api/inventory/         - List inventory
+* GET    /api/dental-records/    - List dental records
 
-POST   /api/inventory/         - Add item
+* POST   /api/dental-records/    - Add record
+
+
+* GET    /api/tooth-charts/      - Get tooth chart
+
+* PUT    /api/tooth-charts/      - Update tooth chart
+
+
+* GET    /api/billing/           - List bills
+
+* POST   /api/billing/           - Create bill
+
+
+* GET    /api/inventory/         - List inventory
+
+* POST   /api/inventory/         - Add item
 
 
 - JWT-based authentication
