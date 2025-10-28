@@ -418,3 +418,36 @@ The system queries the (Patient Records) data store.
 The system receives the record data.
 
 The system displays the "Record/Patient List View" to the user.
+
+UC-12: Patient Record Viewing
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow authorized staff (Owner, Dentist, or Receptionist) to retrieve and view a specific patient's record.
+
+Actors
+User (Owner, Dentist, Receptionist)
+
+Requirement Traceability
+BR-25: Owner, Dentist, and Receptionist must be able to view a patient's medical records and tooth chart.
+
+BR-27: All users must be able to view patient records.
+
+Preconditions
+The user (Owner, Dentist, or Receptionist) is logged into the system.
+
+The user has selected a specific patient to view.
+
+Postconditions
+The system displays the specific patient's record view to the user.
+
+Basic Flow
+The staff user submits a "View Record Request" for a specific patient.
+
+The system receives the request.
+
+The system queries the (Patient Records) data store for that specific record.
+
+The system receives the specific patient record.
+
+The system displays the "Patient Record View" to the user.
