@@ -513,4 +513,16 @@ CREATE TABLE IF NOT EXISTS `mydb`.`django_content_type` (
   `app_label` VARCHAR(255) NULL DEFAULT NULL,
   `model` VARCHAR(255) NULL DEFAULT NULL,
   PRIMARY KEY (`id`));
-
+-- -----------------------------------------------------
+-- Table `mydb`.`auth_permission`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`auth_permission` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `content_type_id` INT NULL DEFAULT NULL,
+  `codename` VARCHAR(255) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`content_type_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`content_type_id`)
+    REFERENCES `mydb`.`django_content_type` (`id`));
