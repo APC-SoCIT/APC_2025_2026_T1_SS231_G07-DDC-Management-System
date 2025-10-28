@@ -765,3 +765,36 @@ The system displays a form for item details (name, quantity, supplier, low-stock
 The user fills in the details and saves.
 
 The system adds the item to the inventory.
+
+UC-22: Inventory Report Provision
+Author: Jasper Valdez Priority: Medium
+
+Purpose
+To allow the Owner to query and generate a report of the current inventory data and stock levels.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-33: The Owner and Receptionist must be able to view the clinic’s inventory.
+
+BR-35: The Owner, Dentist, and Receptionist must be able to view inventory items.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Inventory" or "Reports" section.
+
+Postconditions
+The Owner receives the "Inventory Report."
+
+Basic Flow
+The Owner submits a "Current Stock List Request."
+
+The system receives the request.
+
+The system queries the (Inventory) data store.
+
+The system receives the inventory data.
+
+The system generates and sends the "Inventory Report" to the Owner.
