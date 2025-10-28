@@ -505,4 +505,12 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_user_groups` (
   CONSTRAINT ``
     FOREIGN KEY (`group_id`)
     REFERENCES `mydb`.`auth_group` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_content_type`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_content_type` (
+  `id` INT NULL DEFAULT NULL,
+  `app_label` VARCHAR(255) NULL DEFAULT NULL,
+  `model` VARCHAR(255) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`));
 
