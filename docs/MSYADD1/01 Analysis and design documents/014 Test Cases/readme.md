@@ -43,3 +43,5 @@ The **Status** column can be updated to track progress during the QA process.
 | TC-17          | UC-04         | Verify Appointment Acknowledgment (Verify)              | Verify the user receives a confirmation or acknowledgment message after the appointment is successfully created.                           | Not Run  |
 | TC-18          | UC-05         | Staff Views Clinic Schedule (Basic Flow)                | Verify an Owner, Receptionist, or Dentist can view the clinic's full appointment schedule.                                  
 | Not Run  |
+| TC-19          | UC-05         | Patient Views Own Appointments (Basic Flow)             | Verify a Patient can view their own upcoming appointments and appointment history (as per BR-17).                                          | Not Run  |
+| TC-20          | UC-05         | Dentist Views Individual Schedule (Basic Flow)          | Verify a Dentist can view their individual schedule, showing only their appointments (as per BR-24).                                       | Not Run  |
