@@ -40,3 +40,6 @@ The **Status** column can be updated to track progress during the QA process.
 | TC-14          | UC-04         | Patient Requests Appointment (Basic Flow)               | Verify a Patient can successfully request an appointment by selecting an available service, dentist, and time slot.                        | Not Run  |
 | TC-15          | UC-04         | Staff Creates Appointment (Basic Flow)                  | Verify a Receptionist, Dentist, or Owner can successfully create a new appointment for a patient.                                          | Not Run  |
 | TC-16          | UC-04         | Create Appointment on Booked Slot (Exception)           | Verify the system prevents creating an appointment in a time slot that is already occupied (as per BR-16).                                 | Not Run  |
+| TC-17          | UC-04         | Verify Appointment Acknowledgment (Verify)              | Verify the user receives a confirmation or acknowledgment message after the appointment is successfully created.                           | Not Run  |
+| TC-18          | UC-05         | Staff Views Clinic Schedule (Basic Flow)                | Verify an Owner, Receptionist, or Dentist can view the clinic's full appointment schedule.                                  
+| Not Run  |
