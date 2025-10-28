@@ -85,3 +85,35 @@ The **Status** column can be updated to track progress during the QA process.
 | TC-58          | UC-18         | Staff Depletes Stock (Basic Flow)                       | Verify an Owner, Dentist, or Receptionist can report service usage, and the correct item's stock quantity is reduced.                      | Not Run  |
 | TC-59          | UC-18         | Deplete Out-of-Stock Item (Alternative Flow)            | Verify the system shows an "Error: Out of Stock" acknowledgment if the user tries to deplete more items than are in stock.                 | Not Run  |
 | TC-60          | UC-18         | Verify Inventory Depletion Log (Verify)                 | Verify the stock change is logged with user and timestamp details (as per BR-38).                                                          | Not Run  |
+| TC-61          | UC-18         | Verify Low Stock Alert (Verify)                         | Verify the system generates a low-stock alert if a depletion action causes the stock level to fall below its threshold (as per BR-39).     | Not Run  |
+| TC-62          | UC-19         | Owner Adds New Inventory Item (Basic Flow)              | Verify the Owner can add a new inventory item, and it appears in the inventory list (as per BR-34).                                        | Not Run  |
+| TC-63          | UC-19         | Owner Updates Stock Quantity (Basic Flow)               | Verify the Owner can update the quantity of an existing item (e.g., adding new stock).                                                     | Not Run  |
+| TC-64          | UC-19         | Verify Inventory Addition Log (Verify)                  | Verify the stock addition is logged with user and timestamp details (as per BR-38).                                                        | Not Run  |
+| TC-65          | UC-20         | Owner Views Inventory List (Basic Flow)                 | Verify the Owner can navigate to the inventory section and view the "Current Stock List View."                                             | Not Run  |
+| TC-66          | UC-20         | Non-Owner Access to Inventory Mgt (Exception)           | Verify users other than the Owner (e.g., Patient) cannot access the "Inventory Management Retrieval" function.                             | Not Run  |
+| TC-67          | UC-21         | Staff Adds New Item via Form (Basic Flow)               | Verify an Owner or Receptionist can use the "Add New Item" form to add a new item to the inventory.                                        | Not Run  |
+| TC-68          | UC-21         | Verify Add Item Form Fields (Verify)                    | Verify the "Add New Item" form correctly displays fields for name, quantity, supplier, and low-stock threshold.                            | Not Run  |
+| TC-69          | UC-22         | Owner Generates Inventory Report (Basic Flow)           | Verify the Owner can successfully request and receive an "Inventory Report" (distinct from the simple list view).                          | Not Run  |
+| TC-70          | UC-23         | Owner Views Service List (Basic Flow)                   | Verify the Owner can navigate to the "Manage Services" section and view the current list of all clinic services.                           | Not Run  |
+| TC-71          | UC-24         | Owner Creates New Service (Basic Flow)                  | Verify the Owner can successfully add a new service, and it appears in the service list.                                                   | Not Run  |
+| TC-72          | UC-24         | Owner Updates Existing Service (Basic Flow)             | Verify the Owner can edit the details (e.g., name, price) of an existing service, and the changes are saved.                               | Not Run  | 
+| TC-73          | UC-24         | Owner Deletes Service (Basic Flow)                      | Verify the Owner can successfully delete a service, and it is removed from the service list.                                               | Not Run  |
+| TC-74          | UC-24         | Verify Service Acknowledgment (Verify)                  | Verify the Owner receives a success acknowledgment after creating, updating, or deleting a service.                                        | Not Run  |
+| TC-75          | UC-25         | Patient Views Available Services (Basic Flow)           | Verify a logged-in Patient can view the list of available clinic services (as per BR-05).                                                  | Not Run  |
+| TC-76          | UC-25         | AI Agent Retrieves Services (Basic Flow)                | Verify the AI Agent can successfully query and retrieve the list of available services (as per BR-52).                                     | Not Run  |
+| TC-77          | UC-25         | Staff Views Available Services (Basic Flow)             | Verify an Owner, Dentist, or Receptionist can also view the list of available clinic services.                                             | Not Run  |
+| TC-78          | UC-26         | Owner Generates Financial Report (Basic Flow)           | Verify the Owner can successfully request and receive a comprehensive "Financial Report."                                                  | Not Run  |
+| TC-79          | UC-26         | Verify Financial Report Data (Verify)                   | Verify the financial report accurately summarizes the data from the "Billing&Invoices" data store.                                         | Not Run  |
+| TC-80          | UC-27         | Owner Generates Inventory Analytics Report (Basic Flow) | Verify the Owner can successfully request and receive an "Inventory Analytics Report."                                                     | Not Run  |
+| TC-81          | UC-27         | Verify Inventory Analytics Data (Verify)                | Verify the inventory analytics report accurately reflects stock levels and usage data from the "Inventory" data store.                     | Not Run  |
+
+## 🧩 Notes
+
+- All test cases are linked to their corresponding **Use Case IDs (UC-XX)** for traceability.  
+- The QA team should update the **Status** field after executing each test.  
+- Ensure consistent documentation of results and screenshots for validation.
+
+---
+
+🧑‍💻 **Maintained by:** QA & Dev Team – Dorotheo Dental Clinic System  
+📅 **Last Updated:** October 2025
