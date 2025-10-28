@@ -664,36 +664,3 @@ Alternative Flow (Out of Stock)
 3a2: The system sends a "Usage Acknowledgment (Error: Out of Stock)."
 
 3a3: The user receives the error.
-
-UC-19: Stock Replenishment
-Author: Michael Orenze Priority: Medium
-
-Purpose
-To allow the Owner to add new inventory items or update (increase) the quantity of existing items in the system's inventory records.
-
-Actors
-Owner
-
-Requirement Traceability
-BR-34: The Owner and Receptionist must be able to add new inventory items.
-
-BR-38: The system must log all inventory changes...
-
-Preconditions
-The Owner is logged into the system.
-
-The Owner has navigated to the "Manage Inventory" section.
-
-Postconditions
-The stock quantity for an item is successfully added or updated in the (Inventory) data store.
-
-The Owner receives an acknowledgment of the successful update.
-
-Basic Flow
-The Owner submits "New Stock Data" (e.g., selects an item, enters the new quantity).
-
-The system receives the data.
-
-The system writes the stock addition/update to the (Inventory) data store.
-
-The system sends a "New Stock Acknowledgment" to the Owner.
