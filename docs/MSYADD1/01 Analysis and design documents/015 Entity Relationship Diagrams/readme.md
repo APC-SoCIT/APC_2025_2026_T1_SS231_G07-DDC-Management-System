@@ -376,3 +376,20 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_patientintakeform` (
   CONSTRAINT ``
     FOREIGN KEY (`patient_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_staffavailability`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_staffavailability` (
+  `id` INT NULL DEFAULT NULL,
+  `day_of_week` INT NULL DEFAULT NULL,
+  `is_available` TINYINT NULL DEFAULT NULL,
+  `start_time` TIME NULL DEFAULT NULL,
+  `end_time` TIME NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `staff_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`staff_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`staff_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
