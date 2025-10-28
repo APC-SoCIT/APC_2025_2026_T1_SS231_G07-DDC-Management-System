@@ -352,3 +352,36 @@ The user submits the "New Dental Record."
 The system receives the data and writes it to the (Patient Records) data store.
 
 The system sends a "Record Acknowledgment" to the user.
+
+UC-10: Record Modification
+Author: Ezekiel Galauran Priority: High
+
+Purpose
+To allow authorized staff (Owner, Dentist, or Receptionist) to update an existing patient's dental record with new information.
+
+Actors
+User (Owner, Dentist, Receptionist)
+
+Requirement Traceability
+BR-28: The Owner, Dentist, and Receptionist must be able to update patient records.
+
+BR-31: The system should record all updates to patient records, showing who made them and when.
+
+Preconditions
+The user (Owner, Dentist, or Receptionist) is logged into the system.
+
+The user has successfully retrieved and is currently viewing the specific patient record they intend to modify.
+
+Postconditions
+The patient's record is updated in the (Patient Records) data store.
+
+The user receives an acknowledgment that the modification was successful.
+
+Basic Flow
+The staff user makes the necessary changes to the patient record data.
+
+The user submits the "Updated Record Data."
+
+The system receives the update and writes the changes to the (Patient Records) data store.
+
+The system sends a "Modification Acknowledgment" to the user.
