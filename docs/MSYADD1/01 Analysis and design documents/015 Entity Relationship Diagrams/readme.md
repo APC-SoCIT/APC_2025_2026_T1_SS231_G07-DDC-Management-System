@@ -526,3 +526,19 @@ CREATE TABLE IF NOT EXISTS `mydb`.`auth_permission` (
   CONSTRAINT ``
     FOREIGN KEY (`content_type_id`)
     REFERENCES `mydb`.`django_content_type` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_user_user_permissions`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_user_user_permissions` (
+  `id` INT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  `permission_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`user_id` ASC) VISIBLE,
+  INDEX (`permission_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`permission_id`)
+    REFERENCES `mydb`.`auth_permission` (`id`));
