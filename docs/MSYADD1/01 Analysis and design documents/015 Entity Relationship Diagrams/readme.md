@@ -542,3 +542,19 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_user_user_permissions` (
   CONSTRAINT ``
     FOREIGN KEY (`permission_id`)
     REFERENCES `mydb`.`auth_permission` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`auth_group_permissions`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`auth_group_permissions` (
+  `id` INT NULL DEFAULT NULL,
+  `group_id` INT NULL DEFAULT NULL,
+  `permission_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`group_id` ASC) VISIBLE,
+  INDEX (`permission_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`group_id`)
+    REFERENCES `mydb`.`auth_group` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`permission_id`)
+    REFERENCES `mydb`.`auth_permission` (`id`));
