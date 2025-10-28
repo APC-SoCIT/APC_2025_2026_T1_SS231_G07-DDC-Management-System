@@ -201,3 +201,36 @@ The system sends a "Schedule Query" to the (Appointments) data store.
 The system receives the schedule data.
 
 The system sends the "Full Schedule View / Available Slot Info" back to the actor.
+
+UC-06: Confirm Appointments
+Author: Airo Ravinera Priority: Medium
+
+Purpose
+To allow a user (Patient, Receptionist, Dentist, or Owner) to formally confirm an existing or requested appointment, updating its status. This is particularly relevant for the Receptionist confirming patient-requested slots.
+
+Actors
+User (Patient, Receptionist, Dentist, Owner)
+
+Requirement Traceability
+BR-15: The Receptionist must confirm all consultation appointments before finalizing bookings.
+
+Preconditions
+The user is logged in.
+
+An appointment exists in the system that is pending confirmation.
+
+Postconditions
+The appointment's status is updated to "Confirmed" in the (Appointments) data store.
+
+A notification of the confirmation is sent.
+
+Basic Flow
+The user selects an appointment and submits an "Appointment Confirmation."
+
+The system receives the confirmation.
+
+The system locates the appointment record in the (Appointments) data store.
+
+The system updates the record's status to "Confirmed."
+
+The system sends an "Appointment Notification/Confirmation" to relevant parties.
