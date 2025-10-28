@@ -220,3 +220,14 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_clinicalnote` (
   CONSTRAINT ``
     FOREIGN KEY (`patient_id`)
     REFERENCES `mydb`.`api_user` (`id`)); 
+-- -----------------------------------------------------
+-- Table `mydb`.`api_cliniclocation`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_cliniclocation` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `address` TEXT NULL DEFAULT NULL,
+  `phone` VARCHAR(255) NULL DEFAULT NULL,
+  `latitude` DECIMAL NULL DEFAULT NULL,
+  `longitude` DECIMAL NULL DEFAULT NULL,
+  PRIMARY KEY (`id`));
