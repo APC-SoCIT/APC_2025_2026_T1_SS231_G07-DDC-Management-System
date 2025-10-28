@@ -556,3 +556,36 @@ The system retrieves the invoice details from the (Billing & Invoices) data stor
 The system writes the new payment record to the (Billing & Invoices) data store, associating it with the invoice.
 
 The system sends/generates a "Payment Receipt."
+
+UC-16: Billing Retrieval
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow the Owner to query and retrieve a list of billing records (invoices, payments, balances) from the system.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-42: The Owner and Receptionist must be able to view each patient’s current balance.
+
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the financial or billing section.
+
+Postconditions
+The system displays the requested "List of Bills View" to the Owner.
+
+Basic Flow
+The Owner submits a "List of Bills Request."
+
+The system receives the request.
+
+The system queries the (Billing & Invoices) data store.
+
+The system receives the billing records.
+
+The system displays the "List of Bills View" to the Owner.
