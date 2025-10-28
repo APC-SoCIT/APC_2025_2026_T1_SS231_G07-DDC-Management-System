@@ -829,3 +829,143 @@ The system queries the (Services) data store.
 The system receives the "Available Service List."
 
 The system displays the "Service List View" to the Owner.
+
+UC-24: Service Administration
+Author: Jasper Valdez Priority: High
+
+Purpose
+To allow the Owner to create, update, or delete the clinic's service offerings in the system.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-05: (Implied, as this is the administrative backend for viewing services).
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Manage Services" section.
+
+Postconditions
+The (Services) data store is updated (a service record is created, modified, or deleted).
+
+The Owner receives an acknowledgment.
+
+Basic Flow
+The Owner submits a "Service Create/Update/Delete Request" (e.g., submits a new service form, saves changes, or confirms deletion).
+
+The system receives the request.
+
+The system writes or deletes the service data in the (Services) data store.
+
+The system sends a "Service Acknowledgment" to the Owner.
+
+UC-25: Service Publication
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow any user (Patient, Staff) or the AI Agent to query and view the list of available services offered by the clinic.
+
+Actors
+Owner
+
+Dentist
+
+Receptionist
+
+Patient
+
+AI Agent
+
+Requirement Traceability
+BR-05: All users (Owner, Patient, Dentist, Receptionist, AI Agent) must be able to view available services offered by the clinic.
+
+BR-52: The patient must converse with an AI-Agent that enables them to inquire about the clinic's services.
+
+Preconditions
+Any user or the AI agent is accessing the system.
+
+Postconditions
+The system displays the "Available Services List" to the user/agent.
+
+Basic Flow
+The user or AI Agent submits a "View Available Services Request."
+
+The system receives the request.
+
+The system queries the (Services) data store.
+
+The system receives the service data.
+
+The system displays the "Available Services List."
+
+UC-26: Financial Report Generation
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow the Owner to generate and view a comprehensive financial report based on all invoice and payment data in the system.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Reports" or "Analytics" section.
+
+The (Billing & Invoices) data store contains transaction data.
+
+Postconditions
+The Owner receives the "Financial Report."
+
+Basic Flow
+The Owner submits a "Financial Report Request."
+
+The system receives the request.
+
+The system queries the (Billing & Invoices) data store for all financial data.
+
+The system receives the invoice and payment data.
+
+The system generates the report.
+
+The system sends the "Financial Report" to the Owner.
+
+UC-27: Inventory Report Generation
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow the Owner to generate and view an analytics report based on current inventory data, usage, and stock levels.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-33: The Owner and Receptionist must be able to view the clinic’s inventory.
+
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Reports" or "Analytics" section.
+
+Postconditions
+The Owner receives the "Inventory Analytics Report."
+
+Basic Flow
+The Owner submits an "Inventory Analytics Request."
+
+The system receives the request.
+
+The system queries the (Inventory) data store for stock data and usage logs.
+
+The system receives the inventory data/stock levels.
+
+The system generates the analytics report.
+
+The system sends the "Inventory Analytics Report" to the Owner.
