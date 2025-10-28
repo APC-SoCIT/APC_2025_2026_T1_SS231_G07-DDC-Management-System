@@ -558,3 +558,15 @@ CREATE TABLE IF NOT EXISTS `mydb`.`auth_group_permissions` (
   CONSTRAINT ``
     FOREIGN KEY (`permission_id`)
     REFERENCES `mydb`.`auth_permission` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`authtoken_token`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`authtoken_token` (
+  `key` VARCHAR(255) NULL DEFAULT NULL,
+  `created` TIMESTAMP NOT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`key`),
+  INDEX (`user_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
