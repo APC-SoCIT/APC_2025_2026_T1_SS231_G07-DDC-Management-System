@@ -347,3 +347,32 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_passwordresettoken` (
   CONSTRAINT ``
     FOREIGN KEY (`user_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_patientintakeform`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_patientintakeform` (
+  `id` INT NULL DEFAULT NULL,
+  `allergies` TEXT NULL DEFAULT NULL,
+  `current_medications` TEXT NULL DEFAULT NULL,
+  `medical_conditions` TEXT NULL DEFAULT NULL,
+  `previous_dental_treatments` TEXT NULL DEFAULT NULL,
+  `emergency_contact_name` VARCHAR(255) NULL DEFAULT NULL,
+  `emergency_contact_phone` VARCHAR(255) NULL DEFAULT NULL,
+  `emergency_contact_relationship` VARCHAR(255) NULL DEFAULT NULL,
+  `insurance_provider` VARCHAR(255) NULL DEFAULT NULL,
+  `insurance_policy_number` VARCHAR(255) NULL DEFAULT NULL,
+  `dental_concerns` TEXT NULL DEFAULT NULL,
+  `preferred_dentist` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `filled_by_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`filled_by_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`filled_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
