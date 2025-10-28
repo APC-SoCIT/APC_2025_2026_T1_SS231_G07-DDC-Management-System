@@ -297,3 +297,25 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_document` (
   CONSTRAINT ``
     FOREIGN KEY (`uploaded_by_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_fileattachment`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_fileattachment` (
+  `id` INT NULL DEFAULT NULL,
+  `file` VARCHAR(255) NULL DEFAULT NULL,
+  `file_type` VARCHAR(255) NULL DEFAULT NULL,
+  `title` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `file_size` INT NULL DEFAULT NULL,
+  `uploaded_at` TIMESTAMP NOT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `uploaded_by_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`patient_id` ASC) VISIBLE,
+  INDEX (`uploaded_by_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`uploaded_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
