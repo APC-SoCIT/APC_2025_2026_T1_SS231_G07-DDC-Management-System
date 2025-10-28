@@ -482,3 +482,11 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_treatmentassignment` (
   CONSTRAINT ``
     FOREIGN KEY (`treatment_plan_id`)
     REFERENCES `mydb`.`api_treatmentplan` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`auth_group`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`auth_group` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`));
+
