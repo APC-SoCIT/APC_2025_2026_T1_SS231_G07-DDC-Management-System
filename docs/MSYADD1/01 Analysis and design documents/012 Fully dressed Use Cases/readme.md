@@ -117,3 +117,46 @@ The Owner submits the updated staff list.
 The system receives the update and writes the changes to the (User Accounts) data store.
 
 The Owner receives confirmation that the list was updated.
+
+UC-04: Appointment Creation
+Author: Michael Orenze Priority: Medium
+
+Purpose
+To allow a user (Patient, Owner, Dentist, or Receptionist) to request and create a new appointment by selecting an available time slot.
+
+Actors
+Users (Patient, Owner, Dentist, Receptionist)
+
+Requirement Traceability
+BR-06: Patients must be able to request to schedule an appointment.
+
+BR-09: The Owner, Dentist, and Receptionist must be able to create an appointment schedule.
+
+BR-16: The system must check all chosen appointment slots to ensure they don’t conflict.
+
+BR-23: The system must send a notification... when a patient requests an appointment.
+
+Preconditions
+The user is logged into the system.
+
+The user has navigated to the "Book Appointment" or "Manage Schedule" section.
+
+Postconditions
+A new appointment record is created and stored in the (Appointments) data store.
+
+The user receives a confirmation or acknowledgment message.
+
+Basic Flow
+The user submits a "New Appointment Request" (e.g., selects a service, dentist, or date).
+
+The system queries the (Appointments) data store for availability.
+
+The system displays the available time slots to the user.
+
+The user reviews the options and selects a slot.
+
+The user confirms the new appointment information.
+
+The system writes the new appointment data to the (Appointments) data store.
+
+The system sends an "Appointment Confirmation/Acknowledgment" to the user.
