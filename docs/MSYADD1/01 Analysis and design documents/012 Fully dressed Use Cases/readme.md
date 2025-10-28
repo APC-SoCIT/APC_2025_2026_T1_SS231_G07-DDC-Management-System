@@ -730,3 +730,38 @@ The system queries the (Inventory) data store.
 The system receives the inventory data.
 
 The system displays the "Current Stock List View" to the Owner.
+
+UC-21: Inventory Management Retrieval (Add Item)
+(Note: Title adjusted based on flow)
+
+Author: Jasper Valdez Priority: High
+
+Purpose
+To allow authorized users (Owner or Receptionist) to add new items to the inventory database.
+
+Actors
+Owner
+
+Receptionist
+
+Requirement Traceability
+BR-34: The Owner and Receptionist must be able to add new inventory items.
+
+BR-38: The system must log all inventory changes...
+
+Preconditions
+The user is logged in with an Owner or Receptionist role.
+
+Postconditions
+A new item is added to the inventory database.
+
+The action is logged.
+
+Basic Flow
+The user navigates to "Inventory" and selects "Add New Item."
+
+The system displays a form for item details (name, quantity, supplier, low-stock threshold).
+
+The user fills in the details and saves.
+
+The system adds the item to the inventory.
