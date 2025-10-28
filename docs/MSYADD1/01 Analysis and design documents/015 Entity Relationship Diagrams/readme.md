@@ -319,3 +319,16 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_fileattachment` (
   CONSTRAINT ``
     FOREIGN KEY (`uploaded_by_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_inventoryitem`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_inventoryitem` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `category` VARCHAR(255) NULL DEFAULT NULL,
+  `quantity` INT NULL DEFAULT NULL,
+  `min_stock` INT NULL DEFAULT NULL,
+  `supplier` VARCHAR(255) NULL DEFAULT NULL,
+  `cost` DECIMAL NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`id`));
