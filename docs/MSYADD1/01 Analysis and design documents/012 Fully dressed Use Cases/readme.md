@@ -934,3 +934,38 @@ The system receives the invoice and payment data.
 The system generates the report.
 
 The system sends the "Financial Report" to the Owner.
+
+UC-27: Inventory Report Generation
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow the Owner to generate and view an analytics report based on current inventory data, usage, and stock levels.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-33: The Owner and Receptionist must be able to view the clinic’s inventory.
+
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Reports" or "Analytics" section.
+
+Postconditions
+The Owner receives the "Inventory Analytics Report."
+
+Basic Flow
+The Owner submits an "Inventory Analytics Request."
+
+The system receives the request.
+
+The system queries the (Inventory) data store for stock data and usage logs.
+
+The system receives the inventory data/stock levels.
+
+The system generates the analytics report.
+
+The system sends the "Inventory Analytics Report" to the Owner.
