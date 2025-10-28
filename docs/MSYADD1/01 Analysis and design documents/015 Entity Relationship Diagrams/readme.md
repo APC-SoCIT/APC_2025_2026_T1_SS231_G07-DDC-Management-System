@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_user` (
   `role` VARCHAR(255) NULL DEFAULT NULL,
   `is_archived` TINYINT NULL DEFAULT NULL,
   PRIMARY KEY (`id`));
-  -- -----------------------------------------------------
+-- -----------------------------------------------------
 -- Table `mydb`.`api_service`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `mydb`.`api_service` (
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_service` (
   `image` VARCHAR(255) NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL,
   PRIMARY KEY (`id`));
-  -- -----------------------------------------------------
+-- -----------------------------------------------------
 -- Table `mydb`.`api_appointment`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `mydb`.`api_appointment` (
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_appointment` (
   CONSTRAINT ``
     FOREIGN KEY (`reschedule_service_id`)
     REFERENCES `mydb`.`api_service` (`id`));
-    -- -----------------------------------------------------
+-- -----------------------------------------------------
 -- Table `mydb`.`api_appointmentnotification`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `mydb`.`api_appointmentnotification` (
@@ -168,3 +168,31 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_appointmentnotification` (
   CONSTRAINT ``
     FOREIGN KEY (`recipient_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_billing`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_billing` (
+  `id` INT NULL DEFAULT NULL,
+  `amount` DECIMAL NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `soa_file` VARCHAR(255) NULL DEFAULT NULL,
+  `paid` TINYINT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `appointment_id` INT NULL DEFAULT NULL,
+  `created_by_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `status` VARCHAR(255) NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`appointment_id` ASC) VISIBLE,
+  INDEX (`created_by_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`appointment_id`)
+    REFERENCES `mydb`.`api_appointment` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`created_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));   
