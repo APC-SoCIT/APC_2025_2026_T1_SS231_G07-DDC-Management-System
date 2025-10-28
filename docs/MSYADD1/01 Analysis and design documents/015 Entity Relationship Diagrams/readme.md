@@ -489,4 +489,20 @@ CREATE TABLE IF NOT EXISTS `mydb`.`auth_group` (
   `id` INT NULL DEFAULT NULL,
   `name` VARCHAR(255) NULL DEFAULT NULL,
   PRIMARY KEY (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_user_groups`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_user_groups` (
+  `id` INT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  `group_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`user_id` ASC) VISIBLE,
+  INDEX (`group_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`group_id`)
+    REFERENCES `mydb`.`auth_group` (`id`));
 
