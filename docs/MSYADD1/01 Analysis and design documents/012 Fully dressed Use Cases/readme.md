@@ -589,3 +589,78 @@ The system queries the (Billing & Invoices) data store.
 The system receives the billing records.
 
 The system displays the "List of Bills View" to the Owner.
+
+UC-17: Report Data Provision
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow the Owner to generate a billing report. The system retrieves the necessary data, sends the report to the Owner, and simultaneously forwards the data to the "7.1 Financial Report Generation" subsystem.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the reporting section.
+
+Postconditions
+The Owner receives the requested "Billing Report."
+
+The "Invoice & Payment Data" is successfully sent to the "7.1 Financial Report Generation" process.
+
+Basic Flow
+The Owner submits a "Billing Report Request."
+
+The system receives the request.
+
+The system queries the (Billing & Invoices) data store for invoice data.
+
+The system performs two actions in parallel: a. Sends "Invoice & Payment Data" to (7.1 Financial Report Generation). b. Sends the "Billing Report" to the Owner.
+
+The Owner receives the Billing Report.
+
+UC-18: Service Consumable Depletion
+Author: Michael Orenze Priority: High
+
+Purpose
+To allow authorized staff (Owner, Dentist, Receptionist) to report the consumption of inventory items used during a service, which updates (reduces) the stock levels in the system.
+
+Actors
+User (Owner, Dentist, Receptionist)
+
+Requirement Traceability
+BR-36: The Owner and Receptionist must be able to update inventory item details.
+
+BR-38: The system must log all inventory changes...
+
+BR-39: The system must generate low-stock alerts for inventory items.
+
+Preconditions
+The user (Owner, Dentist, or Receptionist) is logged into the system.
+
+A service or procedure has been completed which consumed inventory items.
+
+Postconditions
+On Success: The stock quantity of the reported item is reduced in the (Inventory) data store.
+
+On Failure (Out of Stock): The stock level is not changed, and the user receives an error.
+
+Basic Flow
+The staff user submits a "Service Usage Report" (specifying items and quantities used).
+
+The system checks the current stock levels.
+
+If items are "In Stock," the system subtracts the used quantity from the (Inventory) data store.
+
+The system sends a "Usage Acknowledgment (Success)."
+
+Alternative Flow (Out of Stock)
+3a1: The system checks stock levels and finds the item is "In Stock?" (No).
+
+3a2: The system sends a "Usage Acknowledgment (Error: Out of Stock)."
+
+3a3: The user receives the error.
