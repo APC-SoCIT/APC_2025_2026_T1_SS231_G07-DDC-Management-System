@@ -256,3 +256,23 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_dentalrecord` (
   CONSTRAINT ``
     FOREIGN KEY (`patient_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_dentistnotification`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_dentistnotification` (
+  `id` INT NULL DEFAULT NULL,
+  `notification_type` VARCHAR(255) NULL DEFAULT NULL,
+  `message` TEXT NULL DEFAULT NULL,
+  `is_read` TINYINT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `appointment_id` INT NULL DEFAULT NULL,
+  `dentist_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`appointment_id` ASC) VISIBLE,
+  INDEX (`dentist_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`appointment_id`)
+    REFERENCES `mydb`.`api_appointment` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`dentist_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
