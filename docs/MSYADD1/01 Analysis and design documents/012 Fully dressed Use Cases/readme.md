@@ -899,3 +899,38 @@ The system queries the (Services) data store.
 The system receives the service data.
 
 The system displays the "Available Services List."
+
+UC-26: Financial Report Generation
+Author: Airo Ravinera Priority: High
+
+Purpose
+To allow the Owner to generate and view a comprehensive financial report based on all invoice and payment data in the system.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Reports" or "Analytics" section.
+
+The (Billing & Invoices) data store contains transaction data.
+
+Postconditions
+The Owner receives the "Financial Report."
+
+Basic Flow
+The Owner submits a "Financial Report Request."
+
+The system receives the request.
+
+The system queries the (Billing & Invoices) data store for all financial data.
+
+The system receives the invoice and payment data.
+
+The system generates the report.
+
+The system sends the "Financial Report" to the Owner.
