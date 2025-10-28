@@ -284,3 +284,38 @@ Alternative Flow (Denial)
 5a2: The Staff submits the "Deny" decision.
 
 5a3: The system sends a "Modification Acknowledgment (Failed! Reschedule Again)" to the Patient.
+
+UC-08: Billing Data Transfer
+Author: Michael Orenze Priority: Medium
+
+Purpose
+To allow an Owner to initiate the billing process by retrieving completed appointment details and transferring them to the "4.1 Invoice Generation" subsystem.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-41: The Owner and the Receptionist must be able to record new charges for dental services provided.
+
+BR-45: The system must allow generation of invoices for services.
+
+BR-47: Owners must be able to view operational and financial reports and analytics.
+
+Preconditions
+The Owner is logged into the system.
+
+A patient has completed an appointment that is now ready for billing.
+
+Postconditions
+The relevant appointment details are successfully sent to the "4.1 Invoice Generation" process.
+
+The Owner and relevant Staff receive a billing report.
+
+Basic Flow
+The Owner selects a completed appointment and submits a "Generate Billing Request."
+
+The system retrieves the appointment details from the (Appointments) data store.
+
+The system sends these "Appointment Details" to the (4.1 Invoice Generation) process.
+
+The system sends a "Billing Report" to the Owner and Staff.
