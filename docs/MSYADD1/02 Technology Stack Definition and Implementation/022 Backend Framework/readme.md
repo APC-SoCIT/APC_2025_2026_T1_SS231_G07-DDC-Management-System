@@ -23,7 +23,17 @@ POST   /api/login/             - User login
 GET    /api/user/              - Current user details
 PATCH  /api/user/              - Update profile
 
+GET    /api/services/          - List services
+GET    /api/services/by_category/ - Filter by category
 
+GET    /api/appointments/      - List appointments
+POST   /api/appointments/      - Create appointment
+PATCH  /api/appointments/{id}/ - Update appointment
+POST   /api/appointments/{id}/approve_reschedule/
+POST   /api/appointments/{id}/reject_reschedule/
+
+GET    /api/dental-records/    - List dental records
+POST   /api/dental-records/    - Add record
 
 
 - JWT-based authentication
