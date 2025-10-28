@@ -231,3 +231,28 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_cliniclocation` (
   `latitude` DECIMAL NULL DEFAULT NULL,
   `longitude` DECIMAL NULL DEFAULT NULL,
   PRIMARY KEY (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_dentalrecord`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_dentalrecord` (
+  `id` INT NULL DEFAULT NULL,
+  `treatment` TEXT NULL DEFAULT NULL,
+  `diagnosis` TEXT NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `appointment_id` INT NULL DEFAULT NULL,
+  `created_by_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`appointment_id` ASC) VISIBLE,
+  INDEX (`created_by_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`appointment_id`)
+    REFERENCES `mydb`.`api_appointment` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`created_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
