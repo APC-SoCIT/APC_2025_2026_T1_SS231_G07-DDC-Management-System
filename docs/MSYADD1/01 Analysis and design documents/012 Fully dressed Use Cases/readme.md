@@ -829,3 +829,34 @@ The system queries the (Services) data store.
 The system receives the "Available Service List."
 
 The system displays the "Service List View" to the Owner.
+
+UC-24: Service Administration
+Author: Jasper Valdez Priority: High
+
+Purpose
+To allow the Owner to create, update, or delete the clinic's service offerings in the system.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-05: (Implied, as this is the administrative backend for viewing services).
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Manage Services" section.
+
+Postconditions
+The (Services) data store is updated (a service record is created, modified, or deleted).
+
+The Owner receives an acknowledgment.
+
+Basic Flow
+The Owner submits a "Service Create/Update/Delete Request" (e.g., submits a new service form, saves changes, or confirms deletion).
+
+The system receives the request.
+
+The system writes or deletes the service data in the (Services) data store.
+
+The system sends a "Service Acknowledgment" to the Owner.
