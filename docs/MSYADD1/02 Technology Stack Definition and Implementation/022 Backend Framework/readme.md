@@ -16,13 +16,16 @@ This is the backend API for our Clinic Management System, built using **Django**
 
 ## 📁 Key Features
 
-- RESTful endpoints for:
-  - Patients
-  - Appointments
-  - Inventory
-  - Billing
-  - Financial data
-  - Dashboard overview
+- RESTful API endpoints:
+
+POST   /api/register/          - User registration
+POST   /api/login/             - User login
+GET    /api/user/              - Current user details
+PATCH  /api/user/              - Update profile
+
+
+
+
 - JWT-based authentication
 - Pagination and error handling
 - CORS and environment variable support via `python-decouple`
