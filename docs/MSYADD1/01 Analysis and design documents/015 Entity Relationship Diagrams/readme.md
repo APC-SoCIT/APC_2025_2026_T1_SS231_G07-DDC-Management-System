@@ -332,3 +332,18 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_inventoryitem` (
   `cost` DECIMAL NULL DEFAULT NULL,
   `updated_at` TIMESTAMP NOT NULL,
   PRIMARY KEY (`id`));
+  -- -----------------------------------------------------
+-- Table `mydb`.`api_passwordresettoken`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_passwordresettoken` (
+  `id` INT NULL DEFAULT NULL,
+  `token` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `expires_at` TIMESTAMP NOT NULL,
+  `is_used` TINYINT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`user_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
