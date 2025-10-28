@@ -664,3 +664,104 @@ Alternative Flow (Out of Stock)
 3a2: The system sends a "Usage Acknowledgment (Error: Out of Stock)."
 
 3a3: The user receives the error.
+
+UC-19: Stock Replenishment
+Author: Michael Orenze Priority: Medium
+
+Purpose
+To allow the Owner to add new inventory items or update (increase) the quantity of existing items in the system's inventory records.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-34: The Owner and Receptionist must be able to add new inventory items.
+
+BR-38: The system must log all inventory changes...
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the "Manage Inventory" section.
+
+Postconditions
+The stock quantity for an item is successfully added or updated in the (Inventory) data store.
+
+The Owner receives an acknowledgment of the successful update.
+
+Basic Flow
+The Owner submits "New Stock Data" (e.g., selects an item, enters the new quantity).
+
+The system receives the data.
+
+The system writes the stock addition/update to the (Inventory) data store.
+
+The system sends a "New Stock Acknowledgment" to the Owner.
+
+UC-20: Inventory Management Retrieval
+Author: Michael Orenze Priority: Medium
+
+Purpose
+To allow the Owner to query and retrieve the current stock list and view inventory details.
+
+Actors
+Owner
+
+Requirement Traceability
+BR-33: The Owner and Receptionist must be able to view the clinic’s inventory.
+
+BR-35: The Owner, Dentist, and Receptionist must be able to view inventory items.
+
+Preconditions
+The Owner is logged into the system.
+
+The Owner has navigated to the inventory management section.
+
+Postconditions
+The system displays the "Current Stock List View" to the Owner.
+
+Basic Flow
+The Owner submits a "Current Stock List Request."
+
+The system receives the request.
+
+The system queries the (Inventory) data store.
+
+The system receives the inventory data.
+
+The system displays the "Current Stock List View" to the Owner.
+
+UC-21: Inventory Management Retrieval (Add Item)
+(Note: Title adjusted based on flow)
+
+Author: Jasper Valdez Priority: High
+
+Purpose
+To allow authorized users (Owner or Receptionist) to add new items to the inventory database.
+
+Actors
+Owner
+
+Receptionist
+
+Requirement Traceability
+BR-34: The Owner and Receptionist must be able to add new inventory items.
+
+BR-38: The system must log all inventory changes...
+
+Preconditions
+The user is logged in with an Owner or Receptionist role.
+
+Postconditions
+A new item is added to the inventory database.
+
+The action is logged.
+
+Basic Flow
+The user navigates to "Inventory" and selects "Add New Item."
+
+The system displays a form for item details (name, quantity, supplier, low-stock threshold).
+
+The user fills in the details and saves.
+
+The system adds the item to the inventory.
