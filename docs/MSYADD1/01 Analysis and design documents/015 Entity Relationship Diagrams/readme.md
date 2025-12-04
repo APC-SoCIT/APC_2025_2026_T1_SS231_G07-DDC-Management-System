@@ -1,55 +1,59 @@
 # 015 Entity Relationship Diagrams
-Clinic Management System - Database Schema
+
+## Clinic Management System - Database Schema
+
 This document outlines the Entity Relationship Diagram (ERD) for the Clinic Management System. The schema is designed to manage patient information, appointments, treatments, billing, inventory, and user roles within a clinical setting.
 
-Entity Relationship Diagram
+---
+
+## Entity Relationship Diagram
+
 The diagram below illustrates the database tables, their columns, and the relationships between them using Crow's Foot notation.
 
-To display the image, make sure image_17c9aa.png is in the same directory as this README file.
+---
 
-Table Descriptions
-Core Entities
-user: Stores user account information, including login credentials and personal details. Users can be patients or staff.
+## Table Descriptions
 
-role: Defines different user roles within the system (e.g., Admin, Doctor, Patient).
+### Core Entities
 
-patient_medical_history: Contains the medical records for each patient, including allergies, medications, and conditions.
+* **api_user**: Stores user account information, including login credentials and personal details. Users can be patients or staff.
+* **auth_group**: Defines different user roles within the system (e.g., Admin, Doctor, Patient).
+* **api_patientintakeform** / **api_dentalrecord**: Contains the medical and dental records for each patient, including allergies, medications, conditions, and previous treatments.
+* **api_appointment**: The central table for scheduling. It links patients, staff (dentists), services, and time slots.
+* **api_clinicalnote**: Logs the specific details and notes from an appointment.
+* **api_treatmentassignment** / **api_treatmentplan**: Define and track planned treatments for patients.
 
-appointment: The central table for scheduling. It links patients, staff, services, and time slots.
+### Service & Inventory
 
-treatment_records: Logs the specific details of treatments performed during an appointment.
+* **api_service**: A list of all services offered by the clinic, including name, category, and description.
+* **api_inventoryitem**: Manages the stock of medical supplies and other items, including quantity, supplier, and cost information.
 
-Service & Inventory
-service: A list of all services offered by the clinic, including name, duration, and price.
+### Billing & Financial
 
-appointment_has_service: A junction table that links services to specific appointments, allowing for multiple services per appointment.
+* **api_billing**: Generates billing information (Statement of Account) potentially linked to an appointment, detailing the amount due.
+* **api_patientintakeform** (Insurance Fields): Stores patient insurance policy information within the intake form. *(Note: You might consider a separate `insurance_detail` table in the future if this becomes more complex).*
 
-inventory: Manages the stock of medical supplies and other items, including quantity and supplier information.
+### Supporting Tables
 
-Billing & Financial
-invoices: Generates billing information for each appointment, detailing the total amount due.
+* **api_appointmentnotification** / **api_dentistnotification**: Handle automated notifications related to appointments.
+* **api_document** / **api_fileattachment**: Store patient-related documents and files.
+* **api_cliniclocation**: Information about the physical clinic location(s).
+* **api_passwordresettoken**: Manages tokens for password resets.
+* **api_staffavailability**: Tracks when staff members are available.
+* **api_teethimage** / **api_toothchart**: Store visual dental records.
+* **auth_permission** / **django_...**: Standard tables used by the Django framework for permissions, sessions, admin logs, etc.
 
-payment: Tracks all payments made against invoices, including payment method and transaction details.
+---
 
-insurance_detail: Stores patient insurance policy information.
+## Relationships Summary (Examples)
 
-Relationships Summary
-A user has one role.
-
-A user (acting as a patient) has one patient_medical_history.
-
-A user can have multiple insurance_detail records.
-
-An appointment is booked by a user and generates an invoice.
-
-An appointment can include multiple services via the appointment_has_service table.
-
-treatment_records result from an appointment.
-
-An invoice receives a payment.
-
-A service can use items from the inventory.
-
+* A **`api_user`** belongs to an **`auth_group`** (role).
+* A **`api_user`** (patient) has one **`api_patientintakeform`**.
+* An **`api_appointment`** is scheduled for a **`api_user`** (patient) and assigned to a **`api_user`** (dentist).
+* An **`api_appointment`** includes an **`api_service`**.
+* An **`api_appointment`** can generate **`api_billing`**.
+* **`api_clinicalnote`** and **`api_dentalrecord`** are associated with an **`api_appointment`**.
+* **`api_treatmentassignment`** is part of an **`api_treatmentplan`** which is for a **`api_user`** (patient).
 -- MySQL Script generated by MySQL Workbench
 -- Tue Oct 28 10:08:14 2025
 -- Model: New Model    Version: 1.0
@@ -393,3 +397,223 @@ CREATE TABLE IF NOT EXISTS `mydb`.`api_staffavailability` (
   CONSTRAINT ``
     FOREIGN KEY (`staff_id`)
     REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_teethimage`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_teethimage` (
+  `id` INT NULL DEFAULT NULL,
+  `image` VARCHAR(255) NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `is_latest` TINYINT NULL DEFAULT NULL,
+  `uploaded_at` TIMESTAMP NOT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `uploaded_by_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`patient_id` ASC) VISIBLE,
+  INDEX (`uploaded_by_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`uploaded_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_toothchart`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_toothchart` (
+  `id` INT NULL DEFAULT NULL,
+  `chart_data` TEXT NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NOT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_treatmentplan`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_treatmentplan` (
+  `id` INT NULL DEFAULT NULL,
+  `title` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `start_date` DATE NULL DEFAULT NULL,
+  `end_date` DATE NULL DEFAULT NULL,
+  `status` VARCHAR(255) NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL,
+  `created_by_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`created_by_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`created_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_treatmentassignment`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_treatmentassignment` (
+  `id` INT NULL DEFAULT NULL,
+  `treatment_name` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL DEFAULT NULL,
+  `status` VARCHAR(255) NULL DEFAULT NULL,
+  `date_assigned` TIMESTAMP NOT NULL,
+  `scheduled_date` DATE NULL DEFAULT NULL,
+  `completed_date` DATE NULL DEFAULT NULL,
+  `notes` TEXT NULL DEFAULT NULL,
+  `assigned_by_id` INT NULL DEFAULT NULL,
+  `assigned_dentist_id` INT NULL DEFAULT NULL,
+  `patient_id` INT NULL DEFAULT NULL,
+  `treatment_plan_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`assigned_by_id` ASC) VISIBLE,
+  INDEX (`assigned_dentist_id` ASC) VISIBLE,
+  INDEX (`patient_id` ASC) VISIBLE,
+  INDEX (`treatment_plan_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`assigned_by_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`assigned_dentist_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`patient_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`treatment_plan_id`)
+    REFERENCES `mydb`.`api_treatmentplan` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`auth_group`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`auth_group` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_user_groups`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_user_groups` (
+  `id` INT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  `group_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`user_id` ASC) VISIBLE,
+  INDEX (`group_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`group_id`)
+    REFERENCES `mydb`.`auth_group` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_content_type`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_content_type` (
+  `id` INT NULL DEFAULT NULL,
+  `app_label` VARCHAR(255) NULL DEFAULT NULL,
+  `model` VARCHAR(255) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`auth_permission`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`auth_permission` (
+  `id` INT NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `content_type_id` INT NULL DEFAULT NULL,
+  `codename` VARCHAR(255) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`content_type_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`content_type_id`)
+    REFERENCES `mydb`.`django_content_type` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`api_user_user_permissions`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`api_user_user_permissions` (
+  `id` INT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  `permission_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`user_id` ASC) VISIBLE,
+  INDEX (`permission_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`permission_id`)
+    REFERENCES `mydb`.`auth_permission` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`auth_group_permissions`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`auth_group_permissions` (
+  `id` INT NULL DEFAULT NULL,
+  `group_id` INT NULL DEFAULT NULL,
+  `permission_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`group_id` ASC) VISIBLE,
+  INDEX (`permission_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`group_id`)
+    REFERENCES `mydb`.`auth_group` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`permission_id`)
+    REFERENCES `mydb`.`auth_permission` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`authtoken_token`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`authtoken_token` (
+  `key` VARCHAR(255) NULL DEFAULT NULL,
+  `created` TIMESTAMP NOT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`key`),
+  INDEX (`user_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_admin_log`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_admin_log` (
+  `id` INT NULL DEFAULT NULL,
+  `action_time` TIMESTAMP NOT NULL,
+  `object_id` TEXT NULL DEFAULT NULL,
+  `object_repr` VARCHAR(255) NULL DEFAULT NULL,
+  `action_flag` INT NULL DEFAULT NULL,
+  `change_message` TEXT NULL DEFAULT NULL,
+  `content_type_id` INT NULL DEFAULT NULL,
+  `user_id` INT NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`content_type_id` ASC) VISIBLE,
+  INDEX (`user_id` ASC) VISIBLE,
+  CONSTRAINT ``
+    FOREIGN KEY (`content_type_id`)
+    REFERENCES `mydb`.`django_content_type` (`id`),
+  CONSTRAINT ``
+    FOREIGN KEY (`user_id`)
+    REFERENCES `mydb`.`api_user` (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_migrations`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_migrations` (
+  `id` INT NULL DEFAULT NULL,
+  `app` VARCHAR(255) NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `applied` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`id`));
+-- -----------------------------------------------------
+-- Table `mydb`.`django_session`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mydb`.`django_session` (
+  `session_key` VARCHAR(255) NULL DEFAULT NULL,
+  `session_data` TEXT NULL DEFAULT NULL,
+  `expire_date` TIMESTAMP NOT NULL,
+  PRIMARY KEY (`session_key`));
+
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
