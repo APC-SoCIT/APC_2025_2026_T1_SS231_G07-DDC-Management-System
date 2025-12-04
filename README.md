@@ -36,19 +36,44 @@ This project proposes a transformative solution: a web-based management system i
 - **Owner** - Full system access, analytics, staff management
 
 ### 🎯 Key Features
-- ✅ **Interactive Tooth Chart** - Anatomical curved arch design with clickable teeth
+
+#### 📋 Patient Records Management
+- ✅ **Unified Patient Database** - Central repository for all patient information and records
 - ✅ **Expandable Patient Records** - Click to view/edit full medical history
-- ✅ **Complete Appointment Lifecycle** - Book → Complete → Dental Record (FULL AUTOMATION!)
-- ✅ **Auto-mark Missed** - System automatically detects and marks missed appointments
+- ✅ **Interactive Tooth Chart** - Anatomical curved arch design with clickable teeth
+- ✅ **Document Management** - Upload and manage X-rays, scans, and reports
+- ✅ **Medical History Tracking** - Comprehensive patient medical history and allergies
+
+#### 📅 Appointment Management
+- ✅ **Centralized Scheduling** - Unified calendar accessible to staff across all branches
+- ✅ **Complete Appointment Lifecycle** - Book → Confirm → Complete → Dental Record (FULL AUTOMATION!)
+- ✅ **Auto-mark Missed Appointments** - System automatically detects and marks missed appointments
 - ✅ **Reschedule & Cancel Requests** - Patient request system with staff approval workflow
 - ✅ **Real-Time Notifications** - Staff and owner receive instant notifications for all appointment actions
-- ✅ **AI Chatbot** - Patient support assistant
-- ✅ **Email Authentication** - Secure token-based login
-- ✅ **Responsive Design** - Works on all devices
-- ✅ **Unified Patient Record Management** - Central database for all patient information and records
-- ✅ **Centralized Appointment Scheduling** - Unified calendar accessible to staff across all branches for real-time booking and coordination
-- ✅ **Integrated Financial & Inventory Modules** - Streamlined tools for creating invoices, tracking payments, and monitoring dental supplies
-- ✅ **Secure Patient Portal** - Patients can view treatment history, appointment schedules, and billing information after authentication
+- ✅ **Multi-Dentist Support** - Assign appointments to specific dentists
+
+#### 📦 Inventory Management
+- ✅ **Supply Tracking** - Monitor dental supplies and materials in real-time
+- ✅ **Low Stock Alerts** - Automatic notifications when inventory falls below reorder points
+- ✅ **Usage Recording** - Track inventory consumption and costs
+- ✅ **Reorder Management** - Manage supplier information and reorder schedules
+
+#### 💰 Billing & Financial Management
+- ✅ **Invoice Generation** - Create itemized bills for services and materials
+- ✅ **Payment Tracking** - Record and monitor patient payments
+- ✅ **Statement of Accounts** - Generate comprehensive billing summaries
+- ✅ **Financial Analytics** - Revenue and expense tracking with detailed reports
+
+#### 🔐 Security & Authentication
+- ✅ **Email Authentication** - Secure token-based login system
+- ✅ **Role-Based Access Control** - Different permissions for patients, staff, and owners
+- ✅ **Secure Patient Portal** - Protected access to personal health information
+
+#### 🎨 User Experience
+- ✅ **Responsive Design** - Works seamlessly on desktop, tablet, and mobile devices
+- ✅ **AI Chatbot** - Patient support assistant for common inquiries
+- ✅ **Intuitive Interface** - User-friendly design for all user types
+- ✅ **Real-Time Updates** - Live data synchronization across all users
 
 ---
 
@@ -116,7 +141,7 @@ For detailed information about the project's design, architecture, and deliverab
 
 ## 👨‍💻 Our Team
 
-This project is brought to you by the talented members of G07.
+This project is brought to you by the talented members of TechTalk.
 
 | Name                   | Role            |
 | --------------------   | --------------- |
