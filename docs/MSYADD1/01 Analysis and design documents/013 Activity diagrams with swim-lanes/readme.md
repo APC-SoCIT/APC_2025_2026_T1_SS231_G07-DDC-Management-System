@@ -5,42 +5,64 @@ This directory contains the comprehensive collection of UML Activity Diagrams th
 
 ## Master Diagram Document
 
-The primary document linked below contains the activity diagrams for all 22 use cases, providing a complete visual guide to the system's operational flows.
+The primary document linked below contains the activity diagrams for all 27 use cases, providing a complete visual guide to the system's operational flows.
 
-* **[View All Activity Diagrams (Use Cases 1-22)](https://drive.google.com/file/d/1kXJ6ctRAWpmxoDnnD4TWgh3sG_YAZnlq/view?usp=sharing)**
+* **[View All Activity Diagrams (Use Cases 1-27)](https://asiapacificcollege.sharepoint.com/:w:/s/SSYADD1SS231T1AY2025-2026/ESvXQG-vpuNIrHRJ4vpWOsoBMshPAhYm2dczWjW33sfPlw?e=UXE83R)**
 
 ## Covered Use Cases
 
 The linked document includes detailed diagrams for the following functionalities:
 
-* **Use Case 1:** Register
-* **Use Case 2:** Login
-* **Use Case 3:** Reset Password
-* **Use Case 4:** Update/View Personal Information
-* **Use Case 5:** View Service
-* **Use Case 6:** Fill/Update Patient Forms
-* **Use Case 7:** Request Consultation Appointment
-* **Use Case 8:** View Appointment Schedules
-* **Use Case 9:** Create Appointment Schedule
-* **Use Case 10:** Update Appointment Schedule
-* **Use Case 11:** Delete Appointment
-* **Use Case 12:** View Appointment History
-* **Use Case 13:** Assign Treatments
-* **Use Case 14:** View Dentist Schedule
-* **Use Case 15a:** Create Patient Record
-* **Use Case 15b:** View Patient Record
-* **Use Case 15c:** Update Patient Record
-* **Use Case 16:** Download Personal Records
-* **Use Case 17:** View / Download Invoice
-* **Use Case 18a:** Add Inventory Item
-* **Use Case 18b:** View Inventory
-* **Use Case 18c:** Update Inventory Item
-* **Use Case 18d:** Delete Inventory Item
-* **Use Case 19a:** Record New Charge
-* **Use Case 19b:** Post Payment or Adjustment
-* **Use Case 19c:** View Patient Transaction History
-* **Use Case 20a:** Create User Account
-* **Use Case 20b:** View User Account Details
-* **Use Case 20d:** Deactivate User Account
-* **Use Case 21:** AI Agent Appointment Assistance
-* **Use Case 22:** Generate Reports
+**UC-01:** Register 
+
+**UC-02:** Login 
+
+**UC-03:** Manage Staff Roles 
+
+**UC-04:** Appointment Creation 
+
+**UC-05:** Schedule Retrieval 
+
+**UC-06:** Confirm Appointments 
+
+**UC-07:** Update Appointments 
+
+**UC-08:** Billing Data Transfer 
+
+**UC-09:** Record Creation 
+
+**UC-10:** Record Modification 
+
+**UC-11:** Staff Record Retrieval 
+
+**UC-12:** Patient Record Viewing 
+
+**UC-13:** Record Exportation 
+
+**UC-14:** Invoice Generation 
+
+**UC-15:** Payment Application 
+
+**UC-16:** Billing Retrieval 
+
+**UC-17:** Report Data Provision 
+
+**UC-18:** Service Consumable Depletion 
+
+**UC-19:** Stock Replenishment 
+
+**UC-20:** Inventory Management Retrieval 
+
+**UC-21:** Inventory Management Retrieval 
+
+**UC-22:** Inventory Report Provision 
+
+**UC-23:** Service List Synchronization 
+
+**UC-24:** Service Administration 
+
+**UC-25:** Service Publication 
+
+**UC-26:** Financial Report Generation 
+
+**UC-27:** Inventory Report Generation
