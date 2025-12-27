@@ -159,7 +159,7 @@ This project is brought to you by the talented members of TechTalk.
 - Node.js 18 or higher
 - Git
 
-### Backend Setup (Windows)
+### Backend Setup (Local Windows)
 
 1. **Navigate to the backend directory:**
    ```powershell
@@ -197,5 +197,31 @@ The backend will be accessible at `http://127.0.0.1:8000/`.
 - The project uses SQLite for local development (no PostgreSQL required).
 - For production, configure `DATABASE_URL` in `.env` for PostgreSQL.
 
-### Frontend Setup
-*(Add frontend commands here if available)*
+### Frontend Setup (Local Development)
+
+1. **Navigate to the frontend directory:**
+   ```bash
+   cd dorotheo-dental-clinic-website/frontend
+   ```
+
+2. **Install dependencies (first time only):**
+   ```bash
+   pnpm install
+   ```
+   *Or if using npm:*
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server:**
+   ```bash
+   pnpm dev
+   ```
+   *Or if using npm:*
+   ```bash
+   npm run dev
+   ```
+
+The frontend will be accessible at `http://localhost:3000/`.
+
+**Note:** These commands are for local development only. For production deployment, refer to the deployment guides in the backend directory.
