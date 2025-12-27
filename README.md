@@ -150,3 +150,53 @@ This project is brought to you by the talented members of TechTalk.
 | Airo Ravinera          | Member          |
 | Michael Orenze         | Member          |
 | Jasper Valdez          | Member          |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.8 or higher
+- Node.js 18 or higher
+- Git
+
+### Backend Setup (Windows)
+
+1. **Navigate to the backend directory:**
+   ```powershell
+   cd "dorotheo-dental-clinic-website\backend"
+   ```
+
+2. **Activate the virtual environment:**
+   ```powershell
+   & "venv\Scripts\Activate.ps1"
+   ```
+
+3. **Install dependencies (first time only):**
+   ```powershell
+   pip install -r requirements.txt
+   ```
+   *Note: If `psycopg2-binary` fails to install (common on Windows), install core packages manually:*
+   ```powershell
+   pip install Django==4.2.7 djangorestframework==3.14.0 django-cors-headers==4.3.1 Pillow gunicorn whitenoise dj-database-url python-dotenv
+   ```
+
+4. **Run database migrations (first time or after model changes):**
+   ```powershell
+   python manage.py migrate
+   ```
+
+5. **Start the development server:**
+   ```powershell
+   python manage.py runserver
+   ```
+
+The backend will be accessible at `http://127.0.0.1:8000/`.
+
+**Notes:**
+- Dependencies only need installation once per environment.
+- The project uses SQLite for local development (no PostgreSQL required).
+- For production, configure `DATABASE_URL` in `.env` for PostgreSQL.
+
+### Frontend Setup
+*(Add frontend commands here if available)*
