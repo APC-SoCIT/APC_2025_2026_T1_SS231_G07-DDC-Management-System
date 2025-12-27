@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Dental Clinic Management System for Dorotheo Dental Clinic
 
 [![Status](https://img.shields.io/badge/status-in_development-orange)](https://github.com/APC-SoCIT/APC_2025_2026_T1_SS231_G07-DDC-Management-System/)
