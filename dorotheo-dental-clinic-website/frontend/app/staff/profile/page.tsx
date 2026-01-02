@@ -44,12 +44,14 @@ export default function StaffProfile() {
 
       const updatedUser = await api.updateStaff(user.id, updateData, token)
       
-      // Update the user in auth context
+      // Update the user in auth context with all fields
       setUser({
         ...user,
         first_name: updatedUser.first_name,
         last_name: updatedUser.last_name,
         email: updatedUser.email,
+        phone: updatedUser.phone,
+        address: updatedUser.address,
       })
       
       setIsEditing(false)
