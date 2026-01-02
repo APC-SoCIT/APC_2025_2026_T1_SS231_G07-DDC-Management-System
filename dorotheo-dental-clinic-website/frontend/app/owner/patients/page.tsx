@@ -104,8 +104,10 @@ export default function OwnerPatients() {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
         
-        // Transform API response to Patient interface
-        const transformedPatients = patientsResponse.map((user: any) => {
+        // Transform API response to Patient interface - exclude archived patients
+        const transformedPatients = patientsResponse
+          .filter((user: any) => !user.is_archived)
+          .map((user: any) => {
           // Filter appointments for this patient
           const patientAppointments = appointmentsResponse.filter(
             (apt: any) => apt.patient === user.id
@@ -156,30 +158,28 @@ export default function OwnerPatients() {
         
         setPatients(transformedPatients)
 
-        // Fetch archived patients
-        if (activeTab === "archived") {
-          const archivedResponse = await api.getArchivedPatients(token)
-          const transformedArchived = archivedResponse.map((user: any) => ({
-            id: user.id,
-            name: `${user.first_name} ${user.last_name}`,
-            email: user.email,
-            phone: user.phone || "N/A",
-            lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
-            status: "inactive" as const,
-            address: user.address || "N/A",
-            dateOfBirth: user.birthday || "N/A",
-            age: user.age || 0,
-            gender: user.gender || "Not specified",
-            medicalHistory: [],
-            allergies: [],
-            upcomingAppointments: [],
-            pastAppointments: 0,
-            totalBilled: 0,
-            balance: 0,
-            notes: "",
-          }))
-          setArchivedPatients(transformedArchived)
-        }
+        // Always fetch archived patients
+        const archivedResponse = await api.getArchivedPatients(token)
+        const transformedArchived = archivedResponse.map((user: any) => ({
+          id: user.id,
+          name: `${user.first_name} ${user.last_name}`,
+          email: user.email,
+          phone: user.phone || "N/A",
+          lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
+          status: "archived" as const,
+          address: user.address || "N/A",
+          dateOfBirth: user.birthday || "N/A",
+          age: user.age || 0,
+          gender: user.gender || "Not specified",
+          medicalHistory: [],
+          allergies: [],
+          upcomingAppointments: [],
+          pastAppointments: 0,
+          totalBilled: 0,
+          balance: 0,
+          notes: "",
+        }))
+        setArchivedPatients(transformedArchived)
       } catch (error) {
         console.error("Error fetching data:", error)
       } finally {
@@ -197,7 +197,14 @@ export default function OwnerPatients() {
     
     try {
       await api.archivePatient(patientId, token!)
-      // Remove from current patients and refresh
+      // Find the archived patient
+      const archivedPatient = patients.find(p => p.id === patientId)
+      if (archivedPatient) {
+        // Update status and add to archived list
+        const updatedPatient = { ...archivedPatient, status: "archived" as const }
+        setArchivedPatients([...archivedPatients, updatedPatient])
+      }
+      // Remove from current patients
       setPatients(patients.filter(p => p.id !== patientId))
       alert("Patient archived successfully!")
     } catch (error) {
@@ -213,30 +220,15 @@ export default function OwnerPatients() {
     
     try {
       await api.restorePatient(patientId, token!)
-      // Remove from archived and refresh
+      // Find the restored patient
+      const restoredPatient = archivedPatients.find(p => p.id === patientId)
+      if (restoredPatient) {
+        // Update status and add to patients list
+        const updatedPatient = { ...restoredPatient, status: "active" as const }
+        setPatients([...patients, updatedPatient])
+      }
+      // Remove from archived
       setArchivedPatients(archivedPatients.filter(p => p.id !== patientId))
-      // Refresh active patients list
-      const response = await api.getPatients(token!)
-      const transformedPatients = response.map((user: any) => ({
-        id: user.id,
-        name: `${user.first_name} ${user.last_name}`,
-        email: user.email,
-        phone: user.phone || "N/A",
-        lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
-        status: user.is_active_patient ? "active" as const : "inactive" as const,
-        address: user.address || "N/A",
-        dateOfBirth: user.birthday || "N/A",
-        age: user.age || 0,
-        gender: user.gender || "Not specified",
-        medicalHistory: [],
-        allergies: [],
-        upcomingAppointments: [],
-        pastAppointments: 0,
-        totalBilled: 0,
-        balance: 0,
-        notes: "",
-      }))
-      setPatients(transformedPatients)
       alert("Patient restored successfully!")
     } catch (error) {
       console.error("Error restoring patient:", error)
@@ -245,7 +237,7 @@ export default function OwnerPatients() {
   }
 
   // Remove mock patients - only use real patient data from API
-  const displayPatients = activeTab === "archived" ? archivedPatients : patients
+  const displayPatients = activeTab === "archived" ? archivedPatients : activeTab === "all" ? [...patients, ...archivedPatients] : patients
   const filteredPatients = displayPatients.filter((patient) => {
     const matchesSearch =
       patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -254,10 +246,10 @@ export default function OwnerPatients() {
 
     const matchesTab =
       activeTab === "all" ||
-      activeTab === "archived" ||
+      (activeTab === "archived" && patient.status === "archived") ||
       (activeTab === "active" && patient.status === "active") ||
       (activeTab === "inactive" && patient.status === "inactive") ||
-      (activeTab === "new" && new Date(patient.lastVisit).getMonth() === new Date().getMonth())
+      (activeTab === "new" && patient.status !== "archived" && new Date(patient.lastVisit).getMonth() === new Date().getMonth())
 
     return matchesSearch && matchesTab
   })
@@ -403,7 +395,6 @@ export default function OwnerPatients() {
           {[
             { id: "all", label: "All Patients" },
             { id: "active", label: "Active" },
-            { id: "inactive", label: "Inactive" },
             { id: "new", label: "New This Month" },
             { id: "archived", label: "Archived" },
           ].map((tab) => (

@@ -4,16 +4,16 @@ import { useState, useEffect } from "react"
 import { Camera } from "lucide-react"
 import AvailabilityCalendar from "@/components/availability-calendar"
 import { useAuth } from "@/lib/auth"
+import { api } from "@/lib/api"
 
 export default function OwnerProfile() {
-  const { user } = useAuth()
+  const { user, token, setUser } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
-    address: "",
   })
 
   // Load user data when component mounts
@@ -23,11 +23,51 @@ export default function OwnerProfile() {
         firstName: user.first_name || "",
         lastName: user.last_name || "",
         email: user.email || "",
-        phone: "",
-        address: "",
+        phone: (user as any).phone || "",
       })
     }
   }, [user])
+
+  const handleSave = async () => {
+    if (!token || !user) return
+
+    try {
+      const updateData = {
+        first_name: profile.firstName,
+        last_name: profile.lastName,
+        email: profile.email,
+        phone: profile.phone,
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/api/users/${user.id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) throw new Error("Failed to update profile")
+      
+      const updatedUser = await response.json()
+      
+      // Update the user in auth context with all fields
+      setUser({
+        ...user,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+      })
+      
+      setIsEditing(false)
+      alert("Profile updated successfully!")
+    } catch (error) {
+      console.error("Error updating profile:", error)
+      alert("Failed to update profile.")
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -57,7 +97,7 @@ export default function OwnerProfile() {
           </div>
           <div>
             <h2 className="text-2xl font-semibold text-[var(--color-text)]">
-              Dr. {user?.first_name} {user?.last_name}
+              {user?.first_name} {user?.last_name}
             </h2>
             <p className="text-[var(--color-text-muted)]">Owner</p>
           </div>
@@ -107,17 +147,6 @@ export default function OwnerProfile() {
               className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
             />
           </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Address</label>
-            <textarea
-              value={profile.address}
-              onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-              disabled={!isEditing}
-              rows={3}
-              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
-            />
-          </div>
         </div>
 
         {isEditing && (
@@ -129,7 +158,7 @@ export default function OwnerProfile() {
               Cancel
             </button>
             <button
-              onClick={() => setIsEditing(false)}
+              onClick={handleSave}
               className="px-6 py-2.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
             >
               Save Changes
