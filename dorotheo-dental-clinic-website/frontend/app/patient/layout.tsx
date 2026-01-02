@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, User, Calendar, FileText, CreditCard, LogOut, Menu, X } from "lucide-react"
+import { LayoutDashboard, User, Calendar, FileText, CreditCard, LogOut, Menu, X, ChevronDown, ChevronRight, Camera, FolderOpen, Activity } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import ChatbotWidget from "@/components/chatbot-widget"
 
@@ -15,12 +15,17 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
   const { logout, user } = useAuth()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isDentalRecordsOpen, setIsDentalRecordsOpen] = useState(false)
 
   const navigation = [
     { name: "Overview", href: "/patient/dashboard", icon: LayoutDashboard },
     { name: "Appointments", href: "/patient/appointments", icon: Calendar },
-    { name: "Dental Records", href: "/patient/records", icon: FileText },
-    { name: "Billing", href: "/patient/billing", icon: CreditCard },
+  ]
+
+  const dentalRecordsSubItems = [
+    { name: "Treatment History", href: "/patient/records/treatment", icon: Activity },
+    { name: "Documents", href: "/patient/records/documents", icon: FolderOpen },
+    { name: "Teeth & X-Ray Images", href: "/patient/records/images", icon: Camera },
   ]
 
   const handleLogout = () => {
@@ -126,6 +131,66 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
                 </Link>
               )
             })}
+
+            {/* Dental Records Collapsible Section */}
+            <div>
+              <button
+                onClick={() => setIsDentalRecordsOpen(!isDentalRecordsOpen)}
+                className={`flex items-center justify-between gap-3 px-4 py-3 w-full rounded-lg transition-colors ${
+                  pathname.startsWith("/patient/records")
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "text-[var(--color-text)] hover:bg-[var(--color-background)]"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5" />
+                  <span className="font-medium">Dental Records</span>
+                </div>
+                {isDentalRecordsOpen ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* Dental Records Subsections */}
+              {isDentalRecordsOpen && (
+                <div className="mt-1 ml-4 space-y-1">
+                  {dentalRecordsSubItems.map((subItem) => {
+                    const isActive = pathname === subItem.href
+                    return (
+                      <Link
+                        key={subItem.name}
+                        href={subItem.href}
+                        onClick={() => setIsSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                          isActive
+                            ? "bg-[var(--color-accent)] text-white"
+                            : "text-[var(--color-text-muted)] hover:bg-[var(--color-background)]"
+                        }`}
+                      >
+                        <subItem.icon className="w-4 h-4" />
+                        <span className="text-sm">{subItem.name}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Billing Link */}
+            <Link
+              href="/patient/billing"
+              onClick={() => setIsSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                pathname === "/patient/billing"
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "text-[var(--color-text)] hover:bg-[var(--color-background)]"
+              }`}
+            >
+              <CreditCard className="w-5 h-5" />
+              <span className="font-medium">Billing</span>
+            </Link>
           </nav>
 
           <div className="p-4 border-t border-[var(--color-border)]">

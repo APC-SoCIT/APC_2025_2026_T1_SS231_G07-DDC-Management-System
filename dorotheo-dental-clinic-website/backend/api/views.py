@@ -219,6 +219,39 @@ class UserViewSet(viewsets.ModelViewSet):
         if password:
             user.set_password(password)
             user.save()
+    
+    def destroy(self, request, *args, **kwargs):
+        """Control deletion permissions based on user type"""
+        user_to_delete = self.get_object()
+        requester = request.user
+        
+        # Prevent deleting owner accounts
+        if user_to_delete.user_type == 'owner':
+            return Response(
+                {'error': 'Owner accounts cannot be deleted'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # For patient accounts: Only Owner and Receptionist can delete
+        if user_to_delete.user_type == 'patient':
+            is_owner = requester.user_type == 'owner'
+            is_receptionist = requester.user_type == 'staff' and requester.role == 'receptionist'
+            
+            if not (is_owner or is_receptionist):
+                return Response(
+                    {'error': 'Only Owner and Receptionist can delete patient accounts'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # For staff accounts: Only Owner can delete
+        if user_to_delete.user_type == 'staff':
+            if requester.user_type != 'owner':
+                return Response(
+                    {'error': 'Only Owner can delete staff accounts'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'])
     def patients(self, request):
@@ -501,10 +534,31 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
     
     def perform_update(self, serializer):
-        """Update patient status after updating appointment"""
+        """Update patient status and create dental record when appointment is completed"""
+        old_status = self.get_object().status
         appointment = serializer.save()
+        
         if appointment.patient:
             appointment.patient.update_patient_status()
+        
+        # If appointment status changed to 'completed', create/update dental record
+        if old_status != 'completed' and appointment.status == 'completed':
+            # Check if dental record already exists for this appointment
+            dental_record, created = DentalRecord.objects.get_or_create(
+                appointment=appointment,
+                patient=appointment.patient,
+                defaults={
+                    'treatment': appointment.service.name if appointment.service else 'General Checkup',
+                    'diagnosis': '',
+                    'notes': appointment.notes or '',
+                    'created_by': appointment.dentist if appointment.dentist else None
+                }
+            )
+            
+            if created:
+                print(f"[Django] Created dental record for completed appointment: {appointment.id}")
+            else:
+                print(f"[Django] Dental record already exists for appointment: {appointment.id}")
 
     @action(detail=False, methods=['get'])
     def today(self, request):
@@ -515,35 +569,57 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def request_reschedule(self, request, pk=None):
         """Patient requests to reschedule an appointment"""
-        appointment = self.get_object()
-        
-        # Check if user is the patient
-        if request.user != appointment.patient:
+        try:
+            appointment = self.get_object()
+            
+            # Check if user is the patient
+            if request.user != appointment.patient:
+                return Response(
+                    {'error': 'Only the patient can request reschedule'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if appointment.status in ['cancelled', 'completed', 'cancel_requested']:
+                return Response(
+                    {'error': 'Cannot reschedule this appointment'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set reschedule request data
+            appointment.reschedule_date = request.data.get('date')
+            appointment.reschedule_time = request.data.get('time')
+            
+            # Handle service - get Service object if ID provided, otherwise use current service
+            service_id = request.data.get('service')
+            if service_id:
+                appointment.reschedule_service_id = service_id
+            else:
+                appointment.reschedule_service = appointment.service
+            
+            # Handle dentist - get User object if ID provided, otherwise use current dentist
+            dentist_id = request.data.get('dentist')
+            if dentist_id:
+                appointment.reschedule_dentist_id = dentist_id
+            else:
+                appointment.reschedule_dentist = appointment.dentist
+            
+            appointment.reschedule_notes = request.data.get('notes', '')
+            appointment.status = 'reschedule_requested'
+            appointment.save()
+            
+            # Create notifications for staff and owner
+            create_appointment_notification(appointment, 'reschedule_request')
+            
+            serializer = self.get_serializer(appointment)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"[ERROR] Failed to process reschedule request: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return Response(
-                {'error': 'Only the patient can request reschedule'},
-                status=status.HTTP_403_FORBIDDEN
+                {'error': f'Failed to process reschedule request: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
-        if appointment.status in ['cancelled', 'completed', 'cancel_requested']:
-            return Response(
-                {'error': 'Cannot reschedule this appointment'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Set reschedule request data
-        appointment.reschedule_date = request.data.get('date')
-        appointment.reschedule_time = request.data.get('time')
-        appointment.reschedule_service = request.data.get('service') if request.data.get('service') else appointment.service
-        appointment.reschedule_dentist = request.data.get('dentist') if request.data.get('dentist') else appointment.dentist
-        appointment.reschedule_notes = request.data.get('notes', '')
-        appointment.status = 'reschedule_requested'
-        appointment.save()
-        
-        # Create notifications for staff and owner
-        create_appointment_notification(appointment, 'reschedule_request')
-        
-        serializer = self.get_serializer(appointment)
-        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def approve_reschedule(self, request, pk=None):
@@ -563,8 +639,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             appointment.service = appointment.reschedule_service
         if appointment.reschedule_dentist:
             appointment.dentist = appointment.reschedule_dentist
-        if appointment.reschedule_notes:
-            appointment.notes = appointment.reschedule_notes
+        # DO NOT overwrite the original notes - keep the dentist's special notes intact
         
         # Clear reschedule fields
         appointment.reschedule_date = None

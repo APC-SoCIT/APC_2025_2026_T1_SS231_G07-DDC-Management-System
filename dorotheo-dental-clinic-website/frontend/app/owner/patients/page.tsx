@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, Fragment, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { 
   Search, 
   Plus, 
@@ -34,7 +35,7 @@ interface Patient {
   email: string
   phone: string
   lastVisit: string
-  status: "active" | "inactive"
+  status: "active" | "inactive" | "archived"
   address: string
   dateOfBirth: string
   age: number
@@ -54,7 +55,8 @@ interface Patient {
 }
 
 export default function OwnerPatients() {
-  const { token } = useAuth()
+  const router = useRouter()
+  const { token, user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive" | "new" | "archived">("all")
   const [showAddModal, setShowAddModal] = useState(false)
@@ -255,8 +257,8 @@ export default function OwnerPatients() {
   })
 
   const handleRowClick = (patientId: number) => {
-    if (editingRow === patientId) return
-    setExpandedRow(expandedRow === patientId ? null : patientId)
+    // Navigate to patient detail page
+    router.push(`/owner/patients/${patientId}`)
   }
 
   const handleEdit = (patient: Patient, e: React.MouseEvent) => {
@@ -277,11 +279,24 @@ export default function OwnerPatients() {
     setEditedData({})
   }
 
-  const handleDelete = (patientId: number, e: React.MouseEvent) => {
+  const handleDelete = async (patientId: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm("Are you sure you want to delete this patient?")) {
+    
+    if (!confirm("Are you sure you want to delete this patient? This action cannot be undone.")) {
+      return
+    }
+    
+    try {
+      await api.deleteUser(patientId, token!)
+      // Remove from both patients and archived patients lists
       setPatients(patients.filter((p) => p.id !== patientId))
+      setArchivedPatients(archivedPatients.filter((p) => p.id !== patientId))
       setExpandedRow(null)
+      alert("Patient deleted successfully")
+    } catch (error: any) {
+      console.error("Error deleting patient:", error)
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to delete patient"
+      alert(errorMessage)
     }
   }
 
@@ -316,28 +331,62 @@ export default function OwnerPatients() {
         address: newPatient.address || null,
       })
 
-      // Refresh the patient list
-      const response = await api.getPatients(token!)
-      const transformedPatients = response.map((user: any) => ({
-        id: user.id,
-        name: `${user.first_name} ${user.last_name}`,
-        email: user.email,
-        phone: user.phone || "N/A",
-        lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
-        status: user.is_active_patient ? "active" : "inactive",
-        address: user.address || "N/A",
-        dateOfBirth: user.birthday || "N/A",
-        age: user.age || 0,
-        gender: user.gender || "Not specified",
-        medicalHistory: [],
-        allergies: [],
-        upcomingAppointments: [],
-        pastAppointments: 0,
-        totalBilled: 0,
-        balance: 0,
-        notes: "",
-      }))
+      // Refresh the patient list with full data including appointments
+      const [patientsResponse, appointmentsResponse] = await Promise.all([
+        api.getPatients(token!),
+        api.getAppointments(token!)
+      ])
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const transformedPatients = patientsResponse
+        .filter((user: any) => !user.is_archived)
+        .map((user: any) => {
+          const patientAppointments = appointmentsResponse.filter(
+            (apt: any) => apt.patient === user.id
+          )
+          
+          const upcomingAppts = patientAppointments
+            .filter((apt: any) => {
+              const aptDate = new Date(apt.date)
+              return aptDate >= today && apt.status !== 'cancelled' && apt.status !== 'completed'
+            })
+            .map((apt: any) => ({
+              date: apt.date,
+              time: apt.time,
+              type: apt.service_name || "General Consultation",
+              doctor: apt.dentist_name || "Dr. Marvin Dorotheo"
+            }))
+            .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          
+          const pastAppts = patientAppointments.filter((apt: any) => {
+            const aptDate = new Date(apt.date)
+            return aptDate < today || apt.status === 'completed'
+          })
+
+          return {
+            id: user.id,
+            name: `${user.first_name} ${user.last_name}`,
+            email: user.email,
+            phone: user.phone || "N/A",
+            lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
+            status: user.is_active_patient ? "active" : "inactive",
+            address: user.address || "N/A",
+            dateOfBirth: user.birthday || "N/A",
+            age: user.age || 0,
+            gender: user.gender || "Not specified",
+            medicalHistory: [],
+            allergies: [],
+            upcomingAppointments: upcomingAppts,
+            pastAppointments: pastAppts.length,
+            totalBilled: 0,
+            balance: 0,
+            notes: "",
+          }
+        })
       setPatients(transformedPatients)
+      setAppointments(appointmentsResponse)
 
       // Reset form and close modal
       setNewPatient({
@@ -436,14 +485,7 @@ export default function OwnerPatients() {
                     className="hover:bg-[var(--color-background)] transition-all duration-200 cursor-pointer"
                   >
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {expandedRow === patient.id ? (
-                          <ChevronUp className="w-4 h-4 text-[var(--color-primary)]" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-[var(--color-text-muted)]" />
-                        )}
-                        <p className="font-medium text-[var(--color-text)]">{patient.name}</p>
-                      </div>
+                      <p className="font-medium text-[var(--color-text)]">{patient.name}</p>
                     </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.email}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.phone}</td>

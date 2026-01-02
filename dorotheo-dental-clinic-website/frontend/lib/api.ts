@@ -174,16 +174,31 @@ export const api = {
 
   // Reschedule request endpoints
   requestReschedule: async (id: number, data: { date: string; time: string; service?: number; dentist?: number; notes?: string }, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/appointments/${id}/request_reschedule/`, {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    })
-    if (!response.ok) throw new Error("Failed to request reschedule")
-    return response.json()
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/${id}/request_reschedule/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+      
+      if (!response.ok) {
+        let errorData: any = {}
+        try {
+          errorData = await response.json()
+        } catch (e) {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
+        }
+        throw { response: { data: errorData }, message: errorData.error || errorData.message || "Failed to request reschedule" }
+      }
+      
+      return response.json()
+    } catch (error: any) {
+      console.error("[API] requestReschedule error:", error)
+      throw error
+    }
   },
 
   approveReschedule: async (id: number, token: string) => {
@@ -352,6 +367,14 @@ export const api = {
     return response.json()
   },
 
+  getUser: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error("Failed to fetch user")
+    return response.json()
+  },
+
   createStaff: async (data: any, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/`, {
       method: "POST",
@@ -371,6 +394,19 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) throw new Error("Failed to delete staff")
+  },
+
+  deleteUser: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
+      method: "DELETE",
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to delete user' }))
+      const error: any = new Error(errorData.error || 'Failed to delete user')
+      error.response = { data: errorData }
+      throw error
+    }
   },
 
   updateStaff: async (id: number, data: any, token: string) => {

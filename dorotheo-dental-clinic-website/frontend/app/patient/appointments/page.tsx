@@ -80,6 +80,7 @@ export default function PatientAppointments() {
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
   const [rescheduleAvailableDates, setRescheduleAvailableDates] = useState<Set<string>>(new Set())
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number}>>([])
+  const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number}>>([])
 
   // Generate 30-minute time slots from 10:00 AM to 8:00 PM
   const generateTimeSlots = () => {
@@ -194,14 +195,17 @@ export default function PatientAppointments() {
   // Fetch dentist availability for reschedule modal
   useEffect(() => {
     const fetchRescheduleDentistAvailability = async () => {
-      if (!token || !rescheduleData.dentist) {
+      if (!token || !rescheduleData.dentist || !showRescheduleModal) {
         setRescheduleDentistAvailability([])
         setRescheduleAvailableDates(new Set())
         return
       }
 
+      console.log('[RESCHEDULE] Fetching availability for dentist:', rescheduleData.dentist)
+
       try {
         const availability = await api.getStaffAvailability(Number(rescheduleData.dentist), token)
+        console.log('[RESCHEDULE] Availability received:', availability)
         setRescheduleDentistAvailability(availability)
         
         // Calculate available dates for the next 90 days
@@ -221,6 +225,7 @@ export default function PatientAppointments() {
           }
         }
         
+        console.log('[RESCHEDULE] Available dates:', Array.from(dates))
         setRescheduleAvailableDates(dates)
       } catch (error) {
         console.error("Error fetching reschedule dentist availability:", error)
@@ -228,7 +233,7 @@ export default function PatientAppointments() {
     }
 
     fetchRescheduleDentistAvailability()
-  }, [rescheduleData.dentist, token])
+  }, [rescheduleData.dentist, token, showRescheduleModal])
 
   // Fetch booked slots when date changes (get ALL slots, not filtered by dentist)
   useEffect(() => {
@@ -262,6 +267,27 @@ export default function PatientAppointments() {
       setRescheduleData(prev => ({ ...prev, date: `${year}-${month}-${day}` }))
     }
   }, [rescheduleSelectedDate])
+
+  // Fetch booked slots for reschedule date
+  useEffect(() => {
+    const fetchRescheduleBookedSlots = async () => {
+      if (!token) return
+
+      try {
+        const date = rescheduleData.date || undefined
+        console.log('[PATIENT RESCHEDULE] Fetching booked slots for date:', date)
+        const slots = await api.getBookedSlots(undefined, date, token)
+        console.log('[PATIENT RESCHEDULE] Booked slots received:', slots)
+        setRescheduleBookedSlots(slots)
+      } catch (error) {
+        console.error("Error fetching reschedule booked slots:", error)
+      }
+    }
+
+    if (rescheduleData.date) {
+      fetchRescheduleBookedSlots()
+    }
+  }, [rescheduleData.date, token])
 
   const handleAddAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -321,16 +347,15 @@ export default function PatientAppointments() {
 
   const handleRequestReschedule = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
+    const dentistId = appointment.dentist?.toString() || ""
     setRescheduleData({
       date: appointment.date,
       time: appointment.time,
-      dentist: appointment.dentist?.toString() || "",
+      dentist: dentistId,
       service: appointment.service?.toString() || "",
       notes: appointment.notes || "",
     })
     setRescheduleSelectedDate(undefined)
-    setRescheduleDentistAvailability([])
-    setRescheduleAvailableDates(new Set())
     setShowRescheduleModal(true)
   }
 
@@ -339,14 +364,34 @@ export default function PatientAppointments() {
     
     if (!token || !selectedAppointment) return
 
+    // Validation
+    if (!rescheduleData.date) {
+      alert("Please select a date")
+      return
+    }
+    if (!rescheduleData.time) {
+      alert("Please select a time")
+      return
+    }
+
     try {
-      const rescheduleRequestData = {
+      const rescheduleRequestData: any = {
         date: rescheduleData.date,
         time: rescheduleData.time,
-        dentist: rescheduleData.dentist ? parseInt(rescheduleData.dentist) : undefined,
-        service: rescheduleData.service ? parseInt(rescheduleData.service) : undefined,
         notes: rescheduleData.notes || "",
       }
+
+      // Only include dentist if changed (though we keep it the same)
+      if (rescheduleData.dentist) {
+        rescheduleRequestData.dentist = parseInt(rescheduleData.dentist)
+      }
+
+      // Only include service if changed
+      if (rescheduleData.service) {
+        rescheduleRequestData.service = parseInt(rescheduleData.service)
+      }
+
+      console.log('[RESCHEDULE] Submitting data:', rescheduleRequestData)
 
       const updatedAppointment = await api.requestReschedule(
         selectedAppointment.id, 
@@ -366,10 +411,32 @@ export default function PatientAppointments() {
         service: "",
         notes: "",
       })
+      setRescheduleSelectedDate(undefined)
+      setRescheduleBookedSlots([])
       alert("Reschedule request submitted! Staff will review it soon.")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error requesting reschedule:", error)
-      alert("Failed to submit reschedule request. Please try again.")
+      console.error("Error details:", JSON.stringify(error, null, 2))
+      
+      // Better error message extraction
+      let errorMsg = "Failed to submit reschedule request. Please try again."
+      
+      if (error?.response?.data) {
+        const errorData = error.response.data
+        if (typeof errorData === 'string') {
+          errorMsg = errorData
+        } else if (errorData.error) {
+          errorMsg = errorData.error
+        } else if (errorData.message) {
+          errorMsg = errorData.message
+        } else {
+          errorMsg = JSON.stringify(errorData, null, 2)
+        }
+      } else if (error?.message) {
+        errorMsg = error.message
+      }
+      
+      alert(`Failed to submit reschedule request:\n${errorMsg}`)
     }
   }
 
@@ -551,7 +618,7 @@ export default function PatientAppointments() {
                   {appointment.status === "reschedule_requested" && appointment.reschedule_date && (
                     <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                       <p className="text-sm font-semibold text-orange-800 mb-2">📅 Requested Reschedule:</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div>
                           <span className="text-orange-600 font-medium">New Date:</span>
                           <p className="text-orange-800">{appointment.reschedule_date}</p>
@@ -560,15 +627,11 @@ export default function PatientAppointments() {
                           <span className="text-orange-600 font-medium">New Time:</span>
                           <p className="text-orange-800">{appointment.reschedule_time}</p>
                         </div>
-                        <div>
-                          <span className="text-orange-600 font-medium">New Dentist:</span>
-                          <p className="text-orange-800">{appointment.reschedule_dentist_name || "To be assigned"}</p>
-                        </div>
                       </div>
-                      {appointment.reschedule_service_name && (
-                        <div className="mt-2">
-                          <span className="text-orange-600 font-medium text-sm">New Treatment:</span>
-                          <p className="text-orange-800 text-sm">{appointment.reschedule_service_name}</p>
+                      {appointment.reschedule_notes && (
+                        <div className="mt-3">
+                          <span className="text-orange-600 font-medium text-sm">Notes:</span>
+                          <p className="text-orange-800 text-sm">{appointment.reschedule_notes}</p>
                         </div>
                       )}
                       <p className="text-xs text-orange-700 mt-2">Waiting for staff approval...</p>
@@ -874,38 +937,39 @@ export default function PatientAppointments() {
 
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Dentist <span className="text-red-500">*</span>
+                  Dentist
                 </label>
-                <select
-                  value={rescheduleData.dentist}
-                  onChange={(e) => setRescheduleData({ ...rescheduleData, dentist: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
-                >
-                  <option value="">Select Dentist</option>
-                  {staff
-                    .filter((member) => member.role === "dentist")
-                    .map((dentist) => (
-                      <option key={dentist.id} value={dentist.id}>
-                        Dr. {dentist.first_name} {dentist.last_name}
-                      </option>
-                    ))}
-                </select>
+                <input
+                  type="text"
+                  value={selectedAppointment.dentist_name || "Not Assigned"}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500 mt-1">Dentist cannot be changed when rescheduling</p>
               </div>
 
               {/* Calendar for selecting date */}
-              {rescheduleData.dentist && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                    Select Date <span className="text-red-500">*</span>
-                  </label>
-                  <div className="border border-[var(--color-border)] rounded-lg p-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                  Select Date <span className="text-red-500">*</span>
+                </label>
+                <div className="border border-[var(--color-border)] rounded-lg p-4 bg-white">
                     <Calendar
                       mode="single"
                       selected={rescheduleSelectedDate}
                       onSelect={setRescheduleSelectedDate}
-                      className="rounded-md"
                       disabled={(date) => {
+                        // Disable past dates
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        if (date < today) return true
+                        
+                        // Disable dates beyond 90 days
+                        const maxDate = new Date(today)
+                        maxDate.setDate(today.getDate() + 90)
+                        if (date > maxDate) return true
+                        
+                        // Disable dates when dentist is not available
                         const dateStr = date.toISOString().split('T')[0]
                         return !rescheduleAvailableDates.has(dateStr)
                       }}
@@ -915,65 +979,71 @@ export default function PatientAppointments() {
                           return rescheduleAvailableDates.has(dateStr)
                         }
                       }}
-                      modifiersStyles={{
-                        available: {
-                          backgroundColor: '#10b981',
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }
+                      modifiersClassNames={{
+                        available: "bg-green-100 text-green-900 font-semibold hover:bg-green-200"
                       }}
+                      className="mx-auto"
                     />
-                    {rescheduleDentistAvailability.length > 0 && (
-                      <div className="mt-3 p-3 bg-green-50 rounded-lg">
-                        <p className="text-sm font-semibold text-green-800 mb-2">Available Times:</p>
-                        {rescheduleDentistAvailability
-                          .filter((a: any) => a.is_available)
-                          .map((availability: any, idx: number) => (
-                            <p key={idx} className="text-sm text-green-700">
-                              {availability.day_name}: {availability.start_time} - {availability.end_time}
-                            </p>
-                          ))}
-                      </div>
+                    {rescheduleAvailableDates.size === 0 && (
+                      <p className="text-sm text-amber-600 mt-2 text-center">
+                        ⚠️ Loading dentist availability...
+                      </p>
                     )}
                   </div>
+                </div>
+
+              {/* Time selection - only show if date is selected */}
+              {rescheduleSelectedDate && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                    Preferred Time <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Select a 30-minute time slot (10:00 AM - 8:00 PM). Grayed out times are already booked.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 border border-[var(--color-border)] rounded-lg">
+                    {generateTimeSlots().map((slot) => {
+                      const isBooked = rescheduleBookedSlots.some(bookedSlot => {
+                        const slotTime = bookedSlot.time.substring(0, 5)
+                        return bookedSlot.date === rescheduleData.date && slotTime === slot.value
+                      })
+                      const isSelected = rescheduleData.time === slot.value
+                      return (
+                        <button
+                          key={slot.value}
+                          type="button"
+                          onClick={() => !isBooked && setRescheduleData({ ...rescheduleData, time: slot.value })}
+                          disabled={isBooked}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            isSelected
+                              ? 'bg-[var(--color-primary)] text-white'
+                              : isBooked
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                              : 'bg-white border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-text)]'
+                          }`}
+                        >
+                          {slot.display}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {!rescheduleData.time && (
+                    <p className="text-xs text-red-600 mt-1">* Please select a time slot</p>
+                  )}
                 </div>
               )}
 
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  New Time <span className="text-red-500">*</span>
+                  Treatment
                 </label>
-                  <input
-                    type="time"
-                    value={rescheduleData.time}
-                    onChange={(e) => setRescheduleData({ ...rescheduleData, time: e.target.value })}
-                    min="10:00"
-                    max="20:30"
-                    step="600"
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    required
-                  />
-                  <p className="text-xs text-gray-600 mt-1">
-                    Clinic hours: 10:00 AM - 8:30 PM (10-minute intervals)
-                  </p>
-                </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Treatment/Service
-                </label>
-                <select
-                  value={rescheduleData.service}
-                  onChange={(e) => setRescheduleData({ ...rescheduleData, service: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                >
-                  <option value="">Keep current service</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  value={selectedAppointment.service_name || "General Consultation"}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500 mt-1">Treatment cannot be changed when rescheduling</p>
               </div>
 
               <div>
@@ -1041,7 +1111,7 @@ export default function PatientAppointments() {
                   </p>
                   <div className="flex items-center gap-4 mt-2 text-sm text-[var(--color-text-muted)]">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
+                      <CalendarIcon className="w-3 h-3" />
                       {selectedAppointment.date}
                     </span>
                     <span className="flex items-center gap-1">
