@@ -633,16 +633,6 @@ export default function StaffAppointments() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRowClick(apt.id)
-                          }}
-                          className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4 text-[var(--color-primary)]" />
-                        </button>
                         {/* Approve Button - Only for pending appointments */}
                         {apt.status === "pending" && (
                           <button
@@ -655,21 +645,6 @@ export default function StaffAppointments() {
                           >
                             <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                        )}
-                        {/* Mark as Complete Button - Only for confirmed appointments */}
-                        {apt.status === "confirmed" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleMarkComplete(apt)
-                            }}
-                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Mark as Completed"
-                          >
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           </button>
                         )}
@@ -747,6 +722,23 @@ export default function StaffAppointments() {
                                   />
                                 </div>
                                 <div>
+                                  <label className="block text-sm font-medium mb-1.5">Dentist *</label>
+                                  <select
+                                    value={editedData.dentist !== undefined ? editedData.dentist || "" : apt.dentist || ""}
+                                    onChange={(e) => setEditedData({ ...editedData, dentist: e.target.value ? Number(e.target.value) : null })}
+                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                                  >
+                                    <option value="">Select Dentist</option>
+                                    {staff
+                                      .filter((s) => s.user_type === "dentist" || s.role === "dentist")
+                                      .map((dentist) => (
+                                        <option key={dentist.id} value={dentist.id}>
+                                          Dr. {dentist.first_name} {dentist.last_name}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
+                                <div>
                                   <label className="block text-sm font-medium mb-1.5">Status</label>
                                   <select
                                     value={editedData.status || apt.status}
@@ -795,20 +787,6 @@ export default function StaffAppointments() {
                                 <h3 className="text-xl font-bold text-[var(--color-primary)]">
                                   Appointment Details
                                 </h3>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => handleStatusChange(apt.id, "completed")}
-                                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
-                                  >
-                                    Mark as Completed
-                                  </button>
-                                  <button
-                                    onClick={() => handleStatusChange(apt.id, "cancelled")}
-                                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                                  >
-                                    Cancel Appointment
-                                  </button>
-                                </div>
                               </div>
 
                               {/* Reschedule Request Section */}
