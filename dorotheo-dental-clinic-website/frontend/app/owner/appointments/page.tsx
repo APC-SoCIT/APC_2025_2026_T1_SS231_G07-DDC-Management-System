@@ -645,6 +645,21 @@ export default function OwnerAppointments() {
                             </svg>
                           </button>
                         )}
+                        {/* Complete Button - Only for confirmed appointments on or after the appointment date */}
+                        {apt.status === "confirmed" && new Date(apt.date) <= new Date(new Date().toDateString()) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMarkComplete(apt)
+                            }}
+                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Mark as Complete"
+                          >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => handleEdit(apt, e)}
                           className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
