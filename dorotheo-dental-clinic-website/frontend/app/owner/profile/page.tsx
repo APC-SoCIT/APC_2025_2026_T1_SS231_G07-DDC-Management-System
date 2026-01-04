@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Camera } from "lucide-react"
-import AvailabilityCalendar from "@/components/availability-calendar"
+import DentistCalendarAvailability from "@/components/dentist-calendar-availability"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 
@@ -167,10 +167,10 @@ export default function OwnerProfile() {
         )}
       </div>
 
-      {/* Weekly Availability Schedule (Owner is also a dentist) */}
+      {/* Calendar-Based Availability Schedule (Owner is also a dentist) */}
       <div className="mt-8">
         <h2 className="text-2xl font-semibold text-[var(--color-text)] mb-4">My Schedule</h2>
-        <AvailabilityCalendar staffId={user?.id} />
+        <DentistCalendarAvailability dentistId={user?.id} />
       </div>
     </div>
   )

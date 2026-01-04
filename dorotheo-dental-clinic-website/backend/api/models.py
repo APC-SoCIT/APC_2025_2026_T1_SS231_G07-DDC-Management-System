@@ -304,6 +304,47 @@ class StaffAvailability(models.Model):
         return f"{self.staff.get_full_name()} - {self.get_day_of_week_display()} - {available}"
 
 
+class DentistAvailability(models.Model):
+    """Date-specific availability for dentists and owner (calendar-based)"""
+    dentist = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='date_availability',
+        limit_choices_to={'role__in': ['dentist', ''], 'user_type__in': ['staff', 'owner']}
+    )
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['dentist', 'date']
+        ordering = ['date', 'start_time']
+        verbose_name = 'Dentist Date Availability'
+        verbose_name_plural = 'Dentist Date Availabilities'
+        indexes = [
+            models.Index(fields=['dentist', 'date']),
+            models.Index(fields=['date']),
+        ]
+
+    def __str__(self):
+        return f"{self.dentist.get_full_name()} - {self.date} ({self.start_time} - {self.end_time})"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # Ensure end_time is after start_time
+        if self.end_time <= self.start_time:
+            raise ValidationError('End time must be after start time')
+        
+        # Ensure dentist is actually a dentist or owner
+        if self.dentist.user_type not in ['staff', 'owner']:
+            raise ValidationError('Availability can only be set for staff or owner')
+        if self.dentist.user_type == 'staff' and self.dentist.role != 'dentist':
+            raise ValidationError('Availability can only be set for dentists')
+
+
 class AppointmentNotification(models.Model):
     """Notifications for staff and owner about appointment activities"""
     NOTIFICATION_TYPES = (
