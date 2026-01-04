@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     User, Service, Appointment, ToothChart, DentalRecord, 
     Document, InventoryItem, Billing, ClinicLocation, 
-    TreatmentPlan, TeethImage, StaffAvailability, DentistNotification, 
+    TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification, 
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
     FileAttachment, ClinicalNote, TreatmentAssignment
 )
@@ -132,6 +132,23 @@ class StaffAvailabilitySerializer(serializers.ModelSerializer):
         fields = ['id', 'staff', 'staff_name', 'day_of_week', 'day_name', 
                   'is_available', 'start_time', 'end_time', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
+
+class DentistAvailabilitySerializer(serializers.ModelSerializer):
+    dentist_name = serializers.CharField(source='dentist.get_full_name', read_only=True)
+
+    class Meta:
+        model = DentistAvailability
+        fields = ['id', 'dentist', 'dentist_name', 'date', 'start_time', 'end_time',
+                  'is_available', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, data):
+        """Ensure end_time is after start_time"""
+        if 'start_time' in data and 'end_time' in data:
+            if data['end_time'] <= data['start_time']:
+                raise serializers.ValidationError("End time must be after start time")
+        return data
 
 
 class DentistNotificationSerializer(serializers.ModelSerializer):

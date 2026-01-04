@@ -82,20 +82,154 @@ export default function PatientAppointments() {
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number}>>([])
   const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number}>>([])
 
-  // Generate 30-minute time slots from 10:00 AM to 8:00 PM
+  // Generate time slots based on dentist's availability for selected date
   const generateTimeSlots = () => {
-    const slots: { value: string; display: string }[] = []
-    for (let hour = 10; hour <= 20; hour++) {
-      for (let minute of [0, 30]) {
-        if (hour === 20 && minute === 30) break // Stop at 8:00 PM
-        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-        // Convert to 12-hour format for display
-        const hour12 = hour > 12 ? hour - 12 : hour
-        const ampm = hour >= 12 ? 'PM' : 'AM'
-        const displayStr = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`
-        slots.push({ value: timeStr, display: displayStr })
-      }
+    console.log('[TIMESLOTS] Generating time slots...')
+    console.log('[TIMESLOTS] newAppointment.date:', newAppointment.date)
+    console.log('[TIMESLOTS] dentistAvailability:', dentistAvailability)
+    console.log('[TIMESLOTS] All dates in availability:', dentistAvailability.map((item: any) => item.date))
+    
+    if (!newAppointment.date || !dentistAvailability || dentistAvailability.length === 0) {
+      console.log('[TIMESLOTS] Missing required data - returning empty array')
+      return []
     }
+
+    // Find the availability for the selected date
+    const dateAvailability = dentistAvailability.find((item: any) => {
+      console.log('[TIMESLOTS] Comparing:', item.date, '===', newAppointment.date, '?', item.date === newAppointment.date)
+      return item.date === newAppointment.date
+    })
+    
+    console.log('[TIMESLOTS] Found availability for date:', dateAvailability)
+    
+    if (!dateAvailability) {
+      console.log('[TIMESLOTS] No availability found for date:', newAppointment.date)
+      console.log('[TIMESLOTS] Available dates are:', dentistAvailability.map((item: any) => item.date))
+      return [] // No availability for this date
+    }
+
+    // Generate slots based on start_time and end_time with 30-minute intervals
+    const slots: { value: string; display: string }[] = []
+    const startHour = parseInt(dateAvailability.start_time.split(':')[0])
+    const startMinute = parseInt(dateAvailability.start_time.split(':')[1])
+    const endHour = parseInt(dateAvailability.end_time.split(':')[0])
+    const endMinute = parseInt(dateAvailability.end_time.split(':')[1])
+
+    let currentHour = startHour
+    let currentMinute = startMinute
+
+    // Add first time slot
+    const firstTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
+    const firstHour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
+    const firstAmpm = currentHour >= 12 ? 'PM' : 'AM'
+    const firstDisplayStr = `${firstHour12}:${currentMinute.toString().padStart(2, '0')} ${firstAmpm}`
+    slots.push({ value: firstTimeStr, display: firstDisplayStr })
+
+    // Generate 30-minute interval slots, skipping 11:30 AM - 12:30 PM (lunch)
+    while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+      // Increment by 30 minutes
+      currentMinute += 30
+      if (currentMinute >= 60) {
+        currentMinute = 0
+        currentHour += 1
+      }
+
+      // Skip 11:30 AM - 12:30 PM (lunch break)
+      if ((currentHour === 11 && currentMinute === 30) || (currentHour === 12 && currentMinute === 0)) {
+        continue
+      }
+
+      // Don't go beyond end time
+      if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
+        break
+      }
+
+      const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
+      const hour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
+      const ampm = currentHour >= 12 ? 'PM' : 'AM'
+      const displayStr = `${hour12}:${currentMinute.toString().padStart(2, '0')} ${ampm}`
+      slots.push({ value: timeStr, display: displayStr })
+    }
+
+    // Add end time if not already included
+    const lastSlot = slots[slots.length - 1]
+    const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
+    if (lastSlot && lastSlot.value !== endTimeStr) {
+      const endHour12 = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour
+      const endAmpm = endHour >= 12 ? 'PM' : 'AM'
+      const endDisplayStr = `${endHour12}:${endMinute.toString().padStart(2, '0')} ${endAmpm}`
+      slots.push({ value: endTimeStr, display: endDisplayStr })
+    }
+
+    return slots
+  }
+
+  // Generate time slots for reschedule modal based on dentist's availability for selected date
+  const generateRescheduleTimeSlots = () => {
+    if (!rescheduleData.date || !rescheduleDentistAvailability || rescheduleDentistAvailability.length === 0) {
+      return []
+    }
+
+    // Find the availability for the selected date
+    const dateAvailability = rescheduleDentistAvailability.find((item: any) => item.date === rescheduleData.date)
+    
+    if (!dateAvailability) {
+      return [] // No availability for this date
+    }
+
+    // Generate slots based on start_time and end_time with 30-minute intervals
+    const slots: { value: string; display: string }[] = []
+    const startHour = parseInt(dateAvailability.start_time.split(':')[0])
+    const startMinute = parseInt(dateAvailability.start_time.split(':')[1])
+    const endHour = parseInt(dateAvailability.end_time.split(':')[0])
+    const endMinute = parseInt(dateAvailability.end_time.split(':')[1])
+
+    let currentHour = startHour
+    let currentMinute = startMinute
+
+    // Add first time slot
+    const firstTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
+    const firstHour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
+    const firstAmpm = currentHour >= 12 ? 'PM' : 'AM'
+    const firstDisplayStr = `${firstHour12}:${currentMinute.toString().padStart(2, '0')} ${firstAmpm}`
+    slots.push({ value: firstTimeStr, display: firstDisplayStr })
+
+    // Generate 30-minute interval slots, skipping 11:30 AM - 12:30 PM (lunch)
+    while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+      // Increment by 30 minutes
+      currentMinute += 30
+      if (currentMinute >= 60) {
+        currentMinute = 0
+        currentHour += 1
+      }
+
+      // Skip 11:30 AM - 12:30 PM (lunch break)
+      if ((currentHour === 11 && currentMinute === 30) || (currentHour === 12 && currentMinute === 0)) {
+        continue
+      }
+
+      // Don't go beyond end time
+      if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
+        break
+      }
+
+      const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
+      const hour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
+      const ampm = currentHour >= 12 ? 'PM' : 'AM'
+      const displayStr = `${hour12}:${currentMinute.toString().padStart(2, '0')} ${ampm}`
+      slots.push({ value: timeStr, display: displayStr })
+    }
+
+    // Add end time if not already included
+    const lastSlot = slots[slots.length - 1]
+    const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
+    if (lastSlot && lastSlot.value !== endTimeStr) {
+      const endHour12 = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour
+      const endAmpm = endHour >= 12 ? 'PM' : 'AM'
+      const endDisplayStr = `${endHour12}:${endMinute.toString().padStart(2, '0')} ${endAmpm}`
+      slots.push({ value: endTimeStr, display: endDisplayStr })
+    }
+
     return slots
   }
 
@@ -153,26 +287,34 @@ export default function PatientAppointments() {
       }
 
       try {
-        const availability = await api.getStaffAvailability(Number(newAppointment.dentist), token)
+        // Get date-specific availability for the next 90 days
+        const today = new Date()
+        const endDate = new Date(today)
+        endDate.setDate(today.getDate() + 90)
+        
+        const todayStr = today.toISOString().split('T')[0]
+        const endDateStr = endDate.toISOString().split('T')[0]
+        
+        const availability = await api.getDentistAvailability(
+          Number(newAppointment.dentist),
+          todayStr,
+          endDateStr,
+          token
+        )
+        
+        console.log('[BOOKING] Dentist availability received:', availability)
         setDentistAvailability(availability)
         
-        // Calculate available dates for the next 90 days
+        // Extract available dates from the date-specific availability
         const dates = new Set<string>()
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        for (let i = 0; i < 90; i++) {
-          const checkDate = new Date(today)
-          checkDate.setDate(today.getDate() + i)
-          const dayOfWeek = checkDate.getDay()
-          
-          // Check if dentist is available on this day of week
-          const dayAvailability = availability.find((a: any) => a.day_of_week === dayOfWeek)
-          if (dayAvailability && dayAvailability.is_available) {
-            dates.add(checkDate.toISOString().split('T')[0])
+        availability.forEach((item: any) => {
+          if (item.is_available) {
+            dates.add(item.date)
+            console.log('[BOOKING] Adding available date:', item.date)
           }
-        }
+        })
         
+        console.log('[BOOKING] Total available dates:', Array.from(dates))
         setAvailableDates(dates)
       } catch (error) {
         console.error("Error fetching dentist availability:", error)
@@ -204,36 +346,41 @@ export default function PatientAppointments() {
       console.log('[RESCHEDULE] Fetching availability for dentist:', rescheduleData.dentist)
 
       try {
-        const availability = await api.getStaffAvailability(Number(rescheduleData.dentist), token)
+        // Get date-specific availability for the next 90 days
+        const today = new Date()
+        const endDate = new Date(today)
+        endDate.setDate(today.getDate() + 90)
+        
+        const todayStr = today.toISOString().split('T')[0]
+        const endDateStr = endDate.toISOString().split('T')[0]
+        
+        const availability = await api.getDentistAvailability(
+          Number(rescheduleData.dentist),
+          todayStr,
+          endDateStr,
+          token
+        )
+        
         console.log('[RESCHEDULE] Availability received:', availability)
         setRescheduleDentistAvailability(availability)
         
-        // Calculate available dates for the next 90 days
+        // Extract available dates from the date-specific availability
         const dates = new Set<string>()
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        for (let i = 0; i < 90; i++) {
-          const checkDate = new Date(today)
-          checkDate.setDate(today.getDate() + i)
-          const dayOfWeek = checkDate.getDay()
-          
-          // Check if dentist is available on this day of week
-          const dayAvailability = availability.find((a: any) => a.day_of_week === dayOfWeek)
-          if (dayAvailability && dayAvailability.is_available) {
-            dates.add(checkDate.toISOString().split('T')[0])
+        availability.forEach((item: any) => {
+          if (item.is_available) {
+            dates.add(item.date)
           }
-        }
+        })
         
-        console.log('[RESCHEDULE] Available dates:', Array.from(dates))
         setRescheduleAvailableDates(dates)
+        console.log('[RESCHEDULE] Available dates:', Array.from(dates))
       } catch (error) {
-        console.error("Error fetching reschedule dentist availability:", error)
+        console.error("Error fetching dentist availability for reschedule:", error)
       }
     }
 
     fetchRescheduleDentistAvailability()
-  }, [rescheduleData.dentist, token, showRescheduleModal])
+  }, [rescheduleData.dentist, showRescheduleModal, token])
 
   // Fetch booked slots when date changes (get ALL slots, not filtered by dentist)
   useEffect(() => {
@@ -316,9 +463,12 @@ export default function PatientAppointments() {
         status: "pending", // Patients create pending appointments - staff/owner must approve
       }
 
-      console.log("Creating appointment:", appointmentData)
+      console.log("[APPOINTMENT] Creating appointment with data:", appointmentData)
+      console.log("[APPOINTMENT] Token:", token ? "Present" : "Missing")
+      console.log("[APPOINTMENT] User:", user)
+      
       const createdAppointment = await api.createAppointment(appointmentData, token)
-      console.log("Appointment created:", createdAppointment)
+      console.log("[APPOINTMENT] Appointment created successfully:", createdAppointment)
       setAllAppointments([createdAppointment, ...allAppointments])
       setShowAddModal(false)
       setNewAppointment({
@@ -332,7 +482,13 @@ export default function PatientAppointments() {
       setBookedSlots([])
       alert("Appointment booked successfully! Staff and owner have been notified.")
     } catch (error: any) {
-      console.error("Error creating appointment:", error)
+      console.error("[APPOINTMENT] Error creating appointment:", error)
+      console.error("[APPOINTMENT] Error details:", {
+        message: error.message,
+        response: error.response,
+        stack: error.stack
+      })
+      
       // Check if it's a double booking error from backend
       if (error?.response?.data?.error === 'Time slot conflict') {
         alert(error.response.data.message || "This time slot is already booked. Please select a different time.")
@@ -777,14 +933,24 @@ export default function PatientAppointments() {
                         maxDate.setDate(today.getDate() + 90)
                         if (date > maxDate) return true
                         
-                        // Disable dates when dentist is not available
-                        const dateStr = date.toISOString().split('T')[0]
-                        return !availableDates.has(dateStr)
+                        // Disable dates when dentist is not available (use local date, not UTC)
+                        const year = date.getFullYear()
+                        const month = String(date.getMonth() + 1).padStart(2, '0')
+                        const day = String(date.getDate()).padStart(2, '0')
+                        const dateStr = `${year}-${month}-${day}`
+                        const isAvailable = availableDates.has(dateStr)
+                        console.log('[CALENDAR] Checking date:', dateStr, 'Available?', isAvailable, 'Available dates:', Array.from(availableDates))
+                        return !isAvailable
                       }}
                       modifiers={{
                         available: (date) => {
-                          const dateStr = date.toISOString().split('T')[0]
-                          return availableDates.has(dateStr)
+                          const year = date.getFullYear()
+                          const month = String(date.getMonth() + 1).padStart(2, '0')
+                          const day = String(date.getDate()).padStart(2, '0')
+                          const dateStr = `${year}-${month}-${day}`
+                          const isAvailable = availableDates.has(dateStr)
+                          console.log('[CALENDAR MODIFIER] Date:', dateStr, 'Available?', isAvailable)
+                          return isAvailable
                         }
                       }}
                       modifiersClassNames={{
@@ -969,13 +1135,19 @@ export default function PatientAppointments() {
                         maxDate.setDate(today.getDate() + 90)
                         if (date > maxDate) return true
                         
-                        // Disable dates when dentist is not available
-                        const dateStr = date.toISOString().split('T')[0]
+                        // Disable dates when dentist is not available (use local date, not UTC)
+                        const year = date.getFullYear()
+                        const month = String(date.getMonth() + 1).padStart(2, '0')
+                        const day = String(date.getDate()).padStart(2, '0')
+                        const dateStr = `${year}-${month}-${day}`
                         return !rescheduleAvailableDates.has(dateStr)
                       }}
                       modifiers={{
                         available: (date) => {
-                          const dateStr = date.toISOString().split('T')[0]
+                          const year = date.getFullYear()
+                          const month = String(date.getMonth() + 1).padStart(2, '0')
+                          const day = String(date.getDate()).padStart(2, '0')
+                          const dateStr = `${year}-${month}-${day}`
                           return rescheduleAvailableDates.has(dateStr)
                         }
                       }}
@@ -1002,7 +1174,7 @@ export default function PatientAppointments() {
                     Select a 30-minute time slot (10:00 AM - 8:00 PM). Grayed out times are already booked.
                   </p>
                   <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 border border-[var(--color-border)] rounded-lg">
-                    {generateTimeSlots().map((slot) => {
+                    {generateRescheduleTimeSlots().map((slot) => {
                       const isBooked = rescheduleBookedSlots.some(bookedSlot => {
                         const slotTime = bookedSlot.time.substring(0, 5)
                         return bookedSlot.date === rescheduleData.date && slotTime === slot.value

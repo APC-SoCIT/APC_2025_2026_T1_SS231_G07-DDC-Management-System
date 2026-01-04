@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User, Service, Appointment, ToothChart, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
-    TreatmentPlan, TeethImage, StaffAvailability, 
+    TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability,
     DentistNotification, AppointmentNotification, PasswordResetToken
 )
 
@@ -101,6 +101,14 @@ class StaffAvailabilityAdmin(admin.ModelAdmin):
     list_filter = ('day_of_week', 'is_available', 'staff')
     search_fields = ('staff__username', 'staff__first_name', 'staff__last_name')
     ordering = ('staff', 'day_of_week')
+
+@admin.register(DentistAvailability)
+class DentistAvailabilityAdmin(admin.ModelAdmin):
+    list_display = ('dentist', 'date', 'start_time', 'end_time', 'is_available')
+    list_filter = ('is_available', 'date', 'dentist')
+    search_fields = ('dentist__username', 'dentist__first_name', 'dentist__last_name')
+    ordering = ('dentist', 'date')
+    date_hierarchy = 'date'
 
 @admin.register(DentistNotification)
 class DentistNotificationAdmin(admin.ModelAdmin):

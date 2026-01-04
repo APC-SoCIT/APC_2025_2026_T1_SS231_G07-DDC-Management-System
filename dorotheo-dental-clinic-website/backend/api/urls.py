@@ -4,10 +4,10 @@ from .views import (
     UserViewSet, ServiceViewSet, AppointmentViewSet, ToothChartViewSet,
     DentalRecordViewSet, DocumentViewSet, InventoryItemViewSet, BillingViewSet,
     ClinicLocationViewSet, TreatmentPlanViewSet, TeethImageViewSet,
-    StaffAvailabilityViewSet, DentistNotificationViewSet, AppointmentNotificationViewSet,
+    StaffAvailabilityViewSet, DentistAvailabilityViewSet, DentistNotificationViewSet, AppointmentNotificationViewSet,
     PatientIntakeFormViewSet, FileAttachmentViewSet, ClinicalNoteViewSet, TreatmentAssignmentViewSet,
     register, login, logout, current_user, analytics, 
-    request_password_reset, reset_password
+    request_password_reset, reset_password, chatbot_query
 )
 
 router = DefaultRouter()
@@ -23,6 +23,7 @@ router.register('locations', ClinicLocationViewSet)
 router.register('treatment-plans', TreatmentPlanViewSet)
 router.register('teeth-images', TeethImageViewSet)
 router.register('staff-availability', StaffAvailabilityViewSet)
+router.register('dentist-availability', DentistAvailabilityViewSet)
 router.register('notifications', DentistNotificationViewSet)
 router.register('appointment-notifications', AppointmentNotificationViewSet)
 router.register('intake-forms', PatientIntakeFormViewSet)
@@ -40,4 +41,5 @@ urlpatterns = [
     path('analytics/', analytics, name='analytics'),
     path('password-reset/request/', request_password_reset, name='request_password_reset'),
     path('password-reset/confirm/', reset_password, name='reset_password'),
+    path('chatbot/', chatbot_query, name='chatbot_query'),
 ]

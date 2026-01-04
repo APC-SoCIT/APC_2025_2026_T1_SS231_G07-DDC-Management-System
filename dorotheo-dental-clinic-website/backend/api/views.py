@@ -11,7 +11,7 @@ import secrets
 from .models import (
     User, Service, Appointment, ToothChart, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
-    TreatmentPlan, TeethImage, StaffAvailability, DentistNotification,
+    TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification,
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
     FileAttachment, ClinicalNote, TreatmentAssignment
 )
@@ -20,7 +20,7 @@ from .serializers import (
     ToothChartSerializer, DentalRecordSerializer, DocumentSerializer,
     InventoryItemSerializer, BillingSerializer, ClinicLocationSerializer,
     TreatmentPlanSerializer, TeethImageSerializer, StaffAvailabilitySerializer,
-    DentistNotificationSerializer, AppointmentNotificationSerializer, 
+    DentistAvailabilitySerializer, DentistNotificationSerializer, AppointmentNotificationSerializer, 
     PasswordResetTokenSerializer, PatientIntakeFormSerializer,
     FileAttachmentSerializer, ClinicalNoteSerializer, TreatmentAssignmentSerializer
 )
@@ -1150,6 +1150,130 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
             )
 
 
+class DentistAvailabilityViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing dentist date-specific availability (calendar-based).
+    """
+    queryset = DentistAvailability.objects.all()
+    serializer_class = DentistAvailabilitySerializer
+
+    def get_queryset(self):
+        """Filter by dentist and date range if specified"""
+        queryset = DentistAvailability.objects.all()
+        dentist_id = self.request.query_params.get('dentist_id', None)
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        
+        if dentist_id:
+            queryset = queryset.filter(dentist_id=dentist_id)
+        
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+        
+        return queryset.order_by('date', 'start_time')
+
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        """
+        Bulk create or update availability for multiple dates.
+        Expected data: {
+            "dentist_id": 1,
+            "dates": [
+                {
+                    "date": "2026-01-10",
+                    "start_time": "09:00:00",
+                    "end_time": "17:00:00",
+                    "is_available": true
+                },
+                ...
+            ]
+        }
+        """
+        dentist_id = request.data.get('dentist_id')
+        dates_data = request.data.get('dates', [])
+        
+        if not dentist_id:
+            return Response(
+                {'error': 'dentist_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            dentist = User.objects.get(id=dentist_id)
+            
+            # Validate dentist role
+            if dentist.user_type not in ['staff', 'owner']:
+                return Response(
+                    {'error': 'User is not a dentist'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if dentist.user_type == 'staff' and dentist.role != 'dentist':
+                return Response(
+                    {'error': 'User is not a dentist'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            created_availability = []
+            
+            # Update or create availability for each date
+            for date_data in dates_data:
+                availability, created = DentistAvailability.objects.update_or_create(
+                    dentist=dentist,
+                    date=date_data['date'],
+                    defaults={
+                        'start_time': date_data.get('start_time', '09:00:00'),
+                        'end_time': date_data.get('end_time', '17:00:00'),
+                        'is_available': date_data.get('is_available', True),
+                    }
+                )
+                created_availability.append(availability)
+            
+            serializer = self.get_serializer(created_availability, many=True)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Dentist not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
+    def bulk_delete(self, request):
+        """
+        Delete availability for specific dates.
+        Expected data: {
+            "dentist_id": 1,
+            "dates": ["2026-01-10", "2026-01-11", ...]
+        }
+        """
+        dentist_id = request.data.get('dentist_id')
+        dates = request.data.get('dates', [])
+        
+        if not dentist_id or not dates:
+            return Response(
+                {'error': 'dentist_id and dates are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        deleted_count = DentistAvailability.objects.filter(
+            dentist_id=dentist_id,
+            date__in=dates
+        ).delete()[0]
+        
+        return Response({
+            'message': f'Deleted {deleted_count} availability records'
+        })
+
+
 class DentistNotificationViewSet(viewsets.ModelViewSet):
     queryset = DentistNotification.objects.all()
     serializer_class = DentistNotificationSerializer
@@ -1378,3 +1502,61 @@ class TreatmentAssignmentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(assignment)
         return Response(serializer.data)
 
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # Can be used by both authenticated and anonymous users
+def chatbot_query(request):
+    """
+    Handle chatbot queries using Ollama LLM.
+    
+    POST body:
+    {
+        "message": "User's message",
+        "conversation_history": [  # Optional
+            {"role": "user", "content": "previous message"},
+            {"role": "assistant", "content": "previous response"}
+        ]
+    }
+    
+    Returns:
+    {
+        "response": "AI generated response",
+        "error": null
+    }
+    """
+    from .chatbot_service import DentalChatbotService
+    
+    try:
+        user_message = request.data.get('message', '').strip()
+        conversation_history = request.data.get('conversation_history', [])
+        
+        if not user_message:
+            return Response(
+                {'error': 'Message is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Initialize chatbot with current user (if authenticated)
+        user = request.user if request.user.is_authenticated else None
+        chatbot = DentalChatbotService(user=user)
+        
+        # Get response from Ollama
+        result = chatbot.get_response(user_message, conversation_history)
+        
+        if result['error']:
+            return Response(
+                {'error': result['error']},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        
+        return Response({
+            'response': result['response'],
+            'quick_replies': result.get('quick_replies', []),
+            'error': None
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Server error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

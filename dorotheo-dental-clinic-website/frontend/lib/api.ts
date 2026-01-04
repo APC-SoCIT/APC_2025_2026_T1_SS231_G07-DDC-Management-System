@@ -626,6 +626,18 @@ export const api = {
     return response.json()
   },
 
+  // Dentist Availability endpoints (date-specific)
+  getDentistAvailability: async (dentistId: number, startDate: string, endDate: string, token: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${startDate}&end_date=${endDate}`,
+      {
+        headers: { Authorization: `Token ${token}` },
+      }
+    )
+    if (!response.ok) throw new Error('Failed to fetch dentist availability')
+    return response.json()
+  },
+
   // Dentist Notification endpoints (kept for backward compatibility)
   getNotifications: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/notifications/`, {
@@ -936,6 +948,28 @@ export const api = {
     if (!response.ok) throw new Error('Failed to export patient records')
     return response.json()
   },
+
+  // Chatbot endpoint
+  chatbotQuery: async (message: string, conversationHistory?: Array<{ role: string; content: string }>, token?: string) => {
+    const headers: any = { "Content-Type": "application/json" }
+    if (token) headers.Authorization = `Token ${token}`
+    
+    const response = await fetch(`${API_BASE_URL}/chatbot/`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        message,
+        conversation_history: conversationHistory || [],
+      }),
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || "Failed to get chatbot response")
+    }
+    
+    return response.json()
+  },
 }
 
 // Export all API functions
@@ -1022,4 +1056,5 @@ export const {
   restorePatient,
   getArchivedPatients,
   exportPatientRecords,
+  chatbotQuery,
 } = api
