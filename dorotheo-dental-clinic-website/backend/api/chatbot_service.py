@@ -486,6 +486,8 @@ Clinic Information:
     def _parse_date_from_message(self, message):
         """
         Parse date from natural language message.
+        PRIORITY: Specific dates (month + day) are checked BEFORE day names
+        to avoid "February 03, 2026" being parsed as "Tuesday" instead.
         
         Args:
             message: User's message string
@@ -496,52 +498,21 @@ Clinic Information:
         message_lower = message.lower()
         today = datetime.now().date()
         
-        # Day of week patterns
-        days_of_week = {
-            'monday': 0, 'mon': 0,
-            'tuesday': 1, 'tue': 1, 'tues': 1,
-            'wednesday': 2, 'wed': 2,
-            'thursday': 3, 'thu': 3, 'thur': 3, 'thurs': 3,
-            'friday': 4, 'fri': 4,
-            'saturday': 5, 'sat': 5,
-            'sunday': 6, 'sun': 6
-        }
-        
-        # Check for "today"
+        # Check for "today" FIRST
         if 'today' in message_lower:
             return today
         
-        # Check for "tomorrow"
+        # Check for "tomorrow" FIRST
         if 'tomorrow' in message_lower:
             return today + timedelta(days=1)
         
-        # Check for "next week"
+        # Check for "next week" FIRST
         if 'next week' in message_lower:
             return today + timedelta(days=7)
         
-        # Check for day of week (e.g., "monday", "this monday", "next friday")
-        for day_name, day_num in days_of_week.items():
-            if day_name in message_lower:
-                current_day = today.weekday()
-                days_ahead = day_num - current_day
-                
-                # If "next" is explicitly specified, go to next week
-                if 'next' in message_lower and day_name in message_lower:
-                    if days_ahead <= 0:
-                        days_ahead += 7
-                    else:
-                        days_ahead += 7
-                # If it's today (days_ahead == 0) and not saying "next", use today
-                elif days_ahead == 0:
-                    return today
-                # If day has already passed this week, go to next week
-                elif days_ahead < 0:
-                    days_ahead += 7
-                
-                return today + timedelta(days=days_ahead)
-        
-        # Check for specific date formats (e.g., "january 5", "jan 5", "1/5", "01/05")
-        # Pattern: month name + day
+        # PRIORITY: Check for specific date formats BEFORE day names
+        # This ensures "February 03, 2026" is parsed as Feb 3, not as "Tuesday"
+        # Pattern: month name + day + optional year
         months = {
             'january': 1, 'jan': 1,
             'february': 2, 'feb': 2,
@@ -557,6 +528,7 @@ Clinic Information:
             'december': 12, 'dec': 12
         }
         
+        # Check for month + day pattern (e.g., "january 13", "feb 03")
         for month_name, month_num in months.items():
             pattern = rf'{month_name}\s+(\d+)'
             match = re.search(pattern, message_lower)
@@ -565,6 +537,8 @@ Clinic Information:
                 year = today.year
                 # If month has passed, assume next year
                 if month_num < today.month:
+                    year += 1
+                elif month_num == today.month and day < today.day:
                     year += 1
                 try:
                     return datetime(year, month_num, day).date()
@@ -586,6 +560,38 @@ Clinic Information:
                 return parsed_date
             except ValueError:
                 pass
+        
+        # ONLY check for day of week if no specific date was found above
+        # This prevents "February 03" from being parsed as "Tuesday"
+        days_of_week = {
+            'monday': 0, 'mon': 0,
+            'tuesday': 1, 'tue': 1, 'tues': 1,
+            'wednesday': 2, 'wed': 2,
+            'thursday': 3, 'thu': 3, 'thur': 3, 'thurs': 3,
+            'friday': 4, 'fri': 4,
+            'saturday': 5, 'sat': 5,
+            'sunday': 6, 'sun': 6
+        }
+        
+        for day_name, day_num in days_of_week.items():
+            if day_name in message_lower:
+                current_day = today.weekday()
+                days_ahead = day_num - current_day
+                
+                # If "next" is explicitly specified, go to next week
+                if 'next' in message_lower and day_name in message_lower:
+                    if days_ahead <= 0:
+                        days_ahead += 7
+                    else:
+                        days_ahead += 7
+                # If it's today (days_ahead == 0) and not saying "next", use today
+                elif days_ahead == 0:
+                    return today
+                # If day has already passed this week, go to next week
+                elif days_ahead < 0:
+                    days_ahead += 7
+                
+                return today + timedelta(days=days_ahead)
         
         return None
     
@@ -812,15 +818,28 @@ Clinic Information:
         # STEP 3: Select Specific Date (if day of week is mentioned but no specific date)
         if dentist and requested_date:
             # Check if user mentioned a day of week in current message (not full context)
+            # BUT make sure they didn't also mention a specific month/date
             day_of_week = None
-            for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']:
-                if day in message.lower():
-                    day_of_week = day.capitalize()
+            has_specific_date = False
+            
+            # Check if message contains specific date pattern (month + day number)
+            months = ['january', 'jan', 'february', 'feb', 'march', 'mar', 'april', 'apr', 'may', 'june', 'jun', 
+                     'july', 'jul', 'august', 'aug', 'september', 'sept', 'sep', 'october', 'oct', 'november', 'nov', 'december', 'dec']
+            for month in months:
+                if month in message.lower() and re.search(r'\d+', message):
+                    has_specific_date = True
                     break
             
-            # If they just said a day name (like "Monday") in current message without time
+            # Check for day of week only if no specific date pattern found
+            if not has_specific_date:
+                for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']:
+                    if day in message.lower():
+                        day_of_week = day.capitalize()
+                        break
+            
+            # If they just said a day name (like "Monday") in current message without time and without specific date
             # This means they're selecting a day, not a specific date yet
-            if day_of_week and not requested_time and not service:
+            if day_of_week and not requested_time and not service and not has_specific_date:
                 # Get all available dates for this dentist on this day of week
                 start_date = datetime.now().date()
                 end_date = start_date + timedelta(days=30)
@@ -1017,11 +1036,11 @@ Clinic Information:
                 'response': "You need to be logged in to cancel an appointment."
             }
         
-        # Get user's upcoming appointments
+        # Get user's upcoming appointments (ONLY CONFIRMED ones, not pending)
         upcoming_appts = Appointment.objects.filter(
             patient=self.user,
             date__gte=datetime.now().date(),
-            status__in=['confirmed', 'pending']
+            status='confirmed'  # Only show confirmed appointments
         ).order_by('date', 'time')
         
         if not upcoming_appts.exists():
