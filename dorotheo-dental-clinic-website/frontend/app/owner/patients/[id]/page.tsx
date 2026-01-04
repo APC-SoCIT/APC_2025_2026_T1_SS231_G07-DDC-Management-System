@@ -21,6 +21,10 @@ import { useAuth } from "@/lib/auth"
 import TeethImageUpload from "@/components/teeth-image-upload"
 import DocumentUpload from "@/components/document-upload"
 
+// Get the API base URL for constructing full image URLs
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+const BACKEND_URL = API_BASE_URL.replace('/api', '')
+
 interface Appointment {
   id: number
   date: string
@@ -440,27 +444,38 @@ export default function PatientDetailPage() {
                 <p className="text-gray-500 text-sm">No teeth images or x-rays</p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {teethImages.map((img) => (
-                    <a
-                      key={img.id}
-                      href={img.image}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50"
-                    >
-                      <img
-                        src={img.image}
-                        alt={img.image_type}
-                        className="w-full h-32 object-cover rounded"
-                      />
-                      <p className="text-xs text-gray-600 mt-2 capitalize">
-                        {img.image_type.replace("_", " ")}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(img.uploaded_at).toLocaleDateString()}
-                      </p>
-                    </a>
-                  ))}
+                  {teethImages.map((img) => {
+                    // Construct full image URL
+                    const imageUrl = img.image.startsWith('http') 
+                      ? img.image 
+                      : `${BACKEND_URL}${img.image}`
+                    
+                    return (
+                      <a
+                        key={img.id}
+                        href={imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50"
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={img.image_type || 'Dental image'}
+                          className="w-full h-32 object-cover rounded"
+                          onError={(e) => {
+                            console.error('Image failed to load:', imageUrl)
+                            e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
+                          }}
+                        />
+                        <p className="text-xs text-gray-600 mt-2 capitalize">
+                          {img.image_type ? img.image_type.replace("_", " ") : "Unknown"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(img.uploaded_at).toLocaleDateString()}
+                        </p>
+                      </a>
+                    )
+                  })}
                 </div>
               )}
             </div>

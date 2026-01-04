@@ -451,11 +451,13 @@ export const api = {
   },
 
   getLatestTeethImage: async (patientId: number, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/teeth-images/latest/?patient_id=${patientId}`, {
+    const response = await fetch(`${API_BASE_URL}/teeth-images/by_patient/?patient_id=${patientId}`, {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) return null
-    return response.json()
+    const images = await response.json()
+    // Return the most recent image
+    return images.length > 0 ? images[images.length - 1] : null
   },
 
   getPatientTeethImages: async (patientId: number, token: string) => {
