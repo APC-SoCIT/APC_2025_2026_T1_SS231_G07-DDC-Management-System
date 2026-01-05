@@ -220,7 +220,7 @@ export default function StaffAppointments() {
           // Check if dentist is available on this day of week
           const dayAvailability = availability.find((a: any) => a.day_of_week === dayOfWeek)
           if (dayAvailability && dayAvailability.is_available) {
-            dates.add(checkDate.toISOString().split('T')[0])
+            dates.add(`${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`)
           }
         }
         
@@ -1141,12 +1141,12 @@ export default function StaffAppointments() {
                         if (date > maxDate) return true
                         
                         // Disable dates when dentist is not available
-                        const dateStr = date.toISOString().split('T')[0]
+                        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
                         return !availableDates.has(dateStr)
                       }}
                       modifiers={{
                         available: (date) => {
-                          const dateStr = date.toISOString().split('T')[0]
+                          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
                           return availableDates.has(dateStr)
                         }
                       }}

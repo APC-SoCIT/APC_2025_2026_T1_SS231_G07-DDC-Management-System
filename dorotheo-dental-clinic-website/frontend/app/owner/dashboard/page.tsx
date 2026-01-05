@@ -41,6 +41,8 @@ export default function OwnerDashboard() {
         
         // Fetch appointments
         const appointments = await api.getAppointments(token)
+        console.log('[Owner Dashboard] Fetched appointments:', appointments)
+        console.log('[Owner Dashboard] Sample appointment dates:', appointments.slice(0, 3).map((a: any) => a.date))
         setAllAppointments(appointments)
       } catch (error) {
         console.error("Error fetching data:", error)
@@ -60,7 +62,8 @@ export default function OwnerDashboard() {
   }> = []
 
   // Get appointments for today (filter out completed and missed)
-  const todayStr = new Date().toISOString().split('T')[0]
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const todayAppointments = allAppointments
     .filter(apt => 
       apt.date === todayStr && 
@@ -70,7 +73,7 @@ export default function OwnerDashboard() {
     .sort((a, b) => a.time.localeCompare(b.time))
 
   // Get appointments for selected date
-  const selectedDateStr = selectedDate.toISOString().split('T')[0]
+  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
   const selectedDayAppointments = allAppointments.filter(apt => apt.date === selectedDateStr).sort((a, b) => a.time.localeCompare(b.time))
 
   // Calendar helper functions
@@ -92,7 +95,11 @@ export default function OwnerDashboard() {
 
   const hasAppointment = (day: number) => {
     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return allAppointments.some(apt => apt.date === dateStr)
+    const hasApt = allAppointments.some(apt => apt.date === dateStr)
+    if (hasApt && day <= 15) { // Log only for first 15 days to avoid spam
+      console.log(`[Owner Dashboard] Day ${day} (${dateStr}): Has appointment`)
+    }
+    return hasApt
   }
 
   const hasBirthday = (day: number) => {

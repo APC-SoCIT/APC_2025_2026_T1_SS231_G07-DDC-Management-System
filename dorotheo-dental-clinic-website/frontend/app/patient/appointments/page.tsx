@@ -292,8 +292,8 @@ export default function PatientAppointments() {
         const endDate = new Date(today)
         endDate.setDate(today.getDate() + 90)
         
-        const todayStr = today.toISOString().split('T')[0]
-        const endDateStr = endDate.toISOString().split('T')[0]
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
         
         const availability = await api.getDentistAvailability(
           Number(newAppointment.dentist),
@@ -351,8 +351,8 @@ export default function PatientAppointments() {
         const endDate = new Date(today)
         endDate.setDate(today.getDate() + 90)
         
-        const todayStr = today.toISOString().split('T')[0]
-        const endDateStr = endDate.toISOString().split('T')[0]
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
         
         const availability = await api.getDentistAvailability(
           Number(rescheduleData.dentist),

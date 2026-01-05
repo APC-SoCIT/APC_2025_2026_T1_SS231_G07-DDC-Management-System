@@ -186,11 +186,8 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
       const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
       const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
       
-      const firstDayStr = firstDay.toISOString().split('T')[0]
-      const lastDayStr = lastDay.toISOString().split('T')[0]
-
-      console.log('[CALENDAR] Fetching existing dates for month:', firstDayStr, 'to', lastDayStr)
-
+      const firstDayStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
+      const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
       // Get all dates in the current month to delete
       const deleteResponse = await fetch(
         `http://127.0.0.1:8000/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`,
