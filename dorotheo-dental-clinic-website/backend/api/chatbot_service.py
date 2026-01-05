@@ -1168,7 +1168,16 @@ Clinic Information:
     
     def handle_reschedule_intent(self, message):
         """
-        Handle appointment rescheduling through AI.
+        Handle appointment rescheduling through AI with multi-step flow.
+        
+        Flow:
+        1. Show user's appointments
+        2. User selects appointment
+        3. Show available dates for that dentist (next 30 days)
+        4. User selects date
+        5. Show available time slots for that date (excluding booked slots)
+        6. User selects time
+        7. Confirm reschedule
         
         Args:
             message: User's reschedule request
@@ -1186,7 +1195,7 @@ Clinic Information:
         upcoming_appts = Appointment.objects.filter(
             patient=self.user,
             date__gte=datetime.now().date(),
-            status__in=['confirmed', 'pending']
+            status__in=['confirmed', 'pending', 'reschedule_requested']
         ).order_by('date', 'time')
         
         if not upcoming_appts.exists():
@@ -1195,37 +1204,60 @@ Clinic Information:
                 'response': "You don't have any upcoming appointments to reschedule."
             }
         
-        # List appointments and ask for details
-        response = "I can help you reschedule your appointment. "
+        # STEP 1: Show appointments and ask which one to reschedule
+        response = "I can help you reschedule your appointment.\n\n"
         quick_replies = []
         
         if upcoming_appts.count() == 1:
             appt = upcoming_appts.first()
             date_str = appt.date.strftime('%A, %B %d')
             time_str = appt.time.strftime('%I:%M %p').lstrip('0')
+            dentist_name = appt.dentist.get_full_name()
             
-            response += f"\n\n**Current Appointment:**\n"
+            response += f"**Current Appointment:**\n"
             response += f"Date: {date_str}\n"
             response += f"Time: {time_str}\n"
-            response += f"Dentist: Dr. {appt.dentist.get_full_name()}\n\n"
-            response += "When would you like to reschedule to?"
+            response += f"Dentist: Dr. {dentist_name}\n\n"
             
-            # Provide quick date options
-            quick_replies = ["Tomorrow", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+            # Show available dates for this dentist (next 30 days, excluding today)
+            from datetime import datetime as dt
+            start_date = datetime.now().date() + timedelta(days=1)  # Start from tomorrow
+            end_date = start_date + timedelta(days=30)
+            
+            availabilities = DentistAvailability.objects.filter(
+                dentist=appt.dentist,
+                date__gte=start_date,
+                date__lte=end_date,
+                is_available=True
+            ).order_by('date')[:10]  # Show up to 10 dates
+            
+            if not availabilities.exists():
+                response += "Dr. " + dentist_name + " has no available dates in the next 30 days. Please contact the clinic directly."
+                return {
+                    'success': False,
+                    'response': response
+                }
+            
+            response += "**Available Dates:**\n\n"
+            for avail in availabilities:
+                date_display = avail.date.strftime('%A, %B %d')
+                response += f"• {date_display}\n"
+                quick_replies.append(avail.date.strftime('%B %d'))
+            
+            response += "\nPlease select a date:"
+            
         else:
             response += "You have multiple appointments:\n\n"
             for i, appt in enumerate(upcoming_appts, 1):
                 date_str = appt.date.strftime('%B %d')
                 time_str = appt.time.strftime('%I:%M %p').lstrip('0')
-                response += f"**{i}.** {date_str} at {time_str} - Dr. {appt.dentist.get_full_name()}\n"
-                quick_replies.append(f"Reschedule #{i}")
-            response += "\nSelect which appointment to reschedule:"
+                response += f"{i}. {date_str} at {time_str} - Dr. {appt.dentist.get_full_name()}\n"
+                quick_replies.append(f"Appointment {i}")
+            response += "\nWhich appointment would you like to reschedule?"
         
         return {
             'success': False,
-            'response': response,
-            'needs_details': True,
-            'appointments': list(upcoming_appts),
+            'response': response.strip(),
             'quick_replies': quick_replies
         }
     
@@ -1367,6 +1399,250 @@ Clinic Information:
                         'error': None
                     }
                 
+                # Check if user is in reschedule flow and selected a date
+                # This checks if previous message showed "Available Dates" and current message is a date
+                if conversation_history and self.is_authenticated:
+                    recent_assistant_messages = [
+                        msg.get('content', '') 
+                        for msg in conversation_history[-3:] 
+                        if msg.get('role') == 'assistant'
+                    ]
+                    
+                    # Check if we're in reschedule date selection
+                    in_reschedule_date_selection = any('**Available Dates:**' in msg for msg in recent_assistant_messages)
+                    
+                    if in_reschedule_date_selection:
+                        # Try to parse the date from message
+                        from datetime import datetime as dt
+                        import re
+                        
+                        # Get user's appointment that they're rescheduling
+                        upcoming_appts = Appointment.objects.filter(
+                            patient=self.user,
+                            date__gte=datetime.now().date(),
+                            status__in=['confirmed', 'pending', 'reschedule_requested']
+                        ).order_by('date', 'time').first()
+                        
+                        if upcoming_appts:
+                            # Try to parse date from formats like "January 12" or "January 12, 2026"
+                            date_patterns = [
+                                r'(\w+)\s+(\d+)',  # "January 12"
+                            ]
+                            
+                            selected_date = None
+                            for pattern in date_patterns:
+                                match = re.search(pattern, user_message, re.IGNORECASE)
+                                if match:
+                                    month_name = match.group(1)
+                                    day = int(match.group(2))
+                                    year = datetime.now().year
+                                    
+                                    # Try to parse the month
+                                    try:
+                                        month_num = datetime.strptime(month_name, '%B').month
+                                    except:
+                                        try:
+                                            month_num = datetime.strptime(month_name, '%b').month
+                                        except:
+                                            continue
+                                    
+                                    # If month is before current month, assume next year
+                                    if month_num < datetime.now().month:
+                                        year += 1
+                                    
+                                    try:
+                                        selected_date = datetime(year, month_num, day).date()
+                                        break
+                                    except:
+                                        continue
+                            
+                            if selected_date:
+                                # Show available time slots for this date and dentist
+                                dentist = upcoming_appts.dentist
+                                
+                                # Get availability for this specific date
+                                availability = DentistAvailability.objects.filter(
+                                    dentist=dentist,
+                                    date=selected_date,
+                                    is_available=True
+                                ).first()
+                                
+                                if not availability:
+                                    response_text = f"Sorry, Dr. {dentist.get_full_name()} is not available on {selected_date.strftime('%A, %B %d')}.\n\n"
+                                    response_text += "Please select another date."
+                                    return {
+                                        'response': response_text,
+                                        'error': None
+                                    }
+                                
+                                # Get existing appointments (exclude booked slots)
+                                existing_appointments = Appointment.objects.filter(
+                                    dentist=dentist,
+                                    date=selected_date,
+                                    status__in=['confirmed', 'pending', 'reschedule_requested']
+                                ).values_list('time', flat=True)
+                                
+                                # Generate time slots
+                                from datetime import time as time_obj
+                                start_time = dt.combine(selected_date, availability.start_time)
+                                end_time = dt.combine(selected_date, availability.end_time)
+                                
+                                # Lunch break: 11:30 AM - 12:30 PM
+                                lunch_start = time_obj(11, 30)
+                                lunch_end = time_obj(12, 30)
+                                
+                                available_times = []
+                                current_time = start_time
+                                
+                                # Generate 30-minute slots (include end time)
+                                while current_time <= end_time:
+                                    time_str = current_time.strftime('%H:%M')
+                                    time_only = current_time.time()
+                                    
+                                    # Skip lunch break
+                                    if time_only >= lunch_start and time_only < lunch_end:
+                                        current_time += timedelta(minutes=30)
+                                        continue
+                                    
+                                    # Check if slot is not already booked
+                                    if time_str not in [str(t)[:5] for t in existing_appointments]:
+                                        available_times.append(current_time.strftime('%I:%M %p').lstrip('0'))
+                                    current_time += timedelta(minutes=30)
+                                
+                                if not available_times:
+                                    response_text = f"Sorry, Dr. {dentist.get_full_name()} has no available time slots on {selected_date.strftime('%A, %B %d')}.\n\n"
+                                    response_text += "Please select another date."
+                                    return {
+                                        'response': response_text,
+                                        'error': None
+                                    }
+                                
+                                response_text = f"📅 **Available Time Slots for {selected_date.strftime('%A, %B %d')}:**\n\n"
+                                response_text += f"Dr. {dentist.get_full_name()}\n\n"
+                                
+                                # Format time slots
+                                time_slots_formatted = []
+                                for i, time_slot in enumerate(available_times):
+                                    time_slots_formatted.append(f"{i+1}. {time_slot}")
+                                response_text += "\n".join(time_slots_formatted)
+                                response_text += "\n\nPlease select a time slot:"
+                                
+                                return {
+                                    'response': response_text.strip(),
+                                    'quick_replies': available_times,  # Show all available time slots
+                                    'error': None
+                                }
+                    
+                    # Check if user is in reschedule time selection (after date selection)
+                    in_reschedule_time_selection = any('**Available Time Slots for' in msg and 'Please select a time slot:' in msg for msg in recent_assistant_messages)
+                    
+                    print(f"[Chatbot] Checking time selection - in_reschedule_time_selection: {in_reschedule_time_selection}")
+                    print(f"[Chatbot] User message: {user_message}")
+                    print(f"[Chatbot] Recent assistant messages: {recent_assistant_messages}")
+                    
+                    if in_reschedule_time_selection:
+                        print(f"[Chatbot] In reschedule time selection mode!")
+                        # Try to parse the time from message
+                        import re
+                        from datetime import datetime as dt
+                        
+                        # Get user's appointment that they're rescheduling
+                        upcoming_appts = Appointment.objects.filter(
+                            patient=self.user,
+                            date__gte=datetime.now().date(),
+                            status__in=['confirmed', 'pending', 'reschedule_requested']
+                        ).order_by('date', 'time').first()
+                        
+                        print(f"[Chatbot] Found appointment to reschedule: {upcoming_appts.id if upcoming_appts else 'None'}")
+                        
+                        if upcoming_appts:
+                            # Try to parse time from formats like "9:00 AM" or "12:30 PM"
+                            time_pattern = r'(\d{1,2}:\d{2})\s*(AM|PM)'
+                            match = re.search(time_pattern, user_message, re.IGNORECASE)
+                            
+                            print(f"[Chatbot] Time pattern match: {match}")
+                            
+                            if match:
+                                time_str = match.group(1)
+                                am_pm = match.group(2).upper()
+                                
+                                print(f"[Chatbot] Parsed time: {time_str} {am_pm}")
+                                
+                                # Parse the time
+                                try:
+                                    selected_time = dt.strptime(f"{time_str} {am_pm}", '%I:%M %p').time()
+                                    
+                                    print(f"[Chatbot] Selected time object: {selected_time}")
+                                    
+                                    # Get the selected date from the recent messages
+                                    date_pattern = r'\*\*Available Time Slots for [^:]+, (\w+) (\d+)'
+                                    selected_date = None
+                                    
+                                    for msg in recent_assistant_messages:
+                                        date_match = re.search(date_pattern, msg)
+                                        if date_match:
+                                            month_name = date_match.group(1)
+                                            day = int(date_match.group(2))
+                                            year = datetime.now().year
+                                            
+                                            print(f"[Chatbot] Found date in message: {month_name} {day}")
+                                            
+                                            try:
+                                                month_num = datetime.strptime(month_name, '%B').month
+                                                if month_num < datetime.now().month:
+                                                    year += 1
+                                                selected_date = datetime(year, month_num, day).date()
+                                                print(f"[Chatbot] Parsed date: {selected_date}")
+                                                break
+                                            except Exception as date_ex:
+                                                print(f"[Chatbot] Date parsing error: {date_ex}")
+                                                continue
+                                    
+                                    if selected_date:
+                                        # Submit reschedule request (not direct update - needs staff approval)
+                                        old_date = upcoming_appts.date
+                                        old_time = upcoming_appts.time
+                                        
+                                        print(f"[Chatbot] Submitting reschedule request for appointment {upcoming_appts.id}")
+                                        print(f"[Chatbot] Current: {old_date} at {old_time}")
+                                        print(f"[Chatbot] Requested: {selected_date} at {selected_time}")
+                                        
+                                        # Store reschedule request details
+                                        upcoming_appts.reschedule_date = selected_date
+                                        upcoming_appts.reschedule_time = selected_time
+                                        upcoming_appts.reschedule_notes = "Rescheduled via AI chatbot"
+                                        upcoming_appts.status = 'reschedule_requested'
+                                        upcoming_appts.save()
+                                        
+                                        print(f"[Chatbot] Reschedule request submitted for appointment {upcoming_appts.id}")
+                                        print(f"[Chatbot] Status: {upcoming_appts.status}")
+                                        print(f"[Chatbot] Requested date: {upcoming_appts.reschedule_date}, time: {upcoming_appts.reschedule_time}")
+                                        
+                                        # Format the response
+                                        date_str = selected_date.strftime('%A, %B %d')
+                                        time_str_formatted = selected_time.strftime('%I:%M %p').lstrip('0')
+                                        dentist_name = upcoming_appts.dentist.get_full_name()
+                                        
+                                        response = f"✅ **Reschedule Request Submitted!**\n\n"
+                                        response += f"**Current Appointment:**\n"
+                                        response += f"Date: {old_date.strftime('%A, %B %d')}\n"
+                                        response += f"Time: {old_time.strftime('%I:%M %p').lstrip('0')}\n\n"
+                                        response += f"**Requested Changes:**\n"
+                                        response += f"New Date: {date_str}\n"
+                                        response += f"New Time: {time_str_formatted}\n"
+                                        response += f"Dentist: Dr. {dentist_name}\n\n"
+                                        response += "Your reschedule request has been sent to the staff for approval. You'll be notified once it's processed.\n\n"
+                                        response += "If you need any further assistance, feel free to ask me!"
+                                        
+                                        return {
+                                            'response': response,
+                                            'error': None
+                                        }
+                                except Exception as e:
+                                    print(f"[Chatbot] Error parsing time: {e}")
+                                    import traceback
+                                    traceback.print_exc()
+                
                 # PRIORITY 3: Check for reschedule intent
                 reschedule_keywords = ['reschedule', 'change appointment', 'move appointment', 'change time', 'change date']
                 if any(keyword in message_lower for keyword in reschedule_keywords):
@@ -1414,11 +1690,11 @@ Clinic Information:
                             'error': None
                         }
                     
-                    # Get existing appointments
+                    # Get existing appointments (exclude already booked slots to prevent double booking)
                     existing_appointments = Appointment.objects.filter(
                         dentist=dentist_selected,
                         date=today,
-                        status__in=['confirmed', 'pending']
+                        status__in=['confirmed', 'pending', 'reschedule_requested']
                     ).values_list('time', flat=True)
                     
                     # Generate time slots
@@ -1433,8 +1709,8 @@ Clinic Information:
                     available_times = []
                     current_time = start_time
                     
-                    # Generate 30-minute slots
-                    while current_time < end_time:
+                    # Generate 30-minute slots (include end time)
+                    while current_time <= end_time:
                         time_str = current_time.strftime('%H:%M')
                         time_only = current_time.time()
                         
@@ -1506,11 +1782,11 @@ Clinic Information:
                                 'error': None
                             }
                         
-                        # Get existing appointments
+                        # Get existing appointments (exclude already booked slots to prevent double booking)
                         existing_appointments = Appointment.objects.filter(
                             dentist=dentist_mentioned,
                             date=today,
-                            status__in=['confirmed', 'pending']
+                            status__in=['confirmed', 'pending', 'reschedule_requested']
                         ).values_list('time', flat=True)
                         
                         # Generate time slots
@@ -1525,8 +1801,8 @@ Clinic Information:
                         available_times = []
                         current_time = start_time
                         
-                        # Generate 30-minute slots
-                        while current_time < end_time:
+                        # Generate 30-minute slots (include end time)
+                        while current_time <= end_time:
                             time_str = current_time.strftime('%H:%M')
                             time_only = current_time.time()
                             
@@ -1573,11 +1849,11 @@ Clinic Information:
                             ).first()
                             
                             if availability:
-                                # Check if there are any free slots
+                                # Check if there are any free slots (exclude already booked to prevent double booking)
                                 existing_appointments = Appointment.objects.filter(
                                     dentist=dentist,
                                     date=today,
-                                    status__in=['confirmed', 'pending']
+                                    status__in=['confirmed', 'pending', 'reschedule_requested']
                                 ).values_list('time', flat=True)
                                 
                                 # Generate time slots
@@ -1592,8 +1868,8 @@ Clinic Information:
                                 has_slots = False
                                 current_time = start_time
                                 
-                                # Check 30-minute slots
-                                while current_time < end_time:
+                                # Check 30-minute slots (include end time)
+                                while current_time <= end_time:
                                     time_only = current_time.time()
                                     
                                     # Skip lunch break
