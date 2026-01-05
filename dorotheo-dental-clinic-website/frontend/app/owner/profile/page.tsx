@@ -23,7 +23,7 @@ export default function OwnerProfile() {
         firstName: user.first_name || "",
         lastName: user.last_name || "",
         email: user.email || "",
-        phone: (user as any).phone || "",
+        phone: user.phone || "",
       })
     }
   }, [user])

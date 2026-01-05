@@ -10,6 +10,7 @@ interface User {
   user_type: "patient" | "staff" | "owner"
   first_name: string
   last_name: string
+  phone?: string
   role?: string  // For staff: 'receptionist' or 'dentist'
 }
 
