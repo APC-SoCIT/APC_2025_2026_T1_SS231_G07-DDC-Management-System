@@ -15,14 +15,14 @@ interface Message {
 
 const initialQuickActions = [
   { icon: Calendar, text: "Book an appointment", message: "I want to book an appointment" },
-  { icon: Calendar, text: "Check availability", message: "Show me available appointment slots" },
+  { icon: Calendar, text: "Check availability", message: "Show available slots today" },
   { icon: XCircle, text: "Cancel appointment", message: "I want to cancel my appointment" },
   { icon: Calendar, text: "Reschedule", message: "I need to reschedule my appointment" },
 ]
 
 const quickReplies = [
   "What services do you offer?",
-  "Show me available appointment slots",
+  "Show available slots today",
   "What are your clinic hours?",
   "Tell me about dental procedures",
 ]

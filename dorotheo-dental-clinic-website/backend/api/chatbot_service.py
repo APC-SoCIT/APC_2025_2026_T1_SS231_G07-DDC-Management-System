@@ -7,7 +7,7 @@ import ollama
 from datetime import datetime, timedelta
 import re
 from django.db.models import Q
-from .models import Service, Appointment, User, StaffAvailability, DentistAvailability
+from .models import Service, Appointment, User, DentistAvailability
 
 
 class DentalChatbotService:
@@ -193,10 +193,28 @@ class DentalChatbotService:
         system_prompt = """You are a helpful dental clinic assistant for Dorotheo Dental Clinic.
 
 YOUR ROLE:
-- Answer questions about dental services, procedures, and clinic operations
+- Answer questions ONLY about dental services, procedures, and clinic operations
 - Help patients understand appointment booking, cancellation, and rescheduling processes
 - Provide general dental health information
 - Be friendly, professional, and empathetic
+
+CRITICAL RESTRICTION - TOPIC BOUNDARIES:
+- You MUST ONLY answer questions related to:
+  * Dorotheo Dental Clinic services and operations
+  * Dental health, treatments, and procedures
+  * Appointment scheduling, booking, and management
+  * General oral health and dental care advice
+  * Clinic hours, location, and contact information
+
+- You MUST REFUSE to answer questions about:
+  * General knowledge unrelated to dentistry (e.g., shoe sizes, trivia, math problems)
+  * System passwords, credentials, or admin access
+  * Topics outside of dental care and clinic operations
+  * Personal information of other patients or staff
+  * Non-dental medical conditions
+
+- If asked about NON-DENTAL topics, you MUST respond with:
+  "I apologize, but I can only assist with questions about Dorotheo Dental Clinic and dental care. Is there anything related to our dental services or your appointments that I can help you with?"
 
 FORMATTING RULES (CRITICAL - FOLLOW EXACTLY):
 1. Use bold (**text**) ONLY for titles, headings, and numbered list items
@@ -259,10 +277,25 @@ WHEN YOU SEE SERVICE DATA IN "CURRENT SYSTEM DATA" SECTION:
 - NEVER refuse to provide service information that appears in the database
 - These are real dental services offered by the clinic
 
+CRITICAL COMMUNICATION STYLE:
+- Answer questions naturally and professionally as a knowledgeable clinic assistant
+- NEVER mention "system data", "database", "CURRENT SYSTEM DATA", or technical terms
+- Present information as if you personally know it about the clinic
+- Use phrases like "Our founder is...", "We offer...", "Dr. [Name] is available..."
+- Speak with confidence and authority about clinic information
+- Be warm, professional, and helpful in tone
+
+EXAMPLE RESPONSES:
+❌ BAD: "According to the CURRENT SYSTEM DATA, the founder is Dr. Marvin F. Dorotheo"
+✅ GOOD: "The founder and owner of Dorotheo Dental Clinic is Dr. Marvin F. Dorotheo. The clinic was established in 2001."
+
+❌ BAD: "Based on the system information, we have these dentists available"
+✅ GOOD: "Our dentists are Dr. Marvin Dorotheo and Dr. Michael Orenze. They're both highly experienced and dedicated to providing excellent dental care."
+
 CRITICAL RULE - ONLY USE PROVIDED DATA:
 - NEVER make up or invent dentist names, staff members, or patient information
-- ONLY mention dentists or staff if they are explicitly listed in the CURRENT SYSTEM DATA section
-- If no dentist data is provided in the context, say "Please contact our clinic directly for information about our dentists"
+- ONLY mention dentists or staff if they are provided in the context below
+- If no dentist data is provided, say "Please contact our clinic directly for information about our dentists"
 - NEVER hallucinate or fabricate information - if you don't have the data, say you don't know
 
 STRICT RESTRICTIONS - You must NEVER:
@@ -274,18 +307,18 @@ STRICT RESTRICTIONS - You must NEVER:
 - Provide SQL queries or database schema information
 
 What You MUST Do:
-- ALWAYS share the complete service list when it appears in CURRENT SYSTEM DATA
-- ALWAYS show all available appointment time slots when provided in the data
+- Share clinic information, services, and dentist names naturally and professionally
+- Show all available appointment time slots when asked
 - Guide users on how to book, cancel, or reschedule appointments
 - Answer general dental health questions
 - Provide clinic hours and contact information
 
 Important Guidelines:
-- Service information is PUBLIC and SAFE - always provide it when available in the data
+- Answer as a professional clinic representative, not as a computer system
 - Never refuse to share service names, descriptions, or procedures
 - If asked about restricted information (passwords, emails, etc), politely decline
 - For booking/canceling/rescheduling, guide users through the proper process
-- Keep responses concise and friendly
+- Keep responses concise, warm, and friendly
 
 Clinic Information:
 - Name: Dorotheo Dental and Diagnostic Center
@@ -1254,116 +1287,379 @@ Clinic Information:
             
             message_lower = user_message.lower()
             
-            # PRIORITY 1: Check for cancellation intent FIRST (before booking)
-            cancel_keywords = ['cancel', 'cancel appointment', 'cancel my appointment', 'remove appointment']
-            if any(keyword in message_lower for keyword in cancel_keywords) and 'book' not in message_lower:
-                # Handle cancellation through AI
-                result = self.handle_cancel_intent(user_message, conversation_history)
-                return {
-                    'response': result['response'],
-                    'quick_replies': result.get('quick_replies'),
-                    'error': None
-                }
+            # PRIORITY 0: Handle simple informational questions FIRST (before any flow detection)
+            # These should NEVER trigger booking/cancel flows
+            informational_questions = [
+                ('owner', 'who is the owner', 'who owns', 'who founded'),
+                ('founder', 'who founded', 'who started', 'who established'),
+                ('dentist', 'who is the dentist', 'who are the dentists', 'list dentist'),
+                ('clinic', 'about clinic', 'clinic information', 'tell me about'),
+                ('hours', 'what time', 'when open', 'clinic hours', 'operating hours'),
+                ('location', 'where is', 'address', 'how to get there'),
+            ]
             
-            # Check if we're in the middle of a cancel flow
-            in_cancel_flow = False
-            if conversation_history:
-                recent_messages = [msg.get('content', '').lower() for msg in conversation_history[-4:]]
-                cancel_indicators = ['cancel', 'confirm cancel', 'keep appointment', 'step 1: select appointment']
-                if any(any(indicator in msg for indicator in cancel_indicators) for msg in recent_messages):
-                    in_cancel_flow = True
+            # Check if this is a simple "who/what/when/where" informational question
+            is_informational = any(
+                q_word in message_lower 
+                for q_word in ['who is', 'who are', 'what is', 'when is', 'where is', 'tell me about', 'about the']
+            )
             
-            if in_cancel_flow:
-                result = self.handle_cancel_intent(user_message, conversation_history)
-                return {
-                    'response': result['response'],
-                    'quick_replies': result.get('quick_replies'),
-                    'error': None
-                }
-            
-            # Check if we're in the middle of a booking flow by looking at conversation history
-            in_booking_flow = False
-            if conversation_history:
-                # Check last few messages for booking context
-                recent_messages = [msg.get('content', '').lower() for msg in conversation_history[-4:]]
-                booking_indicators = ['book', 'schedule', 'appointment', 'step 1', 'step 2', 'step 3', 'step 4', 'step 5', 'choose your dentist', 'choose a day', 'choose a specific date', 'choose a time', 'choose treatment']
-                # Don't trigger booking flow if we're in cancel mode
-                if any(any(indicator in msg for indicator in booking_indicators) for msg in recent_messages):
-                    # Make sure it's not a cancel flow
-                    if not any('cancel' in msg for msg in recent_messages):
-                        in_booking_flow = True
-            
-            # PRIORITY 2: Check for booking intent OR if we're in booking flow
-            booking_keywords = ['book', 'schedule', 'make appointment', 'set appointment', 'appointment for', 'reserve']
-            if any(keyword in message_lower for keyword in booking_keywords) or in_booking_flow:
-                # Handle booking through AI
-                result = self.handle_booking_intent(user_message, conversation_history)
-                return {
-                    'response': result['response'],
-                    'quick_replies': result.get('quick_replies'),
-                    'error': None
-                }
-            
-            # PRIORITY 3: Check for reschedule intent
-            reschedule_keywords = ['reschedule', 'change appointment', 'move appointment', 'change time', 'change date']
-            if any(keyword in message_lower for keyword in reschedule_keywords):
-                # Handle rescheduling through AI
-                result = self.handle_reschedule_intent(user_message)
-                return {
-                    'response': result['response'],
-                    'quick_replies': result.get('quick_replies'),
-                    'error': None
-                }
-            
-            # Handler for asking available slots without mentioning a dentist
-            if any(word in message_lower for word in ['available slot', 'show slot', 'appointment slot', 'available appointment', 'when available', 'available time']):
-                # Check if a specific dentist was mentioned
+            # If it's informational AND doesn't have explicit booking intent, skip to AI
+            if is_informational and not any(book_word in message_lower for book_word in ['book', 'schedule', 'make appointment', 'reserve']):
+                # Let the AI handle it with clinic context - skip all flow handlers
+                pass  # Continue to the AI section below
+            else:
+                # PRIORITY 1: Check for cancellation intent FIRST (before booking)
+                cancel_keywords = ['cancel', 'cancel appointment', 'cancel my appointment', 'remove appointment']
+                if any(keyword in message_lower for keyword in cancel_keywords) and 'book' not in message_lower:
+                    # Handle cancellation through AI
+                    result = self.handle_cancel_intent(user_message, conversation_history)
+                    return {
+                        'response': result['response'],
+                        'quick_replies': result.get('quick_replies'),
+                        'error': None
+                    }
+                
+                # Check if we're in the middle of a cancel flow
+                in_cancel_flow = False
+                if conversation_history:
+                    recent_messages = [msg.get('content', '').lower() for msg in conversation_history[-4:]]
+                    cancel_indicators = ['cancel', 'confirm cancel', 'keep appointment', 'step 1: select appointment']
+                    if any(any(indicator in msg for indicator in cancel_indicators) for msg in recent_messages):
+                        in_cancel_flow = True
+                
+                if in_cancel_flow:
+                    result = self.handle_cancel_intent(user_message, conversation_history)
+                    return {
+                        'response': result['response'],
+                        'quick_replies': result.get('quick_replies'),
+                        'error': None
+                    }
+                
+                # Check if we're in the middle of a booking flow by looking at conversation history
+                # Only consider in booking flow if we see EXPLICIT booking step indicators
+                in_booking_flow = False
+                if conversation_history:
+                    # Check only ASSISTANT messages for booking steps (not user questions)
+                    recent_assistant_messages = [
+                        msg.get('content', '').lower() 
+                        for msg in conversation_history[-4:] 
+                        if msg.get('role') == 'assistant'
+                    ]
+                    # Only trigger if assistant explicitly showed booking steps
+                    booking_step_indicators = ['step 1: choose your dentist', 'step 2: choose a day', 'step 3: choose a specific date', 'step 4: choose a time', 'step 5: choose treatment']
+                    if any(any(indicator in msg for indicator in booking_step_indicators) for msg in recent_assistant_messages):
+                        # Make sure it's not a cancel flow
+                        if not any('cancel' in msg for msg in recent_assistant_messages):
+                            in_booking_flow = True
+                
+                # PRIORITY 2: Check for EXPLICIT booking intent OR if we're in active booking flow
+                # Only trigger on clear booking phrases, not just "appointment"
+                booking_keywords = ['book appointment', 'schedule appointment', 'make an appointment', 'set an appointment', 'i want to book', 'want to schedule', 'reserve appointment', 'book a', 'schedule a']
+                has_booking_intent = any(keyword in message_lower for keyword in booking_keywords)
+                
+                if has_booking_intent or in_booking_flow:
+                    # Handle booking through AI
+                    result = self.handle_booking_intent(user_message, conversation_history)
+                    return {
+                        'response': result['response'],
+                        'quick_replies': result.get('quick_replies'),
+                        'error': None
+                    }
+                
+                # PRIORITY 3: Check for reschedule intent
+                reschedule_keywords = ['reschedule', 'change appointment', 'move appointment', 'change time', 'change date']
+                if any(keyword in message_lower for keyword in reschedule_keywords):
+                    # Handle rescheduling through AI
+                    result = self.handle_reschedule_intent(user_message)
+                    return {
+                        'response': result['response'],
+                        'quick_replies': result.get('quick_replies'),
+                        'error': None
+                    }
+                
+                # Handler for when user clicks on a dentist name (to show their available slots)
+                # This catches "Dr. [Name]" messages without other keywords
                 dentists = User.objects.filter(
                     Q(user_type='staff', role='dentist') | Q(user_type='owner')
                 )
                 
-                dentist_mentioned = False
+                dentist_selected = None
                 for dentist in dentists:
                     dentist_full_name = dentist.get_full_name().lower()
-                    first_name = dentist.first_name.lower()
-                    last_name = dentist.last_name.lower()
-                    
-                    if (dentist_full_name in message_lower or 
-                        first_name in message_lower or 
-                        last_name in message_lower or
-                        f"dr {first_name}" in message_lower or
-                        f"dr. {first_name}" in message_lower):
-                        dentist_mentioned = True
+                    # Check if message is JUST the dentist's name (or close to it)
+                    if (f"dr. {dentist_full_name}" == message_lower.strip() or
+                        f"dr {dentist_full_name}" == message_lower.strip() or
+                        dentist_full_name == message_lower.strip()):
+                        dentist_selected = dentist
                         break
                 
-                # If no dentist mentioned, ask which dentist they want
-                if not dentist_mentioned:
-                    response_text = "Which dentist would you like to see? We have:\n\n"
-                    quick_replies = []
+                if dentist_selected:
+                    # Show available slots for today for this dentist
+                    from datetime import datetime as dt
+                    today = dt.now().date()
+                    
+                    # Get today's availability
+                    availability = DentistAvailability.objects.filter(
+                        dentist=dentist_selected,
+                        date=today,
+                        is_available=True
+                    ).first()
+                    
+                    if not availability:
+                        response_text = f"Dr. {dentist_selected.get_full_name()} has no available slots today.\n\n"
+                        response_text += "Would you like to check availability for another day?"
+                        return {
+                            'response': response_text,
+                            'error': None
+                        }
+                    
+                    # Get existing appointments
+                    existing_appointments = Appointment.objects.filter(
+                        dentist=dentist_selected,
+                        date=today,
+                        status__in=['confirmed', 'pending']
+                    ).values_list('time', flat=True)
+                    
+                    # Generate time slots
+                    from datetime import time as time_obj
+                    start_time = dt.combine(today, availability.start_time)
+                    end_time = dt.combine(today, availability.end_time)
+                    
+                    # Lunch break: 11:30 AM - 12:30 PM
+                    lunch_start = time_obj(11, 30)
+                    lunch_end = time_obj(12, 30)
+                    
+                    available_times = []
+                    current_time = start_time
+                    
+                    # Generate 30-minute slots
+                    while current_time < end_time:
+                        time_str = current_time.strftime('%H:%M')
+                        time_only = current_time.time()
+                        
+                        # Skip lunch break (11:30 AM - 12:30 PM)
+                        if time_only >= lunch_start and time_only < lunch_end:
+                            current_time += timedelta(minutes=30)
+                            continue
+                        
+                        # Check if slot is not already booked
+                        if time_str not in [str(t)[:5] for t in existing_appointments]:
+                            available_times.append(current_time.strftime('%I:%M %p').lstrip('0'))
+                        current_time += timedelta(minutes=30)
+                    
+                    if not available_times:
+                        response_text = f"Dr. {dentist_selected.get_full_name()} has no available slots today.\n\n"
+                        response_text += "Would you like to check availability for another day?"
+                    else:
+                        response_text = f"📅 **Available Time Slots for Dr. {dentist_selected.get_full_name()} Today:**\n\n"
+                        # Format each time slot on its own line with spacing
+                        time_slots_formatted = []
+                        for i, time_slot in enumerate(available_times):
+                            time_slots_formatted.append(f"{i+1}. {time_slot}")
+                        response_text += "\n".join(time_slots_formatted)
+                        response_text += "\n\nWould you like to book an appointment?"
+                    
+                    return {
+                        'response': response_text.strip(),
+                        'error': None
+                    }
+                
+                # Handler for asking available slots without mentioning a dentist
+                if any(word in message_lower for word in ['available slot', 'show slot', 'appointment slot', 'available appointment', 'when available', 'available time']):
+                    # Check if a specific dentist was mentioned
+                    dentists = User.objects.filter(
+                        Q(user_type='staff', role='dentist') | Q(user_type='owner')
+                    )
+                    
+                    dentist_mentioned = None
                     for dentist in dentists:
-                        name = dentist.get_full_name()
-                        response_text += f"- **Dr. {name}**\n"
-                        quick_replies.append(f"Dr. {name}")
-                    response_text += "\nPlease select a dentist below:"
-                    return {
-                        'response': response_text.strip(),
-                        'quick_replies': quick_replies,
-                        'error': None
-                    }
-            
-            # Direct handler for service list - show only title and category
-            if any(word in message_lower for word in ['what service', 'services do you offer', 'what do you offer', 'list service', 'show service']):
-                services = Service.objects.all()
-                if services:
-                    response_text = "We offer the following dental services:\n\n"
-                    for service in services:
-                        category_name = service.category.replace('_', ' ').title()
-                        response_text += f"- **{service.name.title()}** ({category_name})\n"
-                    response_text += "\nWould you like to know more about any specific service or book an appointment?"
-                    return {
-                        'response': response_text.strip(),
-                        'error': None
-                    }
+                        dentist_full_name = dentist.get_full_name().lower()
+                        first_name = dentist.first_name.lower()
+                        last_name = dentist.last_name.lower()
+                        
+                        if (dentist_full_name in message_lower or 
+                            first_name in message_lower or 
+                            last_name in message_lower or
+                            f"dr {first_name}" in message_lower or
+                            f"dr. {first_name}" in message_lower):
+                            dentist_mentioned = dentist
+                            break
+                    
+                    # If a dentist was mentioned, show their available slots for today
+                    if dentist_mentioned:
+                        from datetime import datetime as dt
+                        today = dt.now().date()
+                        
+                        # Get today's availability for this dentist
+                        availability = DentistAvailability.objects.filter(
+                            dentist=dentist_mentioned,
+                            date=today,
+                            is_available=True
+                        ).first()
+                        
+                        if not availability:
+                            response_text = f"Dr. {dentist_mentioned.get_full_name()} has no available slots today.\n\n"
+                            response_text += "Would you like to check availability for another day?"
+                            return {
+                                'response': response_text,
+                                'error': None
+                            }
+                        
+                        # Get existing appointments
+                        existing_appointments = Appointment.objects.filter(
+                            dentist=dentist_mentioned,
+                            date=today,
+                            status__in=['confirmed', 'pending']
+                        ).values_list('time', flat=True)
+                        
+                        # Generate time slots
+                        from datetime import time as time_obj
+                        start_time = dt.combine(today, availability.start_time)
+                        end_time = dt.combine(today, availability.end_time)
+                        
+                        # Lunch break: 11:30 AM - 12:30 PM
+                        lunch_start = time_obj(11, 30)
+                        lunch_end = time_obj(12, 30)
+                        
+                        available_times = []
+                        current_time = start_time
+                        
+                        # Generate 30-minute slots
+                        while current_time < end_time:
+                            time_str = current_time.strftime('%H:%M')
+                            time_only = current_time.time()
+                            
+                            # Skip lunch break (11:30 AM - 12:30 PM)
+                            if time_only >= lunch_start and time_only < lunch_end:
+                                current_time += timedelta(minutes=30)
+                                continue
+                            
+                            # Check if slot is not already booked
+                            if time_str not in [str(t)[:5] for t in existing_appointments]:
+                                available_times.append(current_time.strftime('%I:%M %p').lstrip('0'))
+                            current_time += timedelta(minutes=30)
+                        
+                        if not available_times:
+                            response_text = f"Dr. {dentist_mentioned.get_full_name()} has no available slots today.\n\n"
+                            response_text += "Would you like to check availability for another day?"
+                        else:
+                            response_text = f"📅 **Available Slots for Dr. {dentist_mentioned.get_full_name()} Today:**\n\n"
+                            # Format each time slot on its own line with numbering
+                            time_slots_formatted = []
+                            for i, time_slot in enumerate(available_times):
+                                time_slots_formatted.append(f"{i+1}. {time_slot}")
+                            response_text += "\n".join(time_slots_formatted)
+                            response_text += "\n\nWould you like to book one of these slots?"
+                        
+                        return {
+                            'response': response_text.strip(),
+                            'error': None
+                        }
+                    
+                    # If no dentist mentioned, show list of available dentists for today
+                    else:
+                        from datetime import datetime as dt
+                        today = dt.now().date()
+                        
+                        available_dentists = []
+                        
+                        for dentist in dentists:
+                            # Check if dentist has availability today
+                            availability = DentistAvailability.objects.filter(
+                                dentist=dentist,
+                                date=today,
+                                is_available=True
+                            ).first()
+                            
+                            if availability:
+                                # Check if there are any free slots
+                                existing_appointments = Appointment.objects.filter(
+                                    dentist=dentist,
+                                    date=today,
+                                    status__in=['confirmed', 'pending']
+                                ).values_list('time', flat=True)
+                                
+                                # Generate time slots
+                                from datetime import time as time_obj
+                                start_time = dt.combine(today, availability.start_time)
+                                end_time = dt.combine(today, availability.end_time)
+                                
+                                # Lunch break: 11:30 AM - 12:30 PM
+                                lunch_start = time_obj(11, 30)
+                                lunch_end = time_obj(12, 30)
+                                
+                                has_slots = False
+                                current_time = start_time
+                                
+                                # Check 30-minute slots
+                                while current_time < end_time:
+                                    time_only = current_time.time()
+                                    
+                                    # Skip lunch break
+                                    if time_only >= lunch_start and time_only < lunch_end:
+                                        current_time += timedelta(minutes=30)
+                                        continue
+                                    
+                                    time_str = current_time.strftime('%H:%M')
+                                    if time_str not in [str(t)[:5] for t in existing_appointments]:
+                                        has_slots = True
+                                        break
+                                    current_time += timedelta(minutes=30)
+                                
+                                if has_slots:
+                                    available_dentists.append(dentist)
+                        
+                        if not available_dentists:
+                            response_text = "Sorry, there are no available dentists with open slots today.\n\n"
+                            response_text += "Would you like to check availability for another day?"
+                            return {
+                                'response': response_text,
+                                'error': None
+                            }
+                        
+                        response_text = "👨‍⚕️ **Available Dentists Today:**\n\n"
+                        response_text += "Please select a dentist to view their available time slots:\n\n"
+                        quick_replies = []
+                        
+                        for dentist in available_dentists:
+                            dentist_name = f"Dr. {dentist.get_full_name()}"
+                            response_text += f"• {dentist_name}\n"
+                            quick_replies.append(dentist_name)
+                        
+                        return {
+                            'response': response_text.strip(),
+                            'quick_replies': quick_replies,
+                            'error': None
+                        }
+                
+                
+                # Direct handler for service list - show only title and category
+                if any(word in message_lower for word in ['what service', 'services do you offer', 'what do you offer', 'list service', 'show service']):
+                    services = Service.objects.all()
+                    if services:
+                        response_text = "We offer the following dental services:\n\n"
+                        for service in services:
+                            category_name = service.category.replace('_', ' ').title()
+                            response_text += f"- **{service.name.title()}** ({category_name})\n"
+                        response_text += "\nWould you like to know more about any specific service or book an appointment?"
+                        return {
+                            'response': response_text.strip(),
+                            'error': None
+                        }
+                
+                # Direct handler for "what is [service]" - show only description (NOT procedures)
+                if any(word in message_lower for word in ['what is', 'tell me about', 'describe']):
+                    # Skip if asking about procedure/steps/how - let AI handle those with its knowledge
+                    if not any(proc_word in message_lower for proc_word in ['procedure', 'step', 'how', 'process', 'done', 'work']):
+                        services = Service.objects.all()
+                        for service in services:
+                            if service.name.lower() in message_lower:
+                                response_text = f"{service.description}"
+                                return {
+                                    'response': response_text.strip(),
+                                    'error': None
+                                }
             
             # Direct handler for "what is [service]" - show only description (NOT procedures)
             if any(word in message_lower for word in ['what is', 'tell me about', 'describe']):

@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, User, Calendar, FileText, CreditCard, LogOut, Menu, X, ChevronDown, ChevronRight, Camera, FolderOpen, Activity } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import ChatbotWidget from "@/components/chatbot-widget"
+import NotificationBell from "@/components/notification-bell"
 
 export default function PatientLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname()
@@ -41,6 +42,8 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
           <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-10 w-auto object-contain" />
         </Link>
         <div className="flex items-center gap-2">
+          {/* Notification Bell */}
+          <NotificationBell />
           {/* Mobile Profile Dropdown */}
           <div className="relative">
             <button
@@ -68,7 +71,9 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
 
       {/* Top Header for Desktop */}
       <div className="hidden lg:block fixed top-0 right-0 z-30 bg-white border-b border-[var(--color-border)] px-6 py-3" style={{left: '16rem'}}>
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-4">
+          {/* Notification Bell */}
+          <NotificationBell />
           <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}

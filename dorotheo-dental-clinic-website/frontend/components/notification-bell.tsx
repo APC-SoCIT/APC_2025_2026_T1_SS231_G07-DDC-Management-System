@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Bell, Check, X } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 
 interface Notification {
   id: number
@@ -24,6 +25,7 @@ interface Notification {
 }
 
 export default function NotificationBell() {
+  const { user } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
@@ -207,9 +209,53 @@ export default function NotificationBell() {
         return 'Reschedule Request'
       case 'cancel_request':
         return 'Cancellation Request'
+      case 'appointment_confirmed':
+        return 'Appointment Confirmed'
+      case 'reschedule_approved':
+        return 'Reschedule Approved'
+      case 'reschedule_rejected':
+        return 'Reschedule Rejected'
+      case 'cancel_approved':
+        return 'Cancellation Approved'
+      case 'cancel_rejected':
+        return 'Cancellation Rejected'
       default:
-        return type
+        return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
     }
+  }
+
+  const getNotificationColor = (type: string) => {
+    // For patients - use new color scheme
+    if (user?.user_type === 'patient') {
+      // Green for confirmed/approved actions
+      if (type === 'appointment_confirmed' || type === 'reschedule_approved') {
+        return 'bg-green-100 text-green-800'
+      }
+      // Red for cancellation approved
+      if (type === 'cancel_approved') {
+        return 'bg-red-100 text-red-800'
+      }
+      // Yellow for requests and rejections
+      if (type === 'reschedule_request' || type === 'cancel_request' || 
+          type === 'reschedule_rejected' || type === 'cancel_rejected') {
+        return 'bg-yellow-100 text-yellow-800'
+      }
+      // Default blue for new appointments
+      return 'bg-blue-100 text-blue-800'
+    }
+    
+    // For staff/owner - use original color scheme
+    if (type === 'new_appointment') {
+      return 'bg-green-100 text-green-800'
+    }
+    if (type === 'reschedule_request') {
+      return 'bg-yellow-100 text-yellow-800'
+    }
+    if (type === 'cancel_request' || type === 'appointment_cancelled') {
+      return 'bg-red-100 text-red-800'
+    }
+    // Default
+    return 'bg-blue-100 text-blue-800'
   }
 
   const formatDate = (dateString: string) => {
@@ -291,11 +337,7 @@ export default function NotificationBell() {
                         {/* Type Badge */}
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            notif.notification_type === 'new_appointment' 
-                              ? 'bg-green-100 text-green-800'
-                              : notif.notification_type === 'reschedule_request'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
+                            getNotificationColor(notif.notification_type)
                           }`}>
                             {formatNotificationType(notif.notification_type)}
                           </span>
