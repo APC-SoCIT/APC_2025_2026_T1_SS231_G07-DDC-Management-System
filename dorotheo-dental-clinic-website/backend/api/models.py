@@ -352,10 +352,15 @@ class AppointmentNotification(models.Model):
         ('reschedule_request', 'Reschedule Request'),
         ('cancel_request', 'Cancel Request'),
         ('appointment_cancelled', 'Appointment Cancelled'),
+        ('appointment_confirmed', 'Appointment Confirmed'),
+        ('reschedule_approved', 'Reschedule Approved'),
+        ('reschedule_rejected', 'Reschedule Rejected'),
+        ('cancel_approved', 'Cancellation Approved'),
+        ('cancel_rejected', 'Cancellation Rejected'),
     )
     
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointment_notifications')
-    appointment = models.ForeignKey('Appointment', on_delete=models.CASCADE, related_name='appointment_notifications')
+    appointment = models.ForeignKey('Appointment', on_delete=models.SET_NULL, null=True, blank=True, related_name='appointment_notifications')
     notification_type = models.CharField(max_length=30, choices=NOTIFICATION_TYPES)
     message = models.TextField()
     is_read = models.BooleanField(default=False)

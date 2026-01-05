@@ -18,10 +18,10 @@ frontend/build/
 backend/.env
 
 # Database
-#backend/db.sqlite3
-#*.db
-#*.sqlite
-#*.sqlite3
+backend/db.sqlite3
+*.db
+*.sqlite
+*.sqlite3
 
 # Python
 *.pyc

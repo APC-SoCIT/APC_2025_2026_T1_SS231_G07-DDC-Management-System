@@ -70,7 +70,7 @@ export default function StaffDashboard() {
     .sort((a, b) => a.time.localeCompare(b.time))
 
   // Get appointments for selected date
-  const selectedDateStr = selectedDate.toISOString().split('T')[0]
+  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
   const selectedDayAppointments = allAppointments.filter(apt => apt.date === selectedDateStr).sort((a, b) => a.time.localeCompare(b.time))
 
   // Calendar helper functions

@@ -69,6 +69,42 @@ def create_appointment_notification(appointment, notification_type, custom_messa
     return notifications_created
 
 
+def create_patient_notification(appointment, notification_type, custom_message=None):
+    """
+    Create notification for the patient about their appointment status.
+    
+    Args:
+        appointment: The Appointment instance
+        notification_type: Type of notification
+        custom_message: Optional custom message, will generate default if not provided
+    """
+    if not custom_message:
+        appointment_date = appointment.date.strftime('%B %d, %Y')
+        appointment_time = appointment.time.strftime('%I:%M %p')
+        dentist_name = appointment.dentist.get_full_name() if appointment.dentist else 'our dentist'
+        
+        if notification_type == 'appointment_confirmed':
+            custom_message = f"Your appointment has been confirmed for {appointment_date} at {appointment_time} with Dr. {dentist_name}."
+        elif notification_type == 'reschedule_approved':
+            custom_message = f"Your reschedule request has been approved. Your new appointment is on {appointment_date} at {appointment_time} with Dr. {dentist_name}."
+        elif notification_type == 'reschedule_rejected':
+            custom_message = f"Your reschedule request has been rejected. Your appointment remains on {appointment_date} at {appointment_time}."
+        elif notification_type == 'cancel_approved':
+            custom_message = f"Your cancellation request has been approved. Your appointment for {appointment_date} at {appointment_time} has been cancelled."
+        elif notification_type == 'cancel_rejected':
+            custom_message = f"Your cancellation request has been rejected. Your appointment remains on {appointment_date} at {appointment_time}."
+    
+    # Create notification for the patient
+    notification = AppointmentNotification.objects.create(
+        recipient=appointment.patient,
+        appointment=appointment,
+        notification_type=notification_type,
+        message=custom_message
+    )
+    
+    return notification
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
@@ -500,6 +536,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         
         # Create notifications for all staff and owner
         create_appointment_notification(appointment, 'new_appointment')
+        
+        # Notify patient that appointment is confirmed
+        if appointment.status == 'confirmed':
+            create_patient_notification(appointment, 'appointment_confirmed')
     
     def update(self, request, *args, **kwargs):
         """Update appointment with double booking validation"""
@@ -540,6 +580,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         
         if appointment.patient:
             appointment.patient.update_patient_status()
+        
+        # If appointment status changed from 'pending' to 'confirmed', notify patient
+        if old_status == 'pending' and appointment.status == 'confirmed':
+            create_patient_notification(appointment, 'appointment_confirmed')
         
         # If appointment status changed to 'completed', create/update dental record
         if old_status != 'completed' and appointment.status == 'completed':
@@ -652,6 +696,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment.status = 'confirmed'
         appointment.save()
         
+        # Notify patient that reschedule was approved
+        create_patient_notification(appointment, 'reschedule_approved')
+        
         serializer = self.get_serializer(appointment)
         return Response(serializer.data)
     
@@ -676,6 +723,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         # Revert status to confirmed
         appointment.status = 'confirmed'
         appointment.save()
+        
+        # Notify patient that reschedule was rejected
+        create_patient_notification(appointment, 'reschedule_rejected')
         
         serializer = self.get_serializer(appointment)
         return Response(serializer.data)
@@ -727,6 +777,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Notify patient before deleting
+        create_patient_notification(appointment, 'cancel_approved')
+        
         # Delete the appointment instead of marking as cancelled
         appointment_id = appointment.id
         appointment.delete()
@@ -752,6 +805,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment.cancel_reason = ''
         appointment.cancel_requested_at = None
         appointment.save()
+        
+        # Notify patient that cancel was rejected
+        create_patient_notification(appointment, 'cancel_rejected')
         
         serializer = self.get_serializer(appointment)
         return Response(serializer.data)
@@ -1324,11 +1380,9 @@ class AppointmentNotificationViewSet(viewsets.ModelViewSet):
     serializer_class = AppointmentNotificationSerializer
 
     def get_queryset(self):
-        """Staff and owner see their own notifications"""
+        """Return notifications for the current user (staff, owner, or patient)"""
         user = self.request.user
-        if user.user_type in ['staff', 'owner']:
-            return AppointmentNotification.objects.filter(recipient=user)
-        return AppointmentNotification.objects.none()
+        return AppointmentNotification.objects.filter(recipient=user)
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -1343,22 +1397,15 @@ class AppointmentNotificationViewSet(viewsets.ModelViewSet):
     def mark_all_read(self, request):
         """Mark all notifications as read for current user"""
         user = request.user
-        if user.user_type in ['staff', 'owner']:
-            AppointmentNotification.objects.filter(recipient=user, is_read=False).update(is_read=True)
-            return Response({'message': 'All notifications marked as read'})
-        return Response(
-            {'error': 'Only staff and owner can mark notifications'},
-            status=status.HTTP_403_FORBIDDEN
-        )
+        AppointmentNotification.objects.filter(recipient=user, is_read=False).update(is_read=True)
+        return Response({'message': 'All notifications marked as read'})
 
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
-        """Get count of unread notifications"""
+        """Get count of unread notifications for current user"""
         user = request.user
-        if user.user_type in ['staff', 'owner']:
-            count = AppointmentNotification.objects.filter(recipient=user, is_read=False).count()
-            return Response({'unread_count': count})
-        return Response({'unread_count': 0})
+        count = AppointmentNotification.objects.filter(recipient=user, is_read=False).count()
+        return Response({'unread_count': count})
 
 
 class PatientIntakeFormViewSet(viewsets.ModelViewSet):
