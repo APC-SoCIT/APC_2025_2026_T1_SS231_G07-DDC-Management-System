@@ -20,95 +20,110 @@
 
 ### **EPIC 1: User Management & Authentication** ✅ COMPLETE
 
-#### US-1.1: User Registration & Login
-**As a user, I want to register and log in securely**
-- ✅ Custom User model with roles (patient, staff, owner)
-- ✅ Token-based authentication
-- ✅ Login/Register UI components
-- ✅ Role-based access control
-- **Status:** DONE
+☑️ **DDCMS-23** As a user, I want to register and log in securely  
+`EPIC 1: USER MANAGEMENT` | `✅ DONE`
 
-#### US-1.2: Password Reset
-**As a user, I want to reset my password via email**
-- ✅ PasswordResetToken model
-- ✅ Request password reset API
-- ✅ Reset password API
-- **Status:** DONE
+- Task 1: Custom User model with roles (patient, staff, owner)
+- Task 2: Token-based authentication
+- Task 3: Login/Register UI components
+- Task 4: Role-based access control
 
-#### US-1.3: User Profile Management
-**As a user, I want to view and edit my profile**
-- ✅ Get profile endpoint
-- ✅ Update profile endpoint
-- ✅ Profile UI for all user types
-- **Status:** DONE
+---
+
+☑️ **DDCMS-24** As a user, I want to reset my password via email  
+`EPIC 1: USER MANAGEMENT` | `✅ DONE`
+
+- Task 1: PasswordResetToken model
+- Task 2: Request password reset API
+- Task 3: Reset password API
+
+---
+
+☑️ **DDCMS-25** As a user, I want to view and edit my profile  
+`EPIC 1: USER MANAGEMENT` | `✅ DONE`
+
+- Task 1: Get profile endpoint
+- Task 2: Update profile endpoint
+- Task 3: Profile UI for all user types
 
 ---
 
 ### **EPIC 2: Appointment Management** ✅ COMPLETE
 
-#### US-2.1: Book Appointment (Patient)
-**As a patient, I want to book appointments online**
-- ✅ Select dentist, date, time, service
-- ✅ Check dentist availability
-- ✅ Prevent double booking
-- ✅ Appointment status: pending (requires staff approval)
-- ✅ Notification to staff/owner
-- **Status:** DONE
-- **Files:** `frontend/app/patient/appointments/page.tsx`, `backend/api/views.py`
+☑️ **DDCMS-26** As a patient, I want to book appointments online  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
 
-#### US-2.2: Book Appointment (Staff/Owner)
-**As a staff/owner, I want to create confirmed appointments directly**
-- ✅ Create appointment for any patient
-- ✅ Status: confirmed (no approval needed)
-- ✅ Patient search functionality
-- **Status:** DONE
+- Task 1: Select dentist, date, time, service
+- Task 2: Check dentist availability
+- Task 3: Prevent double booking
+- Task 4: Appointment status: pending (requires staff approval)
+- Task 5: Notification to staff/owner
 
-#### US-2.3: Reschedule Appointment (Patient Request)
-**As a patient, I want to request appointment rescheduling**
-- ✅ Select new date and time
-- ✅ Request stored in reschedule fields
-- ✅ Status changes to 'reschedule_requested'
-- ✅ Notification to staff/owner
-- **Status:** DONE
-- **Files:** `backend/api/views.py` (request_reschedule endpoint)
+---
 
-#### US-2.4: Approve/Reject Reschedule (Staff/Owner)
-**As a staff/owner, I want to approve or reject reschedule requests**
-- ✅ View reschedule requests with comparison
-- ✅ Approve: applies changes to appointment
-- ✅ Reject: reverts to confirmed status
-- ✅ Patient notification
-- **Status:** DONE
-- **Files:** `backend/api/views.py` (approve_reschedule, reject_reschedule)
+☑️ **DDCMS-27** As a staff/owner, I want to create confirmed appointments directly  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
 
-#### US-2.5: Cancel Appointment (Patient Request)
-**As a patient, I want to request appointment cancellation**
-- ✅ Request cancellation with reason
-- ✅ Status changes to 'cancel_requested'
-- ✅ Notification to staff/owner
-- **Status:** DONE
+- Task 1: Create appointment for any patient
+- Task 2: Status: confirmed (no approval needed)
+- Task 3: Patient search functionality
 
-#### US-2.6: Approve/Reject Cancellation (Staff/Owner)
-**As a staff/owner, I want to approve or reject cancellation requests**
-- ✅ View cancellation requests
-- ✅ Approve: deletes appointment
-- ✅ Reject: reverts to confirmed
-- ✅ Patient notification (persists after deletion)
-- **Status:** DONE
+---
 
-#### US-2.7: View Appointments
-**As a user, I want to view my appointments**
-- ✅ Patient: View own appointments
-- ✅ Staff/Owner: View all appointments
-- ✅ Filter by status (upcoming, past)
-- ✅ Calendar view for staff/owner
-- **Status:** DONE
+☑️ **DDCMS-28** As a patient, I want to request appointment rescheduling  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
 
-#### US-2.8: Mark Appointment Complete/Missed
-**As a staff/owner, I want to mark appointments as completed or missed**
-- ✅ Complete: creates dental record
-- ✅ Missed: marks patient as missed
-- **Status:** DONE
+- Task 1: Select new date and time
+- Task 2: Request stored in reschedule fields
+- Task 3: Status changes to 'reschedule_requested'
+- Task 4: Notification to staff/owner
+
+---
+
+☑️ **DDCMS-29** As a staff/owner, I want to approve or reject reschedule requests  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
+
+- Task 1: View reschedule requests with comparison
+- Task 2: Approve: applies changes to appointment
+- Task 3: Reject: reverts to confirmed status
+- Task 4: Patient notification
+
+---
+
+☑️ **DDCMS-30** As a patient, I want to request appointment cancellation  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
+
+- Task 1: Request cancellation with reason
+- Task 2: Status changes to 'cancel_requested'
+- Task 3: Notification to staff/owner
+
+---
+
+☑️ **DDCMS-31** As a staff/owner, I want to approve or reject cancellation requests  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
+
+- Task 1: View cancellation requests
+- Task 2: Approve: deletes appointment
+- Task 3: Reject: reverts to confirmed
+- Task 4: Patient notification persistence
+
+---
+
+☑️ **DDCMS-32** As a user, I want to view my appointments  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
+
+- Task 1: Patient: View own appointments
+- Task 2: Staff/Owner: View all appointments
+- Task 3: Filter by status (upcoming, past)
+- Task 4: Calendar view for staff/owner
+
+---
+
+☑️ **DDCMS-33** As a staff/owner, I want to mark appointments as completed or missed  
+`EPIC 2: APPOINTMENT MGMT` | `✅ DONE`
+
+- Task 1: Complete: creates dental record
+- Task 2: Missed: marks patient as missed
 
 ---
 
@@ -259,120 +274,89 @@
 
 ## 🔄 IN PROGRESS - Partially Implemented
 
-### **EPIC 10: Inventory Management** 🔄 IN PROGRESS
+☑️ **DDCMS-34** View Inventory as a staff/owner  
+`EPIC 10: INVENTORY MGMT` | `🔄 IN PROGRESS`
 
-#### US-10.1: View Inventory
-**As a staff/owner, I want to view dental inventory**
-- ✅ InventoryItem model exists
-- ✅ API endpoints created
-- ❌ Frontend UI incomplete
-- **Status:** IN PROGRESS
-- **Blocking:** Need to implement frontend inventory page
-
-#### US-10.2: Manage Inventory
-**As a staff/owner, I want to add/edit/delete inventory items**
-- ✅ Backend CRUD operations
-- ❌ Frontend forms needed
-- **Status:** IN PROGRESS
+- Task 1: InventoryItem model exists
+- Task 2: API endpoints created
+- Task 3: ❌ Frontend UI incomplete
 
 ---
 
-### **EPIC 11: Billing System** 🔄 IN PROGRESS
+☑️ **DDCMS-35** Manage Inventory items (add/edit/delete)  
+`EPIC 10: INVENTORY MGMT` | `🔄 IN PROGRESS`
 
-#### US-11.1: Generate Bills
-**As a staff/owner, I want to generate bills for completed appointments**
-- ✅ Billing model exists
-- ✅ API endpoints created
-- ❌ Frontend billing UI needed
-- **Status:** IN PROGRESS
-
-#### US-11.2: View Billing History
-**As a staff/owner, I want to view billing history**
-- ✅ Backend API ready
-- ❌ Frontend implementation needed
-- **Status:** IN PROGRESS
+- Task 1: Backend CRUD operations
+- Task 2: ❌ Frontend forms needed
 
 ---
 
-### **EPIC 12: Analytics Dashboard** 🔄 IN PROGRESS
+☑️ **DDCMS-36** Generate Bills for completed appointments  
+`EPIC 11: BILLING` | `🔄 IN PROGRESS`
 
-#### US-12.1: View Analytics
-**As an owner, I want to see clinic analytics**
-- ✅ Analytics endpoint exists
-- ❌ Dashboard UI incomplete
-- **Status:** IN PROGRESS
-- **Next Steps:** Create analytics dashboard with charts
+- Task 1: Billing model exists
+- Task 2: API endpoints created
+- Task 3: ❌ Frontend billing UI needed
 
 ---
 
-### **EPIC 13: Staff Dashboard** 🔄 IN PROGRESS
+☑️ **DDCMS-37** View Billing History  
+`EPIC 11: BILLING` | `🔄 IN PROGRESS`
 
-#### US-13.1: Staff Dashboard with Calendar
-**As a staff, I want to see appointments in calendar view**
-- ✅ Calendar component exists
-- ❌ Timezone issue recently fixed (January 6, 2026)
-- ✅ Shows appointments for selected date
-- **Status:** IN PROGRESS
-- **Recent Fix:** Changed from toISOString() to manual date formatting
+- Task 1: Backend API ready
+- Task 2: ❌ Frontend implementation needed
+
+---
+
+☑️ **DDCMS-38** View Analytics Dashboard  
+`EPIC 12: ANALYTICS` | `🔄 IN PROGRESS`
+
+- Task 1: Analytics endpoint exists
+- Task 2: ❌ Dashboard UI incomplete
 
 ---
 
 ## 📋 TO DO - Not Yet Implemented
 
-### **EPIC 14: Reports** 📋 TO DO
+☐ **DDCMS-39** Generate various reports (appointment, revenue, statistics)  
+`EPIC 14: REPORTS` | `📋 TO DO`
 
-#### US-14.1: Generate Reports
-**As an owner, I want to generate various reports**
-- ❌ Appointment reports
-- ❌ Revenue reports
-- ❌ Patient statistics
-- **Status:** TO DO
-- **Priority:** Medium
+- Task 1: Appointment reports
+- Task 2: Revenue reports
+- Task 3: Patient statistics
 
 ---
 
-### **EPIC 15: Email Notifications** 📋 TO DO
+☐ **DDCMS-40** Send email appointment reminders  
+`EPIC 15: EMAIL` | `📋 TO DO`
 
-#### US-15.1: Email Appointment Reminders
-**As a system, I want to send email reminders**
-- ❌ Email service integration
-- ❌ Appointment reminder emails
-- ❌ Schedule email jobs
-- **Status:** TO DO
-- **Priority:** Low
+- Task 1: Email service integration
+- Task 2: Appointment reminder emails
+- Task 3: Schedule email jobs
 
 ---
 
-### **EPIC 16: SMS Notifications** 📋 TO DO
+☐ **DDCMS-41** Send SMS appointment reminders  
+`EPIC 16: SMS` | `📋 TO DO`
 
-#### US-16.1: SMS Appointment Reminders
-**As a system, I want to send SMS reminders**
-- ❌ SMS gateway integration
-- ❌ SMS templates
-- **Status:** TO DO
-- **Priority:** Low
+- Task 1: SMS gateway integration
+- Task 2: SMS templates
 
 ---
 
-### **EPIC 17: Treatment Plans** 📋 TO DO
+☐ **DDCMS-42** Create Treatment Plans  
+`EPIC 17: TREATMENT PLANS` | `📋 TO DO`
 
-#### US-17.1: Create Treatment Plans
-**As a dentist, I want to create multi-visit treatment plans**
-- ✅ TreatmentPlan model exists
-- ❌ Frontend UI needed
-- **Status:** TO DO
-- **Priority:** Medium
+- Task 1: TreatmentPlan model exists
+- Task 2: Frontend UI needed
 
 ---
 
-### **EPIC 18: File Attachments** 📋 TO DO
+☐ **DDCMS-43** Upload Patient Documents  
+`EPIC 18: FILE ATTACHMENTS` | `📋 TO DO`
 
-#### US-18.1: Upload Documents
-**As a staff, I want to upload patient documents**
-- ✅ FileAttachment model exists
-- ❌ Upload UI needed
-- **Status:** TO DO
-- **Priority:** Medium
+- Task 1: FileAttachment model exists
+- Task 2: Upload UI needed
 
 ---
 
