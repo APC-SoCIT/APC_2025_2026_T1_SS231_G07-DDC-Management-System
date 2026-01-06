@@ -39,13 +39,12 @@ This project proposes a transformative solution: a web-based management system i
 #### 📋 Patient Records Management
 - ✅ **Unified Patient Database** - Central repository for all patient information and records
 - ✅ **Expandable Patient Records** - Click to view/edit full medical history
-- ✅ **Interactive Tooth Chart** - Anatomical curved arch design with clickable teeth
 - ✅ **Document Management** - Upload and manage X-rays, scans, and reports
 - ✅ **Medical History Tracking** - Comprehensive patient medical history and allergies
 
 #### 📅 Appointment Management
 - ✅ **Centralized Scheduling** - Unified calendar accessible to staff across all branches
-- ✅ **Complete Appointment Lifecycle** - Book → Confirm → Complete → Dental Record (FULL AUTOMATION!)
+- ✅ **Complete Appointment Lifecycle** - Book → Confirm → Complete → Dental Record
 - ✅ **Auto-mark Missed Appointments** - System automatically detects and marks missed appointments
 - ✅ **Reschedule & Cancel Requests** - Patient request system with staff approval workflow
 - ✅ **Real-Time Notifications** - Staff and owner receive instant notifications for all appointment actions
