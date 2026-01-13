@@ -15,7 +15,6 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
     firstName: "",
     lastName: "",
     birthday: "",
-    age: "",
     email: "",
     phone: "",
     address: "",
@@ -41,7 +40,6 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         password: formData.password,
         phone: formData.phone,
         birthday: formData.birthday,
-        age: formData.age ? parseInt(formData.age) : null,
         address: formData.address,
         user_type: "patient",
       }
@@ -55,7 +53,6 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         firstName: "",
         lastName: "",
         birthday: "",
-        age: "",
         email: "",
         phone: "",
         address: "",
@@ -73,21 +70,29 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       
       // Parse error message
       let errorMessage = "Registration failed. Please try again."
-      try {
-        const errorData = JSON.parse(err.message)
-        console.error("[RegisterModal] Parsed error data:", errorData)
-        
-        if (errorData.username) {
-          errorMessage = `Username: ${errorData.username.join(", ")}`
-        } else if (errorData.email) {
-          errorMessage = `Email: ${errorData.email.join(", ")}`
-        } else if (errorData.detail) {
-          errorMessage = errorData.detail
-        } else {
-          errorMessage = JSON.stringify(errorData)
-        }
-      } catch {
-        errorMessage = err.message || errorMessage
+      
+      // Check if error has data property (from api.ts)
+      const errorData = err.data || {}
+      console.error("[RegisterModal] Parsed error data:", errorData)
+      
+      const errors = []
+      if (errorData.username) {
+        errors.push(errorData.username.join(", "))
+      }
+      if (errorData.email) {
+        errors.push(errorData.email.join(", "))
+      }
+      if (errorData.password) {
+        errors.push(errorData.password.join(", "))
+      }
+      if (errorData.detail) {
+        errors.push(errorData.detail)
+      }
+      
+      if (errors.length > 0) {
+        errorMessage = errors.join(". ")
+      } else if (err.message && err.message !== "Registration failed") {
+        errorMessage = err.message
       }
       
       setError(errorMessage)
@@ -146,17 +151,6 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Age</label>
-              <input
-                type="number"
-                required
-                value={formData.age}
-                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              />
-            </div>
-
-            <div>
               <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Email</label>
               <input
                 type="email"
@@ -175,6 +169,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                placeholder="+63"
               />
             </div>
           </div>
