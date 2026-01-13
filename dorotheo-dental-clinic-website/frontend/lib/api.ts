@@ -45,7 +45,10 @@ export const api = {
     if (!response.ok) {
       const error = await response.json()
       console.error("[v0] Registration error:", error)
-      throw new Error(JSON.stringify(error))
+      // Create a custom error object that preserves the error data
+      const err: any = new Error("Registration failed")
+      err.data = error
+      throw err
     }
     return response.json()
   },
