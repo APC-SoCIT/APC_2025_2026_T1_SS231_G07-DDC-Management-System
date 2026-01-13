@@ -164,6 +164,7 @@ This project is brought to you by the talented members of TechTalk.
    ```powershell
    cd "dorotheo-dental-clinic-website\backend"
    ```
+   ```
 
 2. **Activate the virtual environment:**
    ```powershell

@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+// Normalize API base to always point to the backend API (prevents hitting Next.js frontend 404s)
+const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+const trimmedBase = rawBase.replace(/\/+$/, "")
+const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trimmedBase}/api`
 
 interface LoginResponse {
   token: string
@@ -174,31 +177,16 @@ export const api = {
 
   // Reschedule request endpoints
   requestReschedule: async (id: number, data: { date: string; time: string; service?: number; dentist?: number; notes?: string }, token: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/appointments/${id}/request_reschedule/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
-      
-      if (!response.ok) {
-        let errorData: any = {}
-        try {
-          errorData = await response.json()
-        } catch (e) {
-          errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
-        }
-        throw { response: { data: errorData }, message: errorData.error || errorData.message || "Failed to request reschedule" }
-      }
-      
-      return response.json()
-    } catch (error: any) {
-      console.error("[API] requestReschedule error:", error)
-      throw error
-    }
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}/request_reschedule/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) throw new Error("Failed to request reschedule")
+    return response.json()
   },
 
   approveReschedule: async (id: number, token: string) => {
@@ -367,14 +355,6 @@ export const api = {
     return response.json()
   },
 
-  getUser: async (id: number, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
-      headers: { Authorization: `Token ${token}` },
-    })
-    if (!response.ok) throw new Error("Failed to fetch user")
-    return response.json()
-  },
-
   createStaff: async (data: any, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/`, {
       method: "POST",
@@ -394,19 +374,6 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) throw new Error("Failed to delete staff")
-  },
-
-  deleteUser: async (id: number, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
-      method: "DELETE",
-      headers: { Authorization: `Token ${token}` },
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Failed to delete user' }))
-      const error: any = new Error(errorData.error || 'Failed to delete user')
-      error.response = { data: errorData }
-      throw error
-    }
   },
 
   updateStaff: async (id: number, data: any, token: string) => {
@@ -451,13 +418,11 @@ export const api = {
   },
 
   getLatestTeethImage: async (patientId: number, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/teeth-images/by_patient/?patient_id=${patientId}`, {
+    const response = await fetch(`${API_BASE_URL}/teeth-images/latest/?patient_id=${patientId}`, {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) return null
-    const images = await response.json()
-    // Return the most recent image
-    return images.length > 0 ? images[images.length - 1] : null
+    return response.json()
   },
 
   getPatientTeethImages: async (patientId: number, token: string) => {
@@ -625,18 +590,6 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch available staff')
-    return response.json()
-  },
-
-  // Dentist Availability endpoints (date-specific)
-  getDentistAvailability: async (dentistId: number, startDate: string, endDate: string, token: string) => {
-    const response = await fetch(
-      `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${startDate}&end_date=${endDate}`,
-      {
-        headers: { Authorization: `Token ${token}` },
-      }
-    )
-    if (!response.ok) throw new Error('Failed to fetch dentist availability')
     return response.json()
   },
 
@@ -950,28 +903,6 @@ export const api = {
     if (!response.ok) throw new Error('Failed to export patient records')
     return response.json()
   },
-
-  // Chatbot endpoint
-  chatbotQuery: async (message: string, conversationHistory?: Array<{ role: string; content: string }>, token?: string) => {
-    const headers: any = { "Content-Type": "application/json" }
-    if (token) headers.Authorization = `Token ${token}`
-    
-    const response = await fetch(`${API_BASE_URL}/chatbot/`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        message,
-        conversation_history: conversationHistory || [],
-      }),
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || "Failed to get chatbot response")
-    }
-    
-    return response.json()
-  },
 }
 
 // Export all API functions
@@ -1058,5 +989,4 @@ export const {
   restorePatient,
   getArchivedPatients,
   exportPatientRecords,
-  chatbotQuery,
 } = api

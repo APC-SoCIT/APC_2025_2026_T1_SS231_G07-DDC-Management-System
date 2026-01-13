@@ -4,8 +4,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
+from django.conf import settings
 from datetime import date, timedelta
 import secrets
 from .models import (
@@ -164,9 +168,15 @@ def logout(request):
 def request_password_reset(request):
     """Request a password reset token"""
     email = request.data.get('email')
+    print(f"[Password Reset] Request received for email: {email}")
+    if not email:
+        return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         user = User.objects.get(email=email)
+        print(f"[Password Reset] User found: {user.username}")
+        # Invalidate any existing active tokens for this user
+        PasswordResetToken.objects.filter(user=user, is_used=False, expires_at__gt=timezone.now()).update(is_used=True)
         
         # Generate unique token
         token = secrets.token_urlsafe(32)
@@ -178,16 +188,46 @@ def request_password_reset(request):
             expires_at=timezone.now() + timedelta(hours=1)
         )
         
-        # In production, send email with token
-        # For now, return token in response (NOT SECURE - only for development)
-        return Response({
-            'message': 'Password reset token generated',
-            'token': token,  # Remove this in production
-            'email': email
-        })
+        # Build reset link to frontend login page with token as query param
+        frontend_base = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        reset_link = f"{frontend_base}/login?reset_token={token}"
+        print(f"[Password Reset] Token generated: {token}")
+        print(f"[Password Reset] Reset link: {reset_link}")
+
+        # Send reset email (uses console backend locally by default)
+        print(f"[Password Reset] Attempting to send email to {email}...")
+        try:
+            send_mail(
+                subject='Dorotheo Dental Clinic - Password Reset',
+                message=(
+                    "You requested a password reset for your Dorotheo Dental Clinic account.\n\n"
+                    f"Reset link: {reset_link}\n"
+                    f"Token: {token}\n\n"
+                    "This link expires in 1 hour. If you did not request this, you can ignore this email."
+                ),
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@dorotheodental.local'),
+                recipient_list=[email],
+                fail_silently=False,  # Show errors for debugging
+            )
+            print(f"[Password Reset] Email sent successfully!")
+        except Exception as e:
+            print(f"[Password Reset] Email error: {str(e)}")
+
+        # Return a generic message (token included for dev convenience)
+        response_data = {
+            'message': 'If the email exists, a password reset link will be sent',
+            'email': email,
+        }
+
+        # When DEBUG or explicitly allowed, include token to simplify local testing
+        if settings.DEBUG:
+            response_data['token'] = token
+            response_data['reset_link'] = reset_link
+        return Response(response_data)
     
     except User.DoesNotExist:
         # Don't reveal if email exists or not
+        print(f"[Password Reset] Email not found in database: {email}")
         return Response({
             'message': 'If the email exists, a password reset link will be sent'
         })
@@ -199,6 +239,13 @@ def reset_password(request):
     """Reset password using token"""
     token = request.data.get('token')
     new_password = request.data.get('new_password')
+
+    if not token or not new_password:
+        return Response({'error': 'Token and new password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        validate_password(new_password)
+    except ValidationError as exc:
+        return Response({'error': exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         reset_token = PasswordResetToken.objects.get(token=token)
