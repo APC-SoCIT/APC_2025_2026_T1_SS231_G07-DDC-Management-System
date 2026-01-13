@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth"
 import RegisterModal from "@/components/register-modal"
 import PasswordResetModal from "@/components/password-reset-modal"
@@ -12,6 +12,7 @@ import { Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login } = useAuth()
   const [formData, setFormData] = useState({
     username: "",
@@ -21,7 +22,17 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false)
+  const [resetTokenFromLink, setResetTokenFromLink] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+
+  // Open reset modal automatically when a reset token is present in the URL (e.g., from email link)
+  useEffect(() => {
+    const token = searchParams.get("reset_token")
+    if (token) {
+      setResetTokenFromLink(token)
+      setIsPasswordResetOpen(true)
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -135,7 +146,11 @@ export default function LoginPage() {
       </div>
 
       <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} />
-      <PasswordResetModal isOpen={isPasswordResetOpen} onClose={() => setIsPasswordResetOpen(false)} />
+      <PasswordResetModal
+        isOpen={isPasswordResetOpen}
+        onClose={() => setIsPasswordResetOpen(false)}
+        initialToken={resetTokenFromLink}
+      />
     </div>
   )
 }

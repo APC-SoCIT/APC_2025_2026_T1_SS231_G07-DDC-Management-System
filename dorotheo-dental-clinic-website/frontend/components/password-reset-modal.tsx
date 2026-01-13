@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { X } from "lucide-react"
 import { api } from "@/lib/api"
 
 interface PasswordResetModalProps {
   isOpen: boolean
   onClose: () => void
+  initialToken?: string
 }
 
-export default function PasswordResetModal({ isOpen, onClose }: PasswordResetModalProps) {
+export default function PasswordResetModal({ isOpen, onClose, initialToken }: PasswordResetModalProps) {
   const [step, setStep] = useState<"request" | "reset">("request")
   const [email, setEmail] = useState("")
   const [token, setToken] = useState("")
@@ -18,6 +19,28 @@ export default function PasswordResetModal({ isOpen, onClose }: PasswordResetMod
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+
+  // Auto-fill and jump to reset step when opened with a token (e.g., from email link)
+  useEffect(() => {
+    if (isOpen && initialToken) {
+      setToken(initialToken)
+      setStep("reset")
+      setMessage("We pre-filled your reset token from the link. Set your new password below.")
+    }
+  }, [initialToken, isOpen])
+
+  // Reset form state when the modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setStep("request")
+      setEmail("")
+      setToken("")
+      setNewPassword("")
+      setConfirmPassword("")
+      setMessage("")
+      setError("")
+    }
+  }, [isOpen])
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault()
