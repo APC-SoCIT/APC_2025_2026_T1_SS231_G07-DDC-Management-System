@@ -7,14 +7,6 @@ import {
   Calendar,
   Upload,
   FileText,
-  Image,
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Cake,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -64,7 +56,7 @@ export default function PatientDetailPage() {
   const router = useRouter()
   const params = useParams()
   const patientId = params.id as string
-  const { token, user } = useAuth()
+  const { token } = useAuth()
 
   const [patient, setPatient] = useState<any>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -94,36 +86,37 @@ export default function PatientDetailPage() {
         documentsData,
         teethImagesData,
       ] = await Promise.all([
-        api.getUser(parseInt(patientId), token),
+        api.getPatientById(Number.parseInt(patientId), token),
         api.getAppointments(token),
-        api.getDentalRecords(parseInt(patientId), token),
-        api.getDocuments(parseInt(patientId), token),
-        api.getPatientTeethImages(parseInt(patientId), token),
+        api.getDentalRecords(Number.parseInt(patientId), token),
+        api.getDocuments(Number.parseInt(patientId), token),
+        api.getPatientTeethImages(Number.parseInt(patientId), token),
       ])
 
+      console.log("Patient data from API:", patientData)
       setPatient(patientData)
       
       // Filter appointments for this patient
       const patientAppointments = appointmentsData.filter(
-        (apt: any) => apt.patient?.id === parseInt(patientId)
+        (apt: any) => apt.patient?.id === Number.parseInt(patientId)
       )
       setAppointments(patientAppointments)
 
       // Filter dental records for this patient
       const patientRecords = dentalRecordsData.filter(
-        (record: any) => record.patient?.id === parseInt(patientId)
+        (record: any) => record.patient?.id === Number.parseInt(patientId)
       )
       setDentalRecords(patientRecords)
 
       // Filter documents for this patient
       const patientDocs = documentsData.filter(
-        (doc: any) => doc.patient === parseInt(patientId)
+        (doc: any) => doc.patient === Number.parseInt(patientId)
       )
       setDocuments(patientDocs)
 
       // Filter teeth images for this patient
       const patientImages = teethImagesData.filter(
-        (img: any) => img.patient === parseInt(patientId)
+        (img: any) => img.patient === Number.parseInt(patientId)
       )
       setTeethImages(patientImages)
     } catch (error) {
@@ -131,6 +124,18 @@ export default function PatientDetailPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const calculateAge = (dateOfBirth: string) => {
+    if (!dateOfBirth) return null
+    const today = new Date()
+    const birthDate = new Date(dateOfBirth)
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
   }
 
   if (isLoading) {
@@ -203,12 +208,14 @@ export default function PatientDetailPage() {
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Age</p>
                     <p className="text-sm text-gray-900 font-medium">
-                      {patient.age ? `${patient.age} years` : "N/A"}
+                      {patient.birthday ? `${calculateAge(patient.birthday)} years` : "N/A"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Birthday</p>
-                    <p className="text-sm text-gray-900 font-medium">{patient.birthday || "N/A"}</p>
+                    <p className="text-sm text-gray-900 font-medium">
+                      {patient.birthday ? new Date(patient.birthday).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : "N/A"}
+                    </p>
                   </div>
                   <div className="col-span-2">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Address</p>
@@ -306,8 +313,8 @@ export default function PatientDetailPage() {
                           apt.status === "completed"
                             ? "bg-green-100 text-green-800"
                             : apt.status === "cancelled"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
                         }`}
                       >
                         {apt.status}
@@ -531,7 +538,7 @@ export default function PatientDetailPage() {
                 </button>
               </div>
               <TeethImageUpload
-                patientId={parseInt(patientId)}
+                patientId={Number.parseInt(patientId)}
                 patientName={`${patient.first_name} ${patient.last_name}`}
                 onClose={() => setShowImageUpload(false)}
               />
@@ -554,7 +561,7 @@ export default function PatientDetailPage() {
                 </button>
               </div>
               <DocumentUpload
-                patientId={parseInt(patientId)}
+                patientId={Number.parseInt(patientId)}
                 patientName={`${patient.first_name} ${patient.last_name}`}
                 onUploadSuccess={() => {
                   setShowDocumentUpload(false)
