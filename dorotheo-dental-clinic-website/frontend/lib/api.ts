@@ -658,6 +658,15 @@ export const api = {
     return response.json()
   },
 
+  clearAllAppointmentNotifications: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/appointment-notifications/clear_all/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to clear all notifications')
+    return response.json()
+  },
+
   getAppointmentNotificationUnreadCount: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/unread_count/`, {
       headers: { Authorization: `Token ${token}` },

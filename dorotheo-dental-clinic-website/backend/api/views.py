@@ -1447,6 +1447,13 @@ class AppointmentNotificationViewSet(viewsets.ModelViewSet):
         AppointmentNotification.objects.filter(recipient=user, is_read=False).update(is_read=True)
         return Response({'message': 'All notifications marked as read'})
 
+    @action(detail=False, methods=['post'])
+    def clear_all(self, request):
+        """Delete all notifications for current user"""
+        user = request.user
+        deleted_count = AppointmentNotification.objects.filter(recipient=user).delete()[0]
+        return Response({'message': f'{deleted_count} notifications cleared'})
+
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
         """Get count of unread notifications for current user"""
