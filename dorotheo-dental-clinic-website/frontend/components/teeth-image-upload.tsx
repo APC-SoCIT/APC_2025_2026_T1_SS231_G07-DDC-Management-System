@@ -10,15 +10,23 @@ interface TeethImageUploadProps {
   patientName: string
   onClose: () => void
   onSuccess?: () => void
+  appointments?: Array<{ id: number; date: string; time: string; service: any; status: string }>
 }
 
-export default function TeethImageUpload({ patientId, patientName, onClose, onSuccess }: TeethImageUploadProps) {
+export default function TeethImageUpload({ patientId, patientName, onClose, onSuccess, appointments }: TeethImageUploadProps) {
   const { token } = useAuth()
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>("")
   const [notes, setNotes] = useState("")
+  const [selectedAppointment, setSelectedAppointment] = useState<number | undefined>(undefined)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string>("")
+
+  // Debug appointments
+  console.log("TeethImageUpload - Received appointments:", appointments)
+  console.log("TeethImageUpload - Appointments length:", appointments?.length)
+  console.log("TeethImageUpload - Patient ID:", patientId)
+  console.log("TeethImageUpload - Patient Name:", patientName)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -46,7 +54,7 @@ export default function TeethImageUpload({ patientId, patientName, onClose, onSu
     setError("")
 
     try {
-      await api.uploadTeethImage(patientId, selectedImage, notes, token)
+      await api.uploadTeethImage(patientId, selectedImage, notes, token, selectedAppointment)
       onSuccess?.()
       onClose()
     } catch (err: any) {
@@ -58,7 +66,7 @@ export default function TeethImageUpload({ patientId, patientName, onClose, onSu
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white">
           <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">
@@ -76,6 +84,36 @@ export default function TeethImageUpload({ patientId, patientName, onClose, onSu
               {error}
             </div>
           )}
+
+          {/* Appointment Selection - FIRST FIELD */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
+              Link to Appointment (Optional)
+            </label>
+            {appointments && appointments.length > 0 ? (
+              <>
+                <select
+                  value={selectedAppointment || ''}
+                  onChange={(e) => setSelectedAppointment(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="">No appointment selected</option>
+                  {appointments.map((apt) => (
+                    <option key={apt.id} value={apt.id}>
+                      {new Date(apt.date).toLocaleDateString()} at {apt.time} - {apt.service?.name || 'Appointment'} ({apt.status})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Linking to an appointment helps track images for specific treatments
+                </p>
+              </>
+            ) : (
+              <div className="text-sm text-gray-500 italic py-2">
+                No appointments available for this patient
+              </div>
+            )}
+          </div>
 
           {/* Image Upload Area */}
           <div>

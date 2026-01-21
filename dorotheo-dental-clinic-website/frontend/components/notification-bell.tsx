@@ -33,10 +33,15 @@ export default function NotificationBell() {
   const [processingId, setProcessingId] = useState<number | null>(null)
 
   useEffect(() => {
+    // Only fetch notifications for owner and staff users
+    if (!user || user.role === 'patient') {
+      return
+    }
+    
     fetchNotifications()
     fetchUnreadCount()
     
-    // Poll for new notifications every 30 seconds
+    // Poll for new notifications every 30 seconds only for owner/staff
     const interval = setInterval(() => {
       fetchUnreadCount()
       if (isOpen) {
@@ -45,7 +50,7 @@ export default function NotificationBell() {
     }, 30000)
     
     return () => clearInterval(interval)
-  }, [isOpen])
+  }, [isOpen, user])
 
   const fetchNotifications = async () => {
     try {
@@ -67,7 +72,12 @@ export default function NotificationBell() {
       
       const data = await api.getAppointmentNotificationUnreadCount(token)
       setUnreadCount(data.unread_count || 0)
-    } catch (error) {
+    } catch (error: any) {
+      // Silently fail for 401 errors (user not authenticated or token expired)
+      if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+        setUnreadCount(0)
+        return
+      }
       console.error('Failed to fetch unread count:', error)
     }
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight, Clock, Save } from "lucide-react"
+import { useAuth } from "@/lib/auth"
 
 interface DentistAvailabilityProps {
   dentistId: number | undefined
@@ -14,6 +15,7 @@ interface SelectedDate {
 }
 
 export default function DentistCalendarAvailability({ dentistId }: DentistAvailabilityProps) {
+  const { token } = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDates, setSelectedDates] = useState<Record<string, SelectedDate>>({})
   const [showTimeModal, setShowTimeModal] = useState(false)
@@ -32,7 +34,6 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
   const loadAvailability = async () => {
     if (!dentistId) return
 
-    const token = localStorage.getItem("token")
     if (!token) return
 
     setIsLoading(true)
@@ -66,11 +67,16 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
         
         setSelectedDates(availabilityMap)
         console.log('[CALENDAR] Selected dates updated:', availabilityMap)
+      } else if (response.status === 401) {
+        // Silently ignore 401 errors (authentication issues)
+        setSelectedDates({})
       } else {
-        console.error('[CALENDAR] Failed to load availability:', response.status)
+        // Only log non-auth errors
+        console.log('[CALENDAR] Failed to load availability:', response.status)
       }
     } catch (error) {
-      console.error("[CALENDAR] Error loading availability:", error)
+      // Silently handle errors to avoid annoying popups
+      setSelectedDates({})
     } finally {
       setIsLoading(false)
     }
@@ -170,14 +176,12 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
       return
     }
 
-    setIsSaving(true)
-    const token = localStorage.getItem("token")
-
     if (!token) {
       alert('You must be logged in to save availability')
-      setIsSaving(false)
       return
     }
+
+    setIsSaving(true)
 
     try {
       console.log('[CALENDAR] Starting save process...')

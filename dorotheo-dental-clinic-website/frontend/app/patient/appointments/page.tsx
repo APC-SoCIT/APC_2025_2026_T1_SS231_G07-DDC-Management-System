@@ -634,6 +634,9 @@ export default function PatientAppointments() {
 
   // Separate appointments into upcoming and past
   const now = new Date()
+  console.log("Current time:", now)
+  console.log("All appointments for filtering:", allAppointments)
+  
   const upcomingAppointments = allAppointments.filter((apt) => {
     const aptDate = new Date(apt.date + 'T' + apt.time)
     return aptDate >= now && apt.status !== 'completed' && apt.status !== 'cancelled'
@@ -641,8 +644,13 @@ export default function PatientAppointments() {
 
   const pastAppointments = allAppointments.filter((apt) => {
     const aptDate = new Date(apt.date + 'T' + apt.time)
-    return aptDate < now || apt.status === 'completed' || apt.status === 'cancelled'
+    const isPast = aptDate < now || apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'missed'
+    console.log(`Appointment ${apt.id} - Date: ${apt.date} ${apt.time}, Status: ${apt.status}, isPast: ${isPast}`)
+    return isPast
   })
+  
+  console.log("Upcoming appointments:", upcomingAppointments)
+  console.log("Past appointments:", pastAppointments)
 
   const appointments = activeTab === "upcoming" ? upcomingAppointments : pastAppointments
 
@@ -651,7 +659,7 @@ export default function PatientAppointments() {
       case "confirmed":
         return "bg-green-100 text-green-700"
       case "missed":
-        return "bg-red-100 text-red-700"
+        return "bg-yellow-100 text-yellow-700"
       case "reschedule_requested":
         return "bg-orange-100 text-orange-700"
       case "cancel_requested":
