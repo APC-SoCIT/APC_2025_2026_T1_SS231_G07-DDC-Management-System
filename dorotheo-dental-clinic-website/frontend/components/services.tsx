@@ -10,6 +10,7 @@ interface Service {
   name: string
   category: string
   description: string
+  duration: number
   image: string
 }
 
@@ -27,6 +28,19 @@ export default function Services() {
   const [isLoading, setIsLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("all")
+
+  // Format duration to show hours and minutes
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} mins`
+    }
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    if (mins === 0) {
+      return `${hours}hr${hours > 1 ? 's' : ''}`
+    }
+    return `${hours}hr${hours > 1 ? 's' : ''} ${mins}mins`
+  }
 
   // Fetch services from API
   useEffect(() => {
@@ -107,7 +121,12 @@ export default function Services() {
                     />
                   </div>
                   <div className="p-6">
-                    <h3 className="text-xl font-semibold text-[var(--color-primary)] mb-2">{service.name}</h3>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-xl font-semibold text-[var(--color-primary)]">{service.name}</h3>
+                      <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-full font-medium whitespace-nowrap ml-2">
+                        {formatDuration(service.duration)}
+                      </span>
+                    </div>
                     <p className="text-[var(--color-text-muted)] leading-relaxed">{service.description}</p>
                   </div>
                 </div>

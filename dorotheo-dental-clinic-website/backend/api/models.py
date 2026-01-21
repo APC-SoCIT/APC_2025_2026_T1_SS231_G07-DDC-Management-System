@@ -78,6 +78,7 @@ class Service(models.Model):
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=50, choices=CATEGORIES)
     description = models.TextField()
+    duration = models.IntegerField(default=30, help_text="Duration in minutes")
     image = models.ImageField(upload_to='services/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
