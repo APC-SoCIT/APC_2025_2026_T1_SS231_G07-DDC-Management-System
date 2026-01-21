@@ -12,6 +12,7 @@ interface Service {
   name: string
   description: string
   category: string
+  duration: number
   image: string
   created_at: string
 }
@@ -22,10 +23,24 @@ export default function ServicesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingService, setEditingService] = useState<Service | null>(null)
+
+  // Format duration to show hours and minutes
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} mins`
+    }
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    if (mins === 0) {
+      return `${hours}hr${hours > 1 ? 's' : ''}`
+    }
+    return `${hours}hr${hours > 1 ? 's' : ''} ${mins}mins`
+  }
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     category: "all",
+    duration: 30,
     image: null as File | null,
   })
   const [imagePreview, setImagePreview] = useState("")
@@ -78,6 +93,7 @@ export default function ServicesPage() {
       data.append("name", formData.name)
       data.append("description", formData.description)
       data.append("category", formData.category)
+      data.append("duration", formData.duration.toString())
       if (formData.image) {
         data.append("image", formData.image)
       }
@@ -93,7 +109,7 @@ export default function ServicesPage() {
       }
 
       // Reset form
-      setFormData({ name: "", description: "", category: "all", image: null })
+      setFormData({ name: "", description: "", category: "all", duration: 30, image: null })
       setImagePreview("")
       setEditingService(null)
       setIsModalOpen(false)
@@ -109,6 +125,7 @@ export default function ServicesPage() {
       name: service.name,
       description: service.description,
       category: service.category,
+      duration: service.duration || 30,
       image: null,
     })
     setImagePreview(service.image)
@@ -131,7 +148,7 @@ export default function ServicesPage() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingService(null)
-    setFormData({ name: "", description: "", category: "all", image: null })
+    setFormData({ name: "", description: "", category: "all", duration: 30, image: null })
     setImagePreview("")
   }
 
@@ -182,9 +199,14 @@ export default function ServicesPage() {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="text-xl font-semibold text-[var(--color-primary)] mb-1">{service.name}</h3>
-                  <span className="inline-block px-3 py-1 bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-xs rounded-full">
-                    {categories.find((c) => c.value === service.category)?.label}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-block px-3 py-1 bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-xs rounded-full">
+                      {categories.find((c) => c.value === service.category)?.label}
+                    </span>
+                    <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-full">
+                      {formatDuration(service.duration)}
+                    </span>
+                  </div>
                 </div>
               </div>
               <p className="text-[var(--color-text-muted)] text-sm mb-4">{service.description}</p>
@@ -249,6 +271,20 @@ export default function ServicesPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Duration (minutes)</label>
+                <input
+                  type="number"
+                  required
+                  min="5"
+                  step="5"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 30 })}
+                  className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  placeholder="e.g., 30"
+                />
               </div>
 
               <div>
