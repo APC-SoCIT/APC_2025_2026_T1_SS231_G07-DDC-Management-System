@@ -94,19 +94,21 @@ export default function PatientDetailPage() {
       ])
 
       console.log("Patient data from API:", patientData)
+      console.log("Dental records from API:", dentalRecordsData)
       setPatient(patientData)
       
       // Filter appointments for this patient
       const patientAppointments = appointmentsData.filter(
         (apt: any) => apt.patient?.id === Number.parseInt(patientId)
       )
+      console.log("All appointments:", appointmentsData)
+      console.log("Filtered patient appointments:", patientAppointments)
+      console.log("Missed appointments:", patientAppointments.filter((apt: Appointment) => apt.status === 'missed'))
+      console.log("Cancelled appointments:", patientAppointments.filter((apt: Appointment) => apt.status === 'cancelled'))
       setAppointments(patientAppointments)
 
-      // Filter dental records for this patient
-      const patientRecords = dentalRecordsData.filter(
-        (record: any) => record.patient?.id === Number.parseInt(patientId)
-      )
-      setDentalRecords(patientRecords)
+      // getDentalRecords already filters by patient ID, no need to filter again
+      setDentalRecords(dentalRecordsData)
 
       // Filter documents for this patient
       const patientDocs = documentsData.filter(
@@ -164,10 +166,6 @@ export default function PatientDetailPage() {
       </div>
     )
   }
-
-  const pastAppointments = appointments.filter(
-    (apt) => new Date(`${apt.date}T${apt.time}`) < new Date() || apt.status === "completed"
-  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -231,10 +229,14 @@ export default function PatientDetailPage() {
       {/* Upcoming Appointments Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
         <div className="px-8 py-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <button
+            onClick={() => router.push(`/owner/patients/${patientId}/appointments`)}
+            className="text-lg font-semibold text-gray-900 flex items-center gap-2 hover:text-blue-600 transition-colors"
+          >
             <Calendar className="w-5 h-5 text-blue-600" />
             Upcoming Appointments
-          </h2>
+            <span className="text-sm text-gray-500 ml-2">View all</span>
+          </button>
         </div>
         <div className="p-8">
           {appointments.filter(
@@ -247,6 +249,7 @@ export default function PatientDetailPage() {
                 .filter(
                   (apt) => new Date(`${apt.date}T${apt.time}`) >= new Date() && apt.status !== "completed" && apt.status !== "cancelled"
                 )
+                .slice(0, 3)
                 .map((apt) => (
                   <div key={apt.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                     <div className="flex justify-between items-start">
@@ -272,85 +275,38 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
-      {/* Past Appointments Section */}
-      <div className="mb-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <div className="px-8 py-6 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gray-600" />
-              Past Appointments
-            </h2>
-          </div>
-          <div className="p-8">
-            {pastAppointments.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No past appointments</p>
-            ) : (
-              <div className="space-y-3">
-                {pastAppointments.map((apt) => (
-                  <div
-                    key={apt.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {apt.service?.name || "General Checkup"}
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {new Date(apt.date).toLocaleDateString()} at {apt.time}
-                        </p>
-                        {apt.dentist && (
-                          <p className="text-sm text-gray-600">
-                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
-                          </p>
-                        )}
-                        {apt.notes && (
-                          <p className="text-sm text-gray-500 mt-2">{apt.notes}</p>
-                        )}
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          apt.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : apt.status === "cancelled"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {apt.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Treatment History Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
         <div className="px-8 py-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <button
+            onClick={() => router.push(`/owner/patients/${patientId}/treatment-history`)}
+            className="text-lg font-semibold text-gray-900 flex items-center gap-2 hover:text-blue-600 transition-colors"
+          >
             <FileText className="w-5 h-5 text-green-600" />
             Treatment History
-          </h2>
+            <span className="text-sm text-gray-500 ml-2">View all</span>
+          </button>
         </div>
         <div className="p-8">
-          {dentalRecords.length === 0 ? (
+          {dentalRecords.length === 0 && appointments.filter(apt => 
+            apt.status === 'completed' || apt.status === 'missed' || apt.status === 'cancelled'
+          ).length === 0 ? (
             <p className="text-gray-500 text-center py-8">No treatment history</p>
           ) : (
             <div className="space-y-4">
-              {dentalRecords.map((record) => (
+              {/* Dental Records (Completed Treatments) - Show only first 3 */}
+              {dentalRecords.slice(0, 3).map((record) => (
                 <div
-                  key={record.id}
+                  key={`record-${record.id}`}
                   className="border border-gray-200 rounded-lg p-4"
                 >
+                  <div className="flex items-start justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">{record.treatment}</h4>
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Completed
+                    </span>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Treatment</p>
-                      <p className="font-medium text-gray-900">{record.treatment}</p>
-                    </div>
                     <div>
                       <p className="text-sm text-gray-500">Date</p>
                       <p className="font-medium text-gray-900">
@@ -366,7 +322,7 @@ export default function PatientDetailPage() {
                       </div>
                     )}
                     {record.diagnosis && (
-                      <div>
+                      <div className="col-span-2">
                         <p className="text-sm text-gray-500">Diagnosis</p>
                         <p className="font-medium text-gray-900">{record.diagnosis}</p>
                       </div>
@@ -380,6 +336,56 @@ export default function PatientDetailPage() {
                   )}
                 </div>
               ))}
+
+              {/* Completed Appointments without dental records */}
+              {dentalRecords.length < 3 && appointments
+                .filter(apt => apt.status === 'completed')
+                .slice(0, 3 - dentalRecords.length)
+                .map((apt) => {
+                  // Check if this appointment already has a dental record
+                  const hasDentalRecord = dentalRecords.some(record => 
+                    record.appointment?.id === apt.id
+                  )
+                  if (hasDentalRecord) return null
+
+                  return (
+                    <div
+                      key={`apt-${apt.id}`}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="font-semibold text-gray-900">
+                          {apt.service?.name || "Appointment"}
+                        </h4>
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Completed
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-500">Date</p>
+                          <p className="font-medium text-gray-900">
+                            {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                          </p>
+                        </div>
+                        {apt.dentist && (
+                          <div>
+                            <p className="text-sm text-gray-500">Dentist</p>
+                            <p className="font-medium text-gray-900">
+                              Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {apt.notes && (
+                        <div className="mt-3">
+                          <p className="text-sm text-gray-500">Notes</p>
+                          <p className="text-gray-700 mt-1">{apt.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>
@@ -388,10 +394,14 @@ export default function PatientDetailPage() {
       {/* Documents & Images Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <button
+            onClick={() => router.push(`/owner/patients/${patientId}/documents`)}
+            className="text-lg font-semibold text-gray-900 flex items-center gap-2 hover:text-blue-600 transition-colors"
+          >
             <FileText className="w-5 h-5 text-purple-600" />
             Documents & Images
-          </h2>
+            <span className="text-sm text-gray-500 ml-2">View all</span>
+          </button>
           <div className="flex gap-2">
             <button
               onClick={() => setShowImageUpload(true)}

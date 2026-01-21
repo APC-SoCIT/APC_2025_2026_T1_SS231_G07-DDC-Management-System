@@ -18,9 +18,20 @@ interface DentalRecord {
   status?: string
 }
 
+interface Appointment {
+  id: number
+  date: string
+  time: string
+  service: { name: string }
+  dentist: { first_name: string; last_name: string }
+  status: string
+  notes: string
+}
+
 export default function TreatmentHistory() {
   const { user, token } = useAuth()
   const [dentalRecords, setDentalRecords] = useState<DentalRecord[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -29,8 +40,23 @@ export default function TreatmentHistory() {
 
       try {
         setIsLoading(true)
-        const records = await api.getDentalRecords(user.id, token)
+        const [records, allAppointments] = await Promise.all([
+          api.getDentalRecords(user.id, token),
+          api.getAppointments(token)
+        ])
+        console.log("Patient ID:", user.id)
+        console.log("Dental records fetched:", records)
+        console.log("All appointments fetched:", allAppointments)
         setDentalRecords(records)
+        // Filter appointments for current user
+        const userAppointments = allAppointments.filter(
+          (apt: any) => apt.patient?.id === user.id
+        )
+        console.log("Filtered user appointments:", userAppointments)
+        console.log("Completed appointments:", userAppointments.filter((apt: any) => apt.status === 'completed'))
+        console.log("Missed appointments:", userAppointments.filter((apt: any) => apt.status === 'missed'))
+        console.log("Cancelled appointments:", userAppointments.filter((apt: any) => apt.status === 'cancelled'))
+        setAppointments(userAppointments)
       } catch (error) {
         console.error("Error fetching dental records:", error)
       } finally {
@@ -54,17 +80,18 @@ export default function TreatmentHistory() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto mb-4"></div>
             <p className="text-[var(--color-text-muted)]">Loading dental records...</p>
           </div>
-        ) : dentalRecords.length > 0 ? (
+        ) : dentalRecords.length > 0 || appointments.filter(apt => apt.status === 'completed' || apt.status === 'missed' || apt.status === 'cancelled').length > 0 ? (
           <div className="space-y-4">
+            {/* Dental Records (Completed Treatments) */}
             {dentalRecords.map((record) => (
-              <div key={record.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div key={`record-${record.id}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-3">
+                  <h4 className="font-semibold text-gray-900">{record.treatment || "Dental Treatment"}</h4>
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Completed
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Treatment</p>
-                    <p className="font-medium text-gray-900">
-                      {record.treatment || "Dental Treatment"}
-                    </p>
-                  </div>
                   <div>
                     <p className="text-sm text-gray-500">Date</p>
                     <p className="font-medium text-gray-900 flex items-center gap-2">
@@ -82,7 +109,7 @@ export default function TreatmentHistory() {
                     </div>
                   )}
                   {record.diagnosis && (
-                    <div>
+                    <div className="col-span-2">
                       <p className="text-sm text-gray-500">Diagnosis</p>
                       <p className="font-medium text-gray-900">{record.diagnosis}</p>
                     </div>
@@ -96,6 +123,127 @@ export default function TreatmentHistory() {
                 )}
               </div>
             ))}
+
+            {/* Completed Appointments */}
+            {appointments
+              .filter(apt => apt.status === 'completed')
+              .map((apt) => {
+                const hasDentalRecord = dentalRecords.some(record => 
+                  record.appointment === apt.id
+                )
+                if (hasDentalRecord) return null
+
+                return (
+                  <div key={`apt-${apt.id}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <h4 className="font-semibold text-gray-900">{apt.service?.name || "Appointment"}</h4>
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Completed
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Date</p>
+                        <p className="font-medium text-gray-900 flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                        </p>
+                      </div>
+                      {apt.dentist && (
+                        <div>
+                          <p className="text-sm text-gray-500">Dentist</p>
+                          <p className="font-medium text-gray-900 flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {apt.notes && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-sm text-gray-500">Notes</p>
+                        <p className="text-gray-700 mt-1">{apt.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+            {/* Missed Appointments */}
+            {appointments
+              .filter(apt => apt.status === 'missed')
+              .map((apt) => (
+                <div key={`missed-${apt.id}`} className="border border-yellow-200 bg-yellow-50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">{apt.service?.name || "Appointment"}</h4>
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      Missed
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Scheduled Date</p>
+                      <p className="font-medium text-gray-900 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                      </p>
+                    </div>
+                    {apt.dentist && (
+                      <div>
+                        <p className="text-sm text-gray-500">Dentist</p>
+                        <p className="font-medium text-gray-900 flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {apt.notes && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-sm text-gray-500">Notes</p>
+                      <p className="text-gray-700 mt-1">{apt.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+            {/* Cancelled Appointments */}
+            {appointments
+              .filter(apt => apt.status === 'cancelled')
+              .map((apt) => (
+                <div key={`cancelled-${apt.id}`} className="border border-red-200 bg-red-50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">{apt.service?.name || "Appointment"}</h4>
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      Cancelled
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Scheduled Date</p>
+                      <p className="font-medium text-gray-900 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                      </p>
+                    </div>
+                    {apt.dentist && (
+                      <div>
+                        <p className="text-sm text-gray-500">Dentist</p>
+                        <p className="font-medium text-gray-900 flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {apt.notes && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-sm text-gray-500">Cancellation Reason</p>
+                      <p className="text-gray-700 mt-1">{apt.notes}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         ) : (
           <div className="text-center py-12">

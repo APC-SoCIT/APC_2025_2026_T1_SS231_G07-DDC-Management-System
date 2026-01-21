@@ -10,17 +10,26 @@ interface DocumentUploadProps {
   patientName: string
   onClose: () => void
   onUploadSuccess: () => void
+  defaultDocumentType?: 'xray' | 'scan' | 'report' | 'medical_certificate' | 'other'
+  appointments?: Array<{ id: number; date: string; time: string; service: any; status: string }>
 }
 
-export default function DocumentUpload({ patientId, patientName, onClose, onUploadSuccess }: DocumentUploadProps) {
+export default function DocumentUpload({ patientId, patientName, onClose, onUploadSuccess, defaultDocumentType, appointments }: DocumentUploadProps) {
   const { token } = useAuth()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [documentType, setDocumentType] = useState<'xray' | 'scan' | 'report' | 'other'>('xray')
+  const [documentType, setDocumentType] = useState<'xray' | 'scan' | 'report' | 'medical_certificate' | 'other'>(defaultDocumentType || 'xray')
   const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [selectedAppointment, setSelectedAppointment] = useState<number | undefined>(undefined)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  // Debug appointments
+  console.log("DocumentUpload - Received appointments:", appointments)
+  console.log("DocumentUpload - Appointments length:", appointments?.length)
+  console.log("DocumentUpload - Patient ID:", patientId)
+  console.log("DocumentUpload - Patient Name:", patientName)
+  console.log("DocumentUpload - Default Document Type:", defaultDocumentType)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -53,7 +62,7 @@ export default function DocumentUpload({ patientId, patientName, onClose, onUplo
       setIsUploading(true)
       setError('')
 
-      await api.uploadDocument(patientId, selectedFile, documentType, title, description, token)
+      await api.uploadDocument(patientId, selectedFile, documentType, title, '', token, selectedAppointment)
 
       onUploadSuccess()
       onClose()
@@ -66,7 +75,7 @@ export default function DocumentUpload({ patientId, patientName, onClose, onUplo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white z-10">
@@ -94,22 +103,54 @@ export default function DocumentUpload({ patientId, patientName, onClose, onUplo
             </div>
           )}
 
-          {/* Document Type */}
+          {/* Appointment Selection - FIRST FIELD */}
           <div>
             <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
-              Document Type *
+              Link to Appointment (Optional)
             </label>
-            <select
-              value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as any)}
-              className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            >
-              <option value="xray">X-Ray</option>
-              <option value="scan">Tooth Scan</option>
-              <option value="report">Report</option>
-              <option value="other">Other</option>
-            </select>
+            {appointments && appointments.length > 0 ? (
+              <>
+                <select
+                  value={selectedAppointment || ''}
+                  onChange={(e) => setSelectedAppointment(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="">No appointment selected</option>
+                  {appointments.map((apt) => (
+                    <option key={apt.id} value={apt.id}>
+                      {new Date(apt.date).toLocaleDateString()} at {apt.time} - {apt.service?.name || 'Appointment'} ({apt.status})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Linking to an appointment helps track documents for specific treatments
+                </p>
+              </>
+            ) : (
+              <div className="text-sm text-gray-500 italic py-2">
+                No appointments available for this patient
+              </div>
+            )}
           </div>
+
+          {/* Document Type - Hidden for medical certificates */}
+          {defaultDocumentType !== 'medical_certificate' && (
+            <div>
+              <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
+                Document Type *
+              </label>
+              <select
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value as any)}
+                className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              >
+                <option value="xray">X-Ray</option>
+                <option value="scan">Tooth Scan</option>
+                <option value="report">Report</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          )}
 
           {/* Title */}
           <div>
@@ -122,20 +163,6 @@ export default function DocumentUpload({ patientId, patientName, onClose, onUplo
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Upper Right Molar X-Ray"
               className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
-              Description (Optional)
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add any relevant notes or observations..."
-              rows={4}
-              className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
             />
           </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Clock } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 
 interface AvailabilityData {
   day_of_week: number
@@ -34,6 +35,7 @@ export default function AvailabilityCalendar({
   onSave, 
   readOnly = false 
 }: AvailabilityCalendarProps) {
+  const { token } = useAuth()
   const [availability, setAvailability] = useState<AvailabilityData[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
@@ -41,9 +43,9 @@ export default function AvailabilityCalendar({
   useEffect(() => {
     if (initialData) {
       setAvailability(initialData)
-    } else if (staffId) {
+    } else if (staffId && token) {
       fetchAvailability()
-    } else {
+    } else if (!initialData) {
       // Initialize with default availability (all days available 9AM-5PM)
       setAvailability(
         DAYS.map(day => ({
@@ -54,15 +56,12 @@ export default function AvailabilityCalendar({
         }))
       )
     }
-  }, [staffId, initialData])
+  }, [staffId, initialData, token])
 
   const fetchAvailability = async () => {
-    if (!staffId) return
+    if (!staffId || !token) return
     
     try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-      
       setLoading(true)
       const data = await api.getStaffAvailability(staffId, token)
       
@@ -123,12 +122,11 @@ export default function AvailabilityCalendar({
       if (onSave) {
         // Use custom save handler if provided
         await onSave(availability)
-      } else if (staffId) {
-        // Use API directly
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('Not authenticated')
-        
+      } else if (staffId && token) {
+        // Use API directly with token from useAuth hook
         await api.updateStaffAvailability(staffId, availability, token)
+      } else {
+        throw new Error('Not authenticated or missing staff ID')
       }
       
       setMessage({ type: 'success', text: 'Availability updated successfully!' })

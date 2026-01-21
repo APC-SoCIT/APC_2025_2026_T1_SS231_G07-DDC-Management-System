@@ -401,11 +401,14 @@ export const api = {
   },
 
   // Teeth images endpoints
-  uploadTeethImage: async (patientId: number, imageFile: File, notes: string, token: string) => {
+  uploadTeethImage: async (patientId: number, imageFile: File, notes: string, token: string, appointmentId?: number) => {
     const formData = new FormData()
     formData.append('patient', patientId.toString())
     formData.append('image', imageFile)
     formData.append('notes', notes)
+    if (appointmentId) {
+      formData.append('appointment', appointmentId.toString())
+    }
 
     const response = await fetch(`${API_BASE_URL}/teeth-images/`, {
       method: 'POST',
@@ -434,6 +437,14 @@ export const api = {
     })
     if (!response.ok) return []
     return response.json()
+  },
+
+  deleteTeethImage: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/teeth-images/${id}/`, {
+      method: 'DELETE',
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to delete teeth image')
   },
 
   // Billing status endpoints
@@ -513,13 +524,16 @@ export const api = {
     return response.json()
   },
 
-  uploadDocument: async (patientId: number, file: File, documentType: string, title: string, description: string, token: string) => {
+  uploadDocument: async (patientId: number, file: File, documentType: string, title: string, description: string, token: string, appointmentId?: number) => {
     const formData = new FormData()
     formData.append('patient', patientId.toString())
     formData.append('file', file)
     formData.append('document_type', documentType)
     formData.append('title', title)
     formData.append('description', description)
+    if (appointmentId) {
+      formData.append('appointment', appointmentId.toString())
+    }
 
     const response = await fetch(`${API_BASE_URL}/documents/`, {
       method: 'POST',
@@ -593,6 +607,17 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch available staff')
+    return response.json()
+  },
+
+  getDentistAvailability: async (dentistId: number, startDate: string, endDate: string, token: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${startDate}&end_date=${endDate}`,
+      {
+        headers: { Authorization: `Token ${token}` },
+      }
+    )
+    if (!response.ok) return []
     return response.json()
   },
 
@@ -956,6 +981,7 @@ export const {
   uploadTeethImage,
   getLatestTeethImage,
   getPatientTeethImages,
+  deleteTeethImage,
   updateBillingStatus,
   getBillingByStatus,
   getDentalRecords,
@@ -969,6 +995,7 @@ export const {
   getStaffAvailability,
   updateStaffAvailability,
   getAvailableStaffByDate,
+  getDentistAvailability,
   getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
