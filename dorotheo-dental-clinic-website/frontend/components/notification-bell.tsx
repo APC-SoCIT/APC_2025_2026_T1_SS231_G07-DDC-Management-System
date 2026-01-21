@@ -117,6 +117,29 @@ export default function NotificationBell() {
     }
   }
 
+  const handleClearAll = async () => {
+    if (!confirm('Are you sure you want to clear all notifications? This cannot be undone.')) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      setLoading(true)
+      await api.clearAllAppointmentNotifications(token)
+      
+      // Clear local state
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (error) {
+      console.error('Failed to clear all notifications:', error)
+      alert('Failed to clear notifications. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleApproveReschedule = async (appointmentId: number, notificationId: number) => {
     try {
       const token = localStorage.getItem('token')
@@ -304,15 +327,27 @@ export default function NotificationBell() {
           {/* Notifications Panel */}
           <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Notifications</h3>
-              {unreadCount > 0 && (
+            <div className="px-4 py-3 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllAsRead}
+                    disabled={loading}
+                    className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                  >
+                    Mark all as read
+                  </button>
+                )}
+              </div>
+              {notifications.length > 0 && (
                 <button
-                  onClick={handleMarkAllAsRead}
+                  onClick={handleClearAll}
                   disabled={loading}
-                  className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                  className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
                 >
-                  Mark all as read
+                  <X className="w-3 h-3" />
+                  Clear all notifications
                 </button>
               )}
             </div>
