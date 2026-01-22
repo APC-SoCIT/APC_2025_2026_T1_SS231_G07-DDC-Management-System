@@ -30,7 +30,7 @@ interface Appointment {
   service_name: string | null
   date: string
   time: string
-  status: "confirmed" | "pending" | "cancelled" | "completed" | "reschedule_requested" | "cancel_requested"
+  status: "confirmed" | "pending" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
   notes: string
   created_at: string
   updated_at: string
@@ -71,6 +71,7 @@ interface Staff {
 export default function OwnerAppointments() {
   const { token } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "missed" | "cancelled" | "completed">("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [editingRow, setEditingRow] = useState<number | null>(null)
@@ -203,27 +204,28 @@ export default function OwnerAppointments() {
       }
 
       try {
-        const availability = await api.getStaffAvailability(Number(newAppointment.dentist), token)
-        setDentistAvailability(availability)
-        
-        // Calculate available dates for the next 90 days
-        const dates = new Set<string>()
+        // Fetch date-specific availability (calendar-based) instead of day-of-week
         const today = new Date()
         today.setHours(0, 0, 0, 0)
+        const endDate = new Date(today)
+        endDate.setDate(today.getDate() + 90)
         
-        for (let i = 0; i < 90; i++) {
-          const checkDate = new Date(today)
-          checkDate.setDate(today.getDate() + i)
-          const dayOfWeek = checkDate.getDay()
-          
-          // Check if dentist is available on this day of week
-          const dayAvailability = availability.find((a: any) => a.day_of_week === dayOfWeek)
-          if (dayAvailability && dayAvailability.is_available) {
-            dates.add(checkDate.toISOString().split('T')[0])
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+        
+        const availability = await api.getDentistAvailability(Number(newAppointment.dentist), todayStr, endDateStr, token)
+        console.log('[OWNER] Dentist date-specific availability:', availability)
+        
+        // Create set of available dates directly from the calendar availability
+        const dates = new Set<string>()
+        availability.forEach((item: any) => {
+          if (item.is_available) {
+            dates.add(item.date)
           }
-        }
+        })
         
         setAvailableDates(dates)
+        console.log('[OWNER] Available dates:', Array.from(dates))
       } catch (error) {
         console.error("Error fetching dentist availability:", error)
       }
@@ -351,6 +353,8 @@ export default function OwnerAppointments() {
         return "Cancelled"
       case "completed":
         return "Completed"
+      case "missed":
+        return "Missed"
       default:
         return status.charAt(0).toUpperCase() + status.slice(1)
     }
@@ -382,13 +386,16 @@ export default function OwnerAppointments() {
   }
 
   const handleApproveCancel = async (appointment: Appointment) => {
-    if (!confirm("Are you sure you want to approve this cancellation? This will permanently delete the appointment.")) {
+    if (!confirm("Are you sure you want to approve this cancellation?")) {
       return
     }
     try {
-      await api.approveCancel(appointment.id, token!)
-      setAppointments(appointments.filter(apt => apt.id !== appointment.id))
-      alert("Cancellation approved. Appointment has been deleted.")
+      const response = await api.approveCancel(appointment.id, token!)
+      // Update the appointment status to cancelled
+      setAppointments(appointments.map(apt => 
+        apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
+      ))
+      alert("Cancellation approved. Appointment marked as cancelled.")
     } catch (error) {
       console.error("Error approving cancellation:", error)
       alert("Failed to approve cancellation.")
@@ -412,14 +419,15 @@ export default function OwnerAppointments() {
   const handleMarkComplete = async (appointment: Appointment) => {
     if (!token) return
     
-    const treatment = prompt("Enter treatment details (optional):", "")
-    if (treatment === null) return // User cancelled
+    if (!confirm("Mark this appointment as completed?")) return
     
     try {
-      await api.markAppointmentComplete(appointment.id, { treatment }, token)
-      // Remove from appointments list (it's now in dental records)
-      setAppointments(appointments.filter(apt => apt.id !== appointment.id))
-      alert("Appointment marked as completed and added to dental records!")
+      await api.updateAppointment(appointment.id, { status: "completed" }, token)
+      // Update the appointment status in the list
+      setAppointments(appointments.map(apt => 
+        apt.id === appointment.id ? { ...apt, status: "completed" as const } : apt
+      ))
+      alert("Appointment marked as completed!")
     } catch (error) {
       console.error("Error marking appointment as complete:", error)
       alert("Failed to mark appointment as complete.")
@@ -433,12 +441,35 @@ export default function OwnerAppointments() {
     
     try {
       await api.markAppointmentMissed(appointment.id, token)
-      // Remove from appointments list
-      setAppointments(appointments.filter(apt => apt.id !== appointment.id))
+      // Update the appointment status in the list
+      setAppointments(appointments.map(apt => 
+        apt.id === appointment.id ? { ...apt, status: "missed" as const } : apt
+      ))
       alert("Appointment marked as missed.")
     } catch (error) {
       console.error("Error marking appointment as missed:", error)
       alert("Failed to mark appointment as missed.")
+    }
+  }
+
+  const handleCancelAppointment = async (appointment: Appointment) => {
+    if (!token) return
+    
+    const reason = prompt("Please provide a reason for cancellation (optional):", "")
+    if (reason === null) return // User cancelled
+    
+    if (!confirm("Are you sure you want to cancel this appointment?")) return
+    
+    try {
+      await api.updateAppointment(appointment.id, { status: "cancelled" }, token)
+      // Update the appointment status in the list
+      setAppointments(appointments.map(apt => 
+        apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
+      ))
+      alert("Appointment cancelled successfully.")
+    } catch (error) {
+      console.error("Error cancelling appointment:", error)
+      alert("Failed to cancel appointment.")
     }
   }
 
@@ -531,12 +562,18 @@ export default function OwnerAppointments() {
     )
   }
 
-  const filteredAppointments = appointments.filter((apt) =>
-    apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredAppointments = appointments.filter((apt) => {
+    // Filter by search query
+    const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    // Filter by status
+    const matchesStatus = statusFilter === "all" || apt.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
 
   return (
     <div className="space-y-6">
@@ -565,6 +602,72 @@ export default function OwnerAppointments() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
+        </div>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-2">
+        <div className="flex gap-2 overflow-x-auto">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "all"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            All Patients
+          </button>
+          <button
+            onClick={() => setStatusFilter("pending")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "pending"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => setStatusFilter("confirmed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "confirmed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Confirmed
+          </button>
+          <button
+            onClick={() => setStatusFilter("missed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "missed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Missed
+          </button>
+          <button
+            onClick={() => setStatusFilter("cancelled")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "cancelled"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Cancelled
+          </button>
+          <button
+            onClick={() => setStatusFilter("completed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "completed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Completed
+          </button>
         </div>
       </div>
 
@@ -630,6 +733,21 @@ export default function OwnerAppointments() {
                             </svg>
                           </button>
                         )}
+                        {/* Complete Button - Only for confirmed appointments */}
+                        {apt.status === "confirmed" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMarkComplete(apt)
+                            }}
+                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Mark as Complete"
+                          >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
                         {/* Mark as Missed Button - Only for confirmed appointments */}
                         {apt.status === "confirmed" && (
                           <button
@@ -645,28 +763,29 @@ export default function OwnerAppointments() {
                             </svg>
                           </button>
                         )}
-                        {/* Complete Button - Only for confirmed appointments on or after the appointment date */}
-                        {apt.status === "confirmed" && new Date(apt.date) <= new Date(new Date().toDateString()) && (
+                        {/* Cancel Button - Only for pending and confirmed appointments */}
+                        {(apt.status === "pending" || apt.status === "confirmed") && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleMarkComplete(apt)
+                              handleCancelAppointment(apt)
                             }}
-                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Mark as Complete"
+                            className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Cancel Appointment"
                           >
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <X className="w-4 h-4 text-red-600" />
                           </button>
                         )}
-                        <button
-                          onClick={(e) => handleEdit(apt, e)}
-                          className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4 text-blue-600" />
-                        </button>
+                        {/* Edit Button - Only for pending and confirmed appointments (for rescheduling) */}
+                        {(apt.status === "pending" || apt.status === "confirmed") && (
+                          <button
+                            onClick={(e) => handleEdit(apt, e)}
+                            className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                            title="Reschedule"
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-600" />
+                          </button>
+                        )}
                         <button
                           onClick={(e) => handleDelete(apt.id, e)}
                           className="p-2 hover:bg-red-50 rounded-lg transition-colors"
@@ -744,9 +863,8 @@ export default function OwnerAppointments() {
                                   >
                                     <option value="pending">Pending</option>
                                     <option value="confirmed">Confirmed</option>
-                                    <option value="cancelled">Cancelled</option>
-                                    <option value="completed">Completed</option>
                                   </select>
+                                  <p className="text-xs text-gray-500 mt-1">Use action buttons for Complete, Missed, or Cancelled status</p>
                                 </div>
                                 <div>
                                   <label className="block text-sm font-medium mb-1.5">Date *</label>
@@ -886,7 +1004,7 @@ export default function OwnerAppointments() {
                                         onClick={() => handleApproveCancel(apt)}
                                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                                       >
-                                        Approve & Delete
+                                        Approve & Cancel
                                       </button>
                                       <button
                                         onClick={() => handleRejectCancel(apt)}
@@ -904,7 +1022,7 @@ export default function OwnerAppointments() {
 
                                   <div className="mt-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
                                     <p className="text-sm text-amber-800">
-                                      <strong>Warning:</strong> Approving this cancellation will permanently delete the appointment from all users' views.
+                                      <strong>Note:</strong> Approving this cancellation will mark the appointment as cancelled. It will appear in the Cancelled section.
                                     </p>
                                   </div>
                                 </div>
@@ -1098,23 +1216,25 @@ export default function OwnerAppointments() {
                       selected={selectedDate}
                       onSelect={setSelectedDate}
                       disabled={(date) => {
-                        // Disable past dates
+                        // Disable past dates (but allow today)
                         const today = new Date()
                         today.setHours(0, 0, 0, 0)
-                        if (date < today) return true
+                        const checkDate = new Date(date)
+                        checkDate.setHours(0, 0, 0, 0)
+                        if (checkDate < today) return true
                         
                         // Disable dates beyond 90 days
                         const maxDate = new Date(today)
                         maxDate.setDate(today.getDate() + 90)
-                        if (date > maxDate) return true
+                        if (checkDate > maxDate) return true
                         
-                        // Disable dates when dentist is not available
-                        const dateStr = date.toISOString().split('T')[0]
+                        // Disable dates when dentist is not available (use local date formatting)
+                        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
                         return !availableDates.has(dateStr)
                       }}
                       modifiers={{
                         available: (date) => {
-                          const dateStr = date.toISOString().split('T')[0]
+                          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
                           return availableDates.has(dateStr)
                         }
                       }}

@@ -32,7 +32,7 @@ interface Appointment {
   service_name: string | null
   date: string
   time: string
-  status: "confirmed" | "pending" | "cancelled" | "completed" | "reschedule_requested" | "cancel_requested"
+  status: "confirmed" | "pending" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
   notes: string
   reschedule_date: string | null
   reschedule_time: string | null
@@ -73,6 +73,7 @@ interface Staff {
 export default function StaffAppointments() {
   const { token } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "missed" | "cancelled" | "completed">("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [editingRow, setEditingRow] = useState<number | null>(null)
@@ -204,27 +205,28 @@ export default function StaffAppointments() {
       }
 
       try {
-        const availability = await api.getStaffAvailability(Number(newAppointment.dentist), token)
-        setDentistAvailability(availability)
-        
-        // Calculate available dates for the next 90 days
-        const dates = new Set<string>()
+        // Fetch date-specific availability (calendar-based) instead of day-of-week
         const today = new Date()
         today.setHours(0, 0, 0, 0)
+        const endDate = new Date(today)
+        endDate.setDate(today.getDate() + 90)
         
-        for (let i = 0; i < 90; i++) {
-          const checkDate = new Date(today)
-          checkDate.setDate(today.getDate() + i)
-          const dayOfWeek = checkDate.getDay()
-          
-          // Check if dentist is available on this day of week
-          const dayAvailability = availability.find((a: any) => a.day_of_week === dayOfWeek)
-          if (dayAvailability && dayAvailability.is_available) {
-            dates.add(`${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`)
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+        
+        const availability = await api.getDentistAvailability(Number(newAppointment.dentist), todayStr, endDateStr, token)
+        console.log('[STAFF] Dentist date-specific availability:', availability)
+        
+        // Create set of available dates directly from the calendar availability
+        const dates = new Set<string>()
+        availability.forEach((item: any) => {
+          if (item.is_available) {
+            dates.add(item.date)
           }
-        }
+        })
         
         setAvailableDates(dates)
+        console.log('[STAFF] Available dates:', Array.from(dates))
       } catch (error) {
         console.error("Error fetching dentist availability:", error)
       }
@@ -384,13 +386,15 @@ export default function StaffAppointments() {
   const handleApproveCancel = async (appointment: Appointment) => {
     if (!token) return
     
-    if (!confirm("Are you sure you want to approve this cancellation? This will permanently delete the appointment.")) return
+    if (!confirm("Are you sure you want to approve this cancellation?")) return
     
     try {
-      await api.approveCancel(appointment.id, token)
-      // Remove the appointment from the list since it's deleted
-      setAppointments(appointments.filter(apt => apt.id !== appointment.id))
-      alert("Cancellation approved. Appointment has been deleted.")
+      const response = await api.approveCancel(appointment.id, token)
+      // Update the appointment status to cancelled
+      setAppointments(appointments.map(apt => 
+        apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
+      ))
+      alert("Cancellation approved. Appointment marked as cancelled.")
     } catch (error) {
       console.error("Error approving cancellation:", error)
       alert("Failed to approve cancellation.")
@@ -417,14 +421,15 @@ export default function StaffAppointments() {
   const handleMarkComplete = async (appointment: Appointment) => {
     if (!token) return
     
-    const treatment = prompt("Enter treatment details (optional):", "")
-    if (treatment === null) return // User cancelled
+    if (!confirm("Mark this appointment as completed?")) return
     
     try {
-      await api.markAppointmentComplete(appointment.id, { treatment }, token)
-      // Remove from appointments list (it's now in dental records)
-      setAppointments(appointments.filter(apt => apt.id !== appointment.id))
-      alert("Appointment marked as completed and added to dental records!")
+      await api.updateAppointment(appointment.id, { status: "completed" }, token)
+      // Update the appointment status in the list
+      setAppointments(appointments.map(apt => 
+        apt.id === appointment.id ? { ...apt, status: "completed" as const } : apt
+      ))
+      alert("Appointment marked as completed!")
     } catch (error) {
       console.error("Error marking appointment as complete:", error)
       alert("Failed to mark appointment as complete.")
@@ -537,13 +542,19 @@ export default function StaffAppointments() {
     )
   }
 
-  const filteredAppointments = appointments.filter((apt) =>
-    apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.patient_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredAppointments = appointments.filter((apt) => {
+    // Filter by search query
+    const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.patient_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    // Filter by status
+    const matchesStatus = statusFilter === "all" || apt.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
 
   if (isLoading) {
     return (
@@ -583,6 +594,72 @@ export default function StaffAppointments() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
+        </div>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-2">
+        <div className="flex gap-2 overflow-x-auto">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "all"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            All Patients
+          </button>
+          <button
+            onClick={() => setStatusFilter("pending")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "pending"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => setStatusFilter("confirmed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "confirmed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Confirmed
+          </button>
+          <button
+            onClick={() => setStatusFilter("missed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "missed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Missed
+          </button>
+          <button
+            onClick={() => setStatusFilter("cancelled")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "cancelled"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Cancelled
+          </button>
+          <button
+            onClick={() => setStatusFilter("completed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "completed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Completed
+          </button>
         </div>
       </div>
 
@@ -648,6 +725,21 @@ export default function StaffAppointments() {
                             </svg>
                           </button>
                         )}
+                        {/* Complete Button - Only for confirmed appointments */}
+                        {apt.status === "confirmed" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMarkComplete(apt)
+                            }}
+                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Mark as Complete"
+                          >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
                         {/* Mark as Missed Button - Only for confirmed appointments */}
                         {apt.status === "confirmed" && (
                           <button
@@ -660,21 +752,6 @@ export default function StaffAppointments() {
                           >
                             <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                        )}
-                        {/* Complete Button - Only for confirmed appointments on or after the appointment date */}
-                        {apt.status === "confirmed" && new Date(apt.date) <= new Date(new Date().toDateString()) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleMarkComplete(apt)
-                            }}
-                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Mark as Complete"
-                          >
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           </button>
                         )}
@@ -904,7 +981,7 @@ export default function StaffAppointments() {
                                         onClick={() => handleApproveCancel(apt)}
                                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                                       >
-                                        Approve & Delete
+                                        Approve & Cancel
                                       </button>
                                       <button
                                         onClick={() => handleRejectCancel(apt)}
@@ -922,7 +999,7 @@ export default function StaffAppointments() {
 
                                   <div className="mt-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
                                     <p className="text-sm text-amber-800">
-                                      <strong>Warning:</strong> Approving this cancellation will permanently delete the appointment from all users' views.
+                                      <strong>Note:</strong> Approving this cancellation will mark the appointment as cancelled. It will appear in the Cancelled section.
                                     </p>
                                   </div>
                                 </div>
@@ -1130,10 +1207,12 @@ export default function StaffAppointments() {
                       selected={selectedDate}
                       onSelect={setSelectedDate}
                       disabled={(date) => {
-                        // Disable past dates
+                        // Disable past dates (but allow today)
                         const today = new Date()
                         today.setHours(0, 0, 0, 0)
-                        if (date < today) return true
+                        const checkDate = new Date(date)
+                        checkDate.setHours(0, 0, 0, 0)
+                        if (checkDate < today) return true
                         
                         // Disable dates beyond 90 days
                         const maxDate = new Date(today)

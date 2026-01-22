@@ -17,7 +17,7 @@ interface Appointment {
 }
 
 export default function OwnerDashboard() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [totalPatients, setTotalPatients] = useState(0)
@@ -138,7 +138,7 @@ export default function OwnerDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Dashboard Overview</h1>
-        <p className="text-[var(--color-text-muted)]">Welcome back, Clinic Owner</p>
+        <p className="text-[var(--color-text-muted)]">Welcome back, {user?.first_name || "Clinic Owner"}</p>
       </div>
 
       {/* Stats Grid */}

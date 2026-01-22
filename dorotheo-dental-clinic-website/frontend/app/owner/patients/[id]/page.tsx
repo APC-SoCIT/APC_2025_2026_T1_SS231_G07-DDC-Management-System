@@ -96,8 +96,12 @@ export default function PatientDetailPage() {
       setPatient(patientData)
       
       // Filter appointments for this patient
+      // Note: apt.patient can be either a number (ID) or an object with an id property
       const patientAppointments = appointmentsData.filter(
-        (apt: any) => apt.patient?.id === Number.parseInt(patientId)
+        (apt: any) => {
+          const aptPatientId = typeof apt.patient === 'number' ? apt.patient : apt.patient?.id
+          return aptPatientId === Number.parseInt(patientId)
+        }
       )
       console.log("All appointments:", appointmentsData)
       console.log("Patient ID:", Number.parseInt(patientId))
@@ -139,6 +143,15 @@ export default function PatientDetailPage() {
       age--
     }
     return age
+  }
+
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return 'N/A'
+    const [hours, minutes] = timeStr.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
   }
 
   if (isLoading) {
@@ -241,17 +254,16 @@ export default function PatientDetailPage() {
         </div>
         <div className="p-8">
           {(() => {
+            // Only show PENDING and CONFIRMED appointments that are in the future
             const upcoming = appointments.filter((apt) => {
               const appointmentDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`)
               const now = new Date()
               const isAfterNow = appointmentDateTime > now
-              const notCompleted = apt.status !== "completed"
-              const notCancelled = apt.status !== "cancelled"
-              const notMissed = apt.status !== "missed"
+              const isUpcomingStatus = apt.status === "pending" || apt.status === "confirmed"
               
-              console.log(`[FILTER] Apt ${apt.id}: date=${apt.date}, time=${apt.time}, status=${apt.status}, isAfter=${isAfterNow}, valid=${isAfterNow && notCompleted && notCancelled && notMissed}`)
+              console.log(`[FILTER] Apt ${apt.id}: date=${apt.date}, time=${apt.time}, status=${apt.status}, isAfter=${isAfterNow}, validStatus=${isUpcomingStatus}, valid=${isAfterNow && isUpcomingStatus}`)
               
-              return isAfterNow && notCompleted && notCancelled && notMissed
+              return isAfterNow && isUpcomingStatus
             })
             
             console.log(`[UPCOMING] Total: ${upcoming.length} out of ${appointments.length}`)
@@ -266,17 +278,21 @@ export default function PatientDetailPage() {
                   <div key={apt.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-semibold text-gray-900">{apt.service?.name || "General Checkup"}</p>
+                        <p className="font-semibold text-gray-900">{(apt as any).service_name || apt.service?.name || "General Checkup"}</p>
                         <p className="text-sm text-gray-600 mt-1">
-                          {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                          {new Date(apt.date).toLocaleDateString()} at {formatTime(apt.time)}
                         </p>
-                        {apt.dentist && (
+                        {((apt as any).dentist_name || apt.dentist) && (
                           <p className="text-sm text-gray-600">
-                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                            {(apt as any).dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
                           </p>
                         )}
                       </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        apt.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                        apt.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
                         {apt.status}
                       </span>
                     </div>
@@ -307,98 +323,115 @@ export default function PatientDetailPage() {
             <p className="text-gray-500 text-center py-8">No treatment history</p>
           ) : (
             <div className="space-y-4">
-              {/* Dental Records (Completed Treatments) - Show only first 3 */}
-              {dentalRecords.slice(0, 3).map((record) => (
-                <div
-                  key={`record-${record.id}`}
-                  className="border border-gray-200 rounded-lg p-4"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <h4 className="font-semibold text-gray-900">{record.treatment}</h4>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Completed
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Date</p>
-                      <p className="font-medium text-gray-900">
-                        {new Date(record.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {record.created_by && (
-                      <div>
-                        <p className="text-sm text-gray-500">Dentist</p>
-                        <p className="font-medium text-gray-900">
-                          Dr. {record.created_by.first_name} {record.created_by.last_name}
-                        </p>
-                      </div>
-                    )}
-                    {record.diagnosis && (
-                      <div className="col-span-2">
-                        <p className="text-sm text-gray-500">Diagnosis</p>
-                        <p className="font-medium text-gray-900">{record.diagnosis}</p>
-                      </div>
-                    )}
-                  </div>
-                  {record.notes && (
-                    <div className="mt-3">
-                      <p className="text-sm text-gray-500">Notes</p>
-                      <p className="text-gray-700 mt-1">{record.notes}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Completed Appointments without dental records */}
-              {dentalRecords.length < 3 && appointments
-                .filter(apt => apt.status === 'completed')
-                .slice(0, 3 - dentalRecords.length)
-                .map((apt) => {
-                  // Check if this appointment already has a dental record
-                  const hasDentalRecord = dentalRecords.some(record => 
-                    record.appointment?.id === apt.id
-                  )
-                  if (hasDentalRecord) return null
-
-                  return (
-                    <div
-                      key={`apt-${apt.id}`}
-                      className="border border-gray-200 rounded-lg p-4"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-semibold text-gray-900">
-                          {apt.service?.name || "Appointment"}
-                        </h4>
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Completed
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500">Date</p>
-                          <p className="font-medium text-gray-900">
-                            {new Date(apt.date).toLocaleDateString()} at {apt.time}
-                          </p>
+              {/* Combine all past appointments (completed, missed, cancelled) */}
+              {[...dentalRecords.map(record => ({ 
+                  type: 'record' as const, 
+                  data: record,
+                  date: new Date(record.created_at)
+                })),
+                ...appointments
+                  .filter(apt => apt.status === 'completed' || apt.status === 'missed' || apt.status === 'cancelled')
+                  .map(apt => ({
+                    type: 'appointment' as const,
+                    data: apt,
+                    date: new Date(apt.date)
+                  }))
+              ]
+                .sort((a, b) => b.date.getTime() - a.date.getTime()) // Sort by date descending
+                .slice(0, 3) // Show only first 3
+                .map((item, index) => {
+                  if (item.type === 'record') {
+                    const record = item.data
+                    return (
+                      <div
+                        key={`record-${record.id}`}
+                        className="border border-gray-200 rounded-lg p-4"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <h4 className="font-semibold text-gray-900">{record.treatment}</h4>
+                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Completed
+                          </span>
                         </div>
-                        {apt.dentist && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <p className="text-sm text-gray-500">Dentist</p>
+                            <p className="text-sm text-gray-500">Date</p>
                             <p className="font-medium text-gray-900">
-                              Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                              {new Date(record.created_at).toLocaleDateString()}
                             </p>
+                          </div>
+                          {record.created_by && (
+                            <div>
+                              <p className="text-sm text-gray-500">Dentist</p>
+                              <p className="font-medium text-gray-900">
+                                Dr. {record.created_by.first_name} {record.created_by.last_name}
+                              </p>
+                            </div>
+                          )}
+                          {record.diagnosis && (
+                            <div className="col-span-2">
+                              <p className="text-sm text-gray-500">Diagnosis</p>
+                              <p className="font-medium text-gray-900">{record.diagnosis}</p>
+                            </div>
+                          )}
+                        </div>
+                        {record.notes && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-500">Notes</p>
+                            <p className="text-gray-700 mt-1">{record.notes}</p>
                           </div>
                         )}
                       </div>
-                      {apt.notes && (
-                        <div className="mt-3">
-                          <p className="text-sm text-gray-500">Notes</p>
-                          <p className="text-gray-700 mt-1">{apt.notes}</p>
+                    )
+                  } else {
+                    const apt = item.data
+                    // Determine status color
+                    const statusBadge = apt.status === 'completed' 
+                      ? 'bg-green-100 text-green-800'
+                      : apt.status === 'missed'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                    
+                    return (
+                      <div
+                        key={`apt-${apt.id}`}
+                        className="border border-gray-200 rounded-lg p-4"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <h4 className="font-semibold text-gray-900">
+                            {(apt as any).service_name || apt.service?.name || "Appointment"}
+                          </h4>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge}`}>
+                            {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Date</p>
+                            <p className="font-medium text-gray-900">
+                              {new Date(apt.date).toLocaleDateString()} at {formatTime(apt.time)}
+                            </p>
+                          </div>
+                          {((apt as any).dentist_name || apt.dentist) && (
+                            <div>
+                              <p className="text-sm text-gray-500">Dentist</p>
+                              <p className="font-medium text-gray-900">
+                                {(apt as any).dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        {apt.notes && (
+                          <div className="mt-3">
+                            <p className="text-sm text-gray-500">Notes</p>
+                            <p className="text-gray-700 mt-1">{apt.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                })
+              }
             </div>
           )}
         </div>
