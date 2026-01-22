@@ -815,7 +815,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def approve_cancel(self, request, pk=None):
-        """Staff/Owner approves cancel request and deletes the appointment"""
+        """Staff/Owner approves cancel request and marks appointment as cancelled"""
         appointment = self.get_object()
         
         if appointment.status != 'cancel_requested':
@@ -824,15 +824,16 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Notify patient before deleting
+        # Change status to cancelled instead of deleting
+        appointment.status = 'cancelled'
+        appointment.save()
+        
+        # Notify patient after cancelling
         create_patient_notification(appointment, 'cancel_approved')
         
-        # Delete the appointment instead of marking as cancelled
-        appointment_id = appointment.id
-        appointment.delete()
-        
+        serializer = self.get_serializer(appointment)
         return Response(
-            {'message': 'Appointment cancelled and deleted successfully', 'id': appointment_id},
+            {'message': 'Appointment cancelled successfully', 'appointment': serializer.data},
             status=status.HTTP_200_OK
         )
     

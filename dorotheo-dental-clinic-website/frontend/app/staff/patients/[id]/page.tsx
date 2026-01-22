@@ -74,6 +74,7 @@ export default function PatientDetailPage() {
   useEffect(() => {
     if (!token || !patientId) return
     fetchPatientData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, patientId])
 
   const fetchPatientData = async () => {
@@ -90,7 +91,7 @@ export default function PatientDetailPage() {
         documentsData,
         teethImagesData,
       ] = await Promise.all([
-        api.getUser(parseInt(patientId), token),
+        api.getPatientById(parseInt(patientId), token),
         api.getAppointments(token),
         api.getDentalRecords(parseInt(patientId), token),
         api.getDocuments(parseInt(patientId), token),
@@ -100,8 +101,12 @@ export default function PatientDetailPage() {
       setPatient(patientData)
       
       // Filter appointments for this patient
+      // Note: apt.patient can be either a number (ID) or an object with an id property
       const patientAppointments = appointmentsData.filter(
-        (apt: any) => apt.patient?.id === parseInt(patientId)
+        (apt: any) => {
+          const aptPatientId = typeof apt.patient === 'number' ? apt.patient : apt.patient?.id
+          return aptPatientId === parseInt(patientId)
+        }
       )
       setAppointments(patientAppointments)
 
@@ -119,6 +124,15 @@ export default function PatientDetailPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return 'N/A'
+    const [hours, minutes] = timeStr.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
   }
 
   if (isLoading) {
@@ -236,17 +250,21 @@ export default function PatientDetailPage() {
                   <div key={apt.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-semibold text-gray-900">{apt.service?.name || "General Checkup"}</p>
+                        <p className="font-semibold text-gray-900">{(apt as any).service_name || apt.service?.name || "General Checkup"}</p>
                         <p className="text-sm text-gray-600 mt-1">
-                          {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                          {new Date(apt.date).toLocaleDateString()} at {formatTime(apt.time)}
                         </p>
-                        {apt.dentist && (
+                        {((apt as any).dentist_name || apt.dentist) && (
                           <p className="text-sm text-gray-600">
-                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                            {(apt as any).dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
                           </p>
                         )}
                       </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        apt.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                        apt.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
                         {apt.status}
                       </span>
                     </div>
@@ -280,14 +298,14 @@ export default function PatientDetailPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-medium text-gray-900">
-                          {apt.service?.name || "General Checkup"}
+                          {(apt as any).service_name || apt.service?.name || "General Checkup"}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
-                          {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                          {new Date(apt.date).toLocaleDateString()} at {formatTime(apt.time)}
                         </p>
-                        {apt.dentist && (
+                        {((apt as any).dentist_name || apt.dentist) && (
                           <p className="text-sm text-gray-600">
-                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                            {(apt as any).dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
                           </p>
                         )}
                         {apt.notes && (

@@ -27,6 +27,7 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
 
   useEffect(() => {
     if (dentistId) {
+      console.log('[CALENDAR] Loading availability for dentist ID:', dentistId)
       loadAvailability()
     }
   }, [dentistId, currentDate])
@@ -41,10 +42,14 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
     // Get first and last day of current month
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
     const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+    
+    // Format dates using local timezone to avoid date shifting
+    const firstDayStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
+    const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDay.toISOString().split('T')[0]}&end_date=${lastDay.toISOString().split('T')[0]}`,
+        `http://127.0.0.1:8000/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`,
         {
           headers: {
             Authorization: `Token ${token}`,
@@ -57,16 +62,24 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
         console.log('[CALENDAR] Loaded availability:', data)
         const availabilityMap: Record<string, SelectedDate> = {}
         
+        // Get today's date for comparison
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
         data.forEach((item: any) => {
-          availabilityMap[item.date] = {
-            date: item.date,
-            startTime: item.start_time.substring(0, 5), // Convert "09:00:00" to "09:00"
-            endTime: item.end_time.substring(0, 5),
+          const itemDate = new Date(item.date)
+          // Only include dates that are today or in the future
+          if (itemDate >= today) {
+            availabilityMap[item.date] = {
+              date: item.date,
+              startTime: item.start_time.substring(0, 5), // Convert "09:00:00" to "09:00"
+              endTime: item.end_time.substring(0, 5),
+            }
           }
         })
         
         setSelectedDates(availabilityMap)
-        console.log('[CALENDAR] Selected dates updated:', availabilityMap)
+        console.log('[CALENDAR] Selected dates updated (past dates filtered):', availabilityMap)
       } else if (response.status === 401) {
         // Silently ignore 401 errors (authentication issues)
         setSelectedDates({})

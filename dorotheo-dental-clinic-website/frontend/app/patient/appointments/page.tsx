@@ -632,19 +632,32 @@ export default function PatientAppointments() {
     return `Dr. ${fullName}`
   }
 
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return 'N/A'
+    const [hours, minutes] = timeStr.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
+  }
+
   // Separate appointments into upcoming and past
   const now = new Date()
   console.log("Current time:", now)
   console.log("All appointments for filtering:", allAppointments)
   
+  // Upcoming: Only PENDING and CONFIRMED appointments in the future
   const upcomingAppointments = allAppointments.filter((apt) => {
     const aptDate = new Date(apt.date + 'T' + apt.time)
-    return aptDate >= now && apt.status !== 'completed' && apt.status !== 'cancelled'
+    const isUpcomingStatus = apt.status === 'pending' || apt.status === 'confirmed'
+    return aptDate >= now && isUpcomingStatus
   })
 
+  // Past: Completed, Missed, Cancelled, or appointments that have passed
   const pastAppointments = allAppointments.filter((apt) => {
     const aptDate = new Date(apt.date + 'T' + apt.time)
-    const isPast = aptDate < now || apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'missed'
+    const isPastStatus = apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'missed'
+    const isPast = aptDate < now || isPastStatus
     console.log(`Appointment ${apt.id} - Date: ${apt.date} ${apt.time}, Status: ${apt.status}, isPast: ${isPast}`)
     return isPast
   })
@@ -658,16 +671,18 @@ export default function PatientAppointments() {
     switch (status) {
       case "confirmed":
         return "bg-green-100 text-green-700"
+      case "completed":
+        return "bg-green-100 text-green-700"
       case "missed":
+        return "bg-yellow-100 text-yellow-700"
+      case "pending":
         return "bg-yellow-100 text-yellow-700"
       case "reschedule_requested":
         return "bg-orange-100 text-orange-700"
       case "cancel_requested":
         return "bg-red-100 text-red-700"
-      case "completed":
-        return "bg-blue-100 text-blue-700"
       case "cancelled":
-        return "bg-gray-100 text-gray-700"
+        return "bg-red-100 text-red-700"
       default:
         return "bg-gray-100 text-gray-700"
     }
@@ -771,7 +786,7 @@ export default function PatientAppointments() {
                     </div>
                     <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
                       <Clock className="w-4 h-4" />
-                      <span className="text-sm">{appointment.time}</span>
+                      <span className="text-sm">{formatTime(appointment.time)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
                       <User className="w-4 h-4" />
@@ -789,7 +804,7 @@ export default function PatientAppointments() {
                         </div>
                         <div>
                           <span className="text-orange-600 font-medium">New Time:</span>
-                          <p className="text-orange-800">{appointment.reschedule_time}</p>
+                          <p className="text-orange-800">{formatTime(appointment.reschedule_time || '')}</p>
                         </div>
                       </div>
                       {appointment.reschedule_notes && (
@@ -931,15 +946,17 @@ export default function PatientAppointments() {
                       selected={selectedDate}
                       onSelect={setSelectedDate}
                       disabled={(date) => {
-                        // Disable past dates
+                        // Disable past dates (but allow today)
                         const today = new Date()
                         today.setHours(0, 0, 0, 0)
-                        if (date < today) return true
+                        const checkDate = new Date(date)
+                        checkDate.setHours(0, 0, 0, 0)
+                        if (checkDate < today) return true
                         
                         // Disable dates beyond 90 days
                         const maxDate = new Date(today)
                         maxDate.setDate(today.getDate() + 90)
-                        if (date > maxDate) return true
+                        if (checkDate > maxDate) return true
                         
                         // Disable dates when dentist is not available (use local date, not UTC)
                         const year = date.getFullYear()
@@ -1133,15 +1150,17 @@ export default function PatientAppointments() {
                       selected={rescheduleSelectedDate}
                       onSelect={setRescheduleSelectedDate}
                       disabled={(date) => {
-                        // Disable past dates
+                        // Disable past dates (but allow today)
                         const today = new Date()
                         today.setHours(0, 0, 0, 0)
-                        if (date < today) return true
+                        const checkDate = new Date(date)
+                        checkDate.setHours(0, 0, 0, 0)
+                        if (checkDate < today) return true
                         
                         // Disable dates beyond 90 days
                         const maxDate = new Date(today)
                         maxDate.setDate(today.getDate() + 90)
-                        if (date > maxDate) return true
+                        if (checkDate > maxDate) return true
                         
                         // Disable dates when dentist is not available (use local date, not UTC)
                         const year = date.getFullYear()
