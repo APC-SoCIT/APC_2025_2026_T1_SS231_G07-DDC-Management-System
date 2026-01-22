@@ -44,6 +44,7 @@ interface Service {
   name: string
   category: string
   description: string
+  duration: number
 }
 
 export default function PatientAppointments() {
@@ -79,15 +80,13 @@ export default function PatientAppointments() {
   const [rescheduleDentistAvailability, setRescheduleDentistAvailability] = useState<any[]>([])
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
   const [rescheduleAvailableDates, setRescheduleAvailableDates] = useState<Set<string>>(new Set())
-  const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number}>>([])
-  const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number}>>([])
+  const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([])
+  const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([])
 
-  // Generate time slots based on dentist's availability for selected date
-  const generateTimeSlots = () => {
-    console.log('[TIMESLOTS] Generating time slots...')
+  // Generate time slots based on dentist's availability and service duration
+  const generateTimeSlots = (durationMinutes: number = 30) => {
+    console.log('[TIMESLOTS] Generating time slots with duration:', durationMinutes)
     console.log('[TIMESLOTS] newAppointment.date:', newAppointment.date)
-    console.log('[TIMESLOTS] dentistAvailability:', dentistAvailability)
-    console.log('[TIMESLOTS] All dates in availability:', dentistAvailability.map((item: any) => item.date))
     
     if (!newAppointment.date || !dentistAvailability || dentistAvailability.length === 0) {
       console.log('[TIMESLOTS] Missing required data - returning empty array')
@@ -95,73 +94,80 @@ export default function PatientAppointments() {
     }
 
     // Find the availability for the selected date
-    const dateAvailability = dentistAvailability.find((item: any) => {
-      console.log('[TIMESLOTS] Comparing:', item.date, '===', newAppointment.date, '?', item.date === newAppointment.date)
-      return item.date === newAppointment.date
-    })
+    const dateAvailability = dentistAvailability.find((item: any) => item.date === newAppointment.date)
     
     console.log('[TIMESLOTS] Found availability for date:', dateAvailability)
     
     if (!dateAvailability) {
       console.log('[TIMESLOTS] No availability found for date:', newAppointment.date)
-      console.log('[TIMESLOTS] Available dates are:', dentistAvailability.map((item: any) => item.date))
-      return [] // No availability for this date
+      return []
     }
 
-    // Generate slots based on start_time and end_time with 30-minute intervals
+    // Generate slots based on start_time and end_time with custom duration intervals
     const slots: { value: string; display: string }[] = []
-    const startHour = parseInt(dateAvailability.start_time.split(':')[0])
-    const startMinute = parseInt(dateAvailability.start_time.split(':')[1])
-    const endHour = parseInt(dateAvailability.end_time.split(':')[0])
-    const endMinute = parseInt(dateAvailability.end_time.split(':')[1])
+    const [startHour, startMinute] = dateAvailability.start_time.split(':').map(Number)
+    const [endHour, endMinute] = dateAvailability.end_time.split(':').map(Number)
+    
+    const startMinutes = startHour * 60 + startMinute
+    const endMinutes = endHour * 60 + endMinute
 
-    let currentHour = startHour
-    let currentMinute = startMinute
-
-    // Add first time slot
-    const firstTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
-    const firstHour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
-    const firstAmpm = currentHour >= 12 ? 'PM' : 'AM'
-    const firstDisplayStr = `${firstHour12}:${currentMinute.toString().padStart(2, '0')} ${firstAmpm}`
-    slots.push({ value: firstTimeStr, display: firstDisplayStr })
-
-    // Generate 30-minute interval slots, skipping 11:30 AM - 12:30 PM (lunch)
-    while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
-      // Increment by 30 minutes
-      currentMinute += 30
-      if (currentMinute >= 60) {
-        currentMinute = 0
-        currentHour += 1
-      }
-
-      // Skip 11:30 AM - 12:30 PM (lunch break)
-      if ((currentHour === 11 && currentMinute === 30) || (currentHour === 12 && currentMinute === 0)) {
+    // Generate slots with the specified duration interval
+    for (let totalMinutes = startMinutes; totalMinutes < endMinutes; totalMinutes += durationMinutes) {
+      const hour = Math.floor(totalMinutes / 60)
+      const minute = totalMinutes % 60
+      
+      // Skip lunch break (11:30 AM - 12:30 PM)
+      if ((hour === 11 && minute === 30) || (hour === 12 && minute === 0)) {
         continue
       }
-
-      // Don't go beyond end time
-      if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
-        break
-      }
-
-      const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
-      const hour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
-      const ampm = currentHour >= 12 ? 'PM' : 'AM'
-      const displayStr = `${hour12}:${currentMinute.toString().padStart(2, '0')} ${ampm}`
+      
+      const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      const displayStr = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`
+      
       slots.push({ value: timeStr, display: displayStr })
     }
 
-    // Add end time if not already included
-    const lastSlot = slots[slots.length - 1]
-    const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`
-    if (lastSlot && lastSlot.value !== endTimeStr) {
-      const endHour12 = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour
-      const endAmpm = endHour >= 12 ? 'PM' : 'AM'
-      const endDisplayStr = `${endHour12}:${endMinute.toString().padStart(2, '0')} ${endAmpm}`
-      slots.push({ value: endTimeStr, display: endDisplayStr })
-    }
-
     return slots
+  }
+
+  // Check if a time slot overlaps with any existing appointments
+  const isTimeSlotBooked = (date: string, time: string, durationMinutes: number = 30) => {
+    // Parse the proposed start time
+    const [startHour, startMinute] = time.split(':').map(Number)
+    const proposedStart = startHour * 60 + startMinute
+    const proposedEnd = proposedStart + durationMinutes
+    
+    const isBooked = bookedSlots.some(slot => {
+      // Only check appointments on the same date
+      if (slot.date !== date) return false
+      
+      // Get the booked appointment's time range
+      const [bookedHour, bookedMinute] = slot.time.substring(0, 5).split(':').map(Number)
+      const bookedStart = bookedHour * 60 + bookedMinute
+      
+      // Get duration of the booked appointment
+      let bookedDuration = 30
+      if (slot.service_id) {
+        const bookedService = services.find(s => s.id === slot.service_id)
+        if (bookedService && bookedService.duration) {
+          bookedDuration = bookedService.duration
+        }
+      }
+      const bookedEnd = bookedStart + bookedDuration
+      
+      // Check for overlap
+      const overlaps = (proposedStart < bookedEnd) && (proposedEnd > bookedStart)
+      
+      if (overlaps) {
+        console.log(`[PATIENT] Time slot ${time} (${proposedStart}-${proposedEnd}) overlaps with booked slot ${slot.time} (${bookedStart}-${bookedEnd})`)
+      }
+      
+      return overlaps
+    })
+    
+    return isBooked
   }
 
   // Generate time slots for reschedule modal based on dentist's availability for selected date
@@ -231,23 +237,6 @@ export default function PatientAppointments() {
     }
 
     return slots
-  }
-
-  // Check if a time slot is already booked
-  // BLOCKING RULE: Same date + time = BLOCKED (regardless of dentist)
-  const isTimeSlotBooked = (date: string, time: string) => {
-    // Normalize time format: remove seconds if present (10:00:00 -> 10:00)
-    const normalizedTime = time.substring(0, 5)
-    
-    const isBooked = bookedSlots.some(slot => {
-      const slotTime = slot.time.substring(0, 5) // Normalize slot time too
-      
-      // Only check if same date AND same time
-      return slot.date === date && slotTime === normalizedTime
-    })
-    
-    console.log(`[PATIENT] Checking ${time} on ${date}:`, isBooked ? 'BLOCKED' : 'Available')
-    return isBooked
   }
 
   useEffect(() => {
@@ -444,11 +433,29 @@ export default function PatientAppointments() {
       return
     }
 
-    // Check for time slot conflicts using the booked slots data
-    const hasConflict = isTimeSlotBooked(newAppointment.date, newAppointment.time)
+    // Get the selected service duration
+    const selectedService = services.find(s => s.id === Number(newAppointment.service))
+    const duration = selectedService?.duration || 30
+
+    // Check for time slot conflicts using the booked slots data with overlap detection
+    const hasConflict = isTimeSlotBooked(newAppointment.date, newAppointment.time, duration)
 
     if (hasConflict) {
-      alert("This time slot is already booked. Please select a different time.")
+      alert("This time slot conflicts with an existing appointment. Please select a different time.")
+      return
+    }
+
+    // Check if patient already has an appointment with same service on same day at same time
+    const hasDuplicate = allAppointments.some(apt => 
+      apt.patient === user.id &&
+      apt.date === newAppointment.date &&
+      apt.time === newAppointment.time &&
+      apt.service === Number(newAppointment.service) &&
+      (apt.status === 'pending' || apt.status === 'confirmed')
+    )
+
+    if (hasDuplicate) {
+      alert("You already have this appointment booked for this time. Please select a different time or service.")
       return
     }
 
@@ -992,37 +999,45 @@ export default function PatientAppointments() {
                 </div>
               )}
 
-              {/* Time selection - only show if date is selected */}
-              {selectedDate && (
+              {/* Time selection - only show if date AND service are selected */}
+              {selectedDate && newAppointment.service && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                     Preferred Time <span className="text-red-500">*</span>
                   </label>
                   <p className="text-xs text-gray-600 mb-2">
-                    Select a 30-minute time slot (10:00 AM - 8:00 PM). Grayed out times are already booked.
+                    {(() => {
+                      const selectedService = services.find(s => s.id === Number(newAppointment.service))
+                      const duration = selectedService?.duration || 30
+                      return `Select a ${duration}-minute time slot (10:00 AM - 8:00 PM). Grayed out times conflict with existing appointments.`
+                    })()}
                   </p>
                   <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 border border-[var(--color-border)] rounded-lg">
-                    {generateTimeSlots().map((slot) => {
-                      const isBooked = isTimeSlotBooked(newAppointment.date, slot.value)
-                      const isSelected = newAppointment.time === slot.value
-                      return (
-                        <button
-                          key={slot.value}
-                          type="button"
-                          onClick={() => !isBooked && setNewAppointment({ ...newAppointment, time: slot.value })}
-                          disabled={isBooked}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-[var(--color-primary)] text-white'
-                              : isBooked
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
-                              : 'bg-white border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-text)]'
-                          }`}
-                        >
-                          {slot.display}
-                        </button>
-                      )
-                    })}
+                    {(() => {
+                      const selectedService = services.find(s => s.id === Number(newAppointment.service))
+                      const duration = selectedService?.duration || 30
+                      return generateTimeSlots(duration).map((slot) => {
+                        const isBooked = isTimeSlotBooked(newAppointment.date, slot.value, duration)
+                        const isSelected = newAppointment.time === slot.value
+                        return (
+                          <button
+                            key={slot.value}
+                            type="button"
+                            onClick={() => !isBooked && setNewAppointment({ ...newAppointment, time: slot.value })}
+                            disabled={isBooked}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              isSelected
+                                ? 'bg-[var(--color-primary)] text-white'
+                                : isBooked
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                : 'bg-white border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-text)]'
+                            }`}
+                          >
+                            {slot.display}
+                          </button>
+                        )
+                      })
+                    })()}
                   </div>
                   {!newAppointment.time && (
                     <p className="text-xs text-red-600 mt-1">* Please select a time slot</p>
