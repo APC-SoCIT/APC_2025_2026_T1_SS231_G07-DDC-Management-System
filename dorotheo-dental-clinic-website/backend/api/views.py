@@ -880,8 +880,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if date:
             queryset = queryset.filter(date=date)
         
-        # Return only date and time (no patient info for privacy)
-        booked_slots = queryset.values('date', 'time', 'dentist_id').distinct()
+        # Return date, time, dentist_id, and service_id for overlap detection
+        booked_slots = queryset.values('date', 'time', 'dentist_id', 'service_id').distinct()
         
         return Response(list(booked_slots))
 
