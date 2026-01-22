@@ -105,17 +105,9 @@ export default function PatientDetailPage() {
       )
       setAppointments(patientAppointments)
 
-      // Filter dental records for this patient
-      const patientRecords = dentalRecordsData.filter(
-        (record: any) => record.patient?.id === parseInt(patientId)
-      )
-      setDentalRecords(patientRecords)
-
-      // Filter documents for this patient
-      const patientDocs = documentsData.filter(
-        (doc: any) => doc.patient === parseInt(patientId)
-      )
-      setDocuments(patientDocs)
+      // getDentalRecords and getDocuments already filter by patient ID on the backend
+      setDentalRecords(dentalRecordsData)
+      setDocuments(documentsData)
 
       // Filter teeth images for this patient
       const patientImages = teethImagesData.filter(
@@ -226,17 +218,21 @@ export default function PatientDetailPage() {
           </h2>
         </div>
         <div className="p-8">
-          {appointments.filter(
-            (apt) => new Date(`${apt.date}T${apt.time}`) >= new Date() && apt.status !== "completed" && apt.status !== "cancelled"
-          ).length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No upcoming appointments</p>
-          ) : (
-            <div className="space-y-3">
-              {appointments
-                .filter(
-                  (apt) => new Date(`${apt.date}T${apt.time}`) >= new Date() && apt.status !== "completed" && apt.status !== "cancelled"
-                )
-                .map((apt) => (
+          {(() => {
+            const upcoming = appointments.filter((apt) => {
+              const appointmentDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`)
+              const now = new Date()
+              return appointmentDateTime > now && 
+                     apt.status !== "completed" && 
+                     apt.status !== "cancelled" && 
+                     apt.status !== "missed"
+            })
+            
+            return upcoming.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No upcoming appointments</p>
+            ) : (
+              <div className="space-y-3">
+                {upcoming.map((apt) => (
                   <div key={apt.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
@@ -256,8 +252,9 @@ export default function PatientDetailPage() {
                     </div>
                   </div>
                 ))}
-            </div>
-          )}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
