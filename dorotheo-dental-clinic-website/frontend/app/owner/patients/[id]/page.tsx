@@ -10,8 +10,7 @@ import {
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import TeethImageUpload from "@/components/teeth-image-upload"
-import DocumentUpload from "@/components/document-upload"
+import UnifiedDocumentUpload from "@/components/unified-document-upload"
 
 // Get the API base URL for constructing full image URLs
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
@@ -64,8 +63,7 @@ export default function PatientDetailPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [teethImages, setTeethImages] = useState<TeethImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showImageUpload, setShowImageUpload] = useState(false)
-  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   useEffect(() => {
     if (!token || !patientId) return
@@ -102,25 +100,28 @@ export default function PatientDetailPage() {
         (apt: any) => apt.patient?.id === Number.parseInt(patientId)
       )
       console.log("All appointments:", appointmentsData)
+      console.log("Patient ID:", Number.parseInt(patientId))
       console.log("Filtered patient appointments:", patientAppointments)
+      console.log("Current time:", new Date())
+      console.log("Upcoming filter test:", patientAppointments.map((apt: Appointment) => ({
+        id: apt.id,
+        date: apt.date,
+        time: apt.time,
+        status: apt.status,
+        appointmentDateTime: new Date(`${apt.date}T${apt.time || '00:00'}`),
+        now: new Date(),
+        isUpcoming: new Date(`${apt.date}T${apt.time || '00:00'}`) > new Date()
+      })))
       console.log("Missed appointments:", patientAppointments.filter((apt: Appointment) => apt.status === 'missed'))
       console.log("Cancelled appointments:", patientAppointments.filter((apt: Appointment) => apt.status === 'cancelled'))
       setAppointments(patientAppointments)
 
-      // getDentalRecords already filters by patient ID, no need to filter again
+      // getDentalRecords and getDocuments already filter by patient ID on the backend
       setDentalRecords(dentalRecordsData)
+      setDocuments(documentsData)
 
-      // Filter documents for this patient
-      const patientDocs = documentsData.filter(
-        (doc: any) => doc.patient === Number.parseInt(patientId)
-      )
-      setDocuments(patientDocs)
-
-      // Filter teeth images for this patient
-      const patientImages = teethImagesData.filter(
-        (img: any) => img.patient === Number.parseInt(patientId)
-      )
-      setTeethImages(patientImages)
+      // Filter teeth images for this patient (getPatientTeethImages already filters)
+      setTeethImages(teethImagesData)
     } catch (error) {
       console.error("Error fetching patient data:", error)
     } finally {
@@ -239,17 +240,28 @@ export default function PatientDetailPage() {
           </button>
         </div>
         <div className="p-8">
-          {appointments.filter(
-            (apt) => new Date(`${apt.date}T${apt.time}`) >= new Date() && apt.status !== "completed" && apt.status !== "cancelled"
-          ).length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No upcoming appointments</p>
-          ) : (
-            <div className="space-y-3">
-              {appointments
-                .filter(
-                  (apt) => new Date(`${apt.date}T${apt.time}`) >= new Date() && apt.status !== "completed" && apt.status !== "cancelled"
-                )
-                .slice(0, 3)
+          {(() => {
+            const upcoming = appointments.filter((apt) => {
+              const appointmentDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`)
+              const now = new Date()
+              const isAfterNow = appointmentDateTime > now
+              const notCompleted = apt.status !== "completed"
+              const notCancelled = apt.status !== "cancelled"
+              const notMissed = apt.status !== "missed"
+              
+              console.log(`[FILTER] Apt ${apt.id}: date=${apt.date}, time=${apt.time}, status=${apt.status}, isAfter=${isAfterNow}, valid=${isAfterNow && notCompleted && notCancelled && notMissed}`)
+              
+              return isAfterNow && notCompleted && notCancelled && notMissed
+            })
+            
+            console.log(`[UPCOMING] Total: ${upcoming.length} out of ${appointments.length}`)
+            
+            return upcoming.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No upcoming appointments</p>
+            ) : (
+              <div className="space-y-3">
+                {upcoming
+                  .slice(0, 3)
                 .map((apt) => (
                   <div key={apt.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                     <div className="flex justify-between items-start">
@@ -270,8 +282,9 @@ export default function PatientDetailPage() {
                     </div>
                   </div>
                 ))}
-            </div>
-          )}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -402,22 +415,13 @@ export default function PatientDetailPage() {
             Documents & Images
             <span className="text-sm text-gray-500 ml-2">View all</span>
           </button>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowImageUpload(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Images
-            </button>
-            <button
-              onClick={() => setShowDocumentUpload(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Document
-            </button>
-          </div>
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Document
+          </button>
         </div>
         <div className="p-8">
           <div className="space-y-6">
@@ -533,55 +537,17 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
-      {/* Upload Modals */}
-      {showImageUpload && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Upload Teeth Images & X-rays</h3>
-                <button
-                  onClick={() => setShowImageUpload(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-              <TeethImageUpload
-                patientId={Number.parseInt(patientId)}
-                patientName={`${patient.first_name} ${patient.last_name}`}
-                onClose={() => setShowImageUpload(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDocumentUpload && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Upload Documents</h3>
-                <button
-                  onClick={() => setShowDocumentUpload(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-              <DocumentUpload
-                patientId={Number.parseInt(patientId)}
-                patientName={`${patient.first_name} ${patient.last_name}`}
-                onUploadSuccess={() => {
-                  setShowDocumentUpload(false)
-                  fetchPatientData()
-                }}
-                onClose={() => setShowDocumentUpload(false)}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Upload Modal */}
+      {showUploadModal && patient && (
+        <UnifiedDocumentUpload
+          patientId={Number.parseInt(patientId)}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          onClose={() => setShowUploadModal(false)}
+          onUploadSuccess={() => {
+            setShowUploadModal(false)
+            fetchPatientData()
+          }}
+        />
       )}
     </div>
   )

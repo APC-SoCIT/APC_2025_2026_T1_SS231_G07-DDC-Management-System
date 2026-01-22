@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, FileText, Upload } from "lucide-react"
+import { ArrowLeft, FileText, Upload, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import TeethImageUpload from "@/components/teeth-image-upload"
-import DocumentUpload from "@/components/document-upload"
+import UnifiedDocumentUpload from "@/components/unified-document-upload"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 const BACKEND_URL = API_BASE_URL.replace('/api', '')
@@ -42,8 +41,7 @@ export default function PatientDocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [teethImages, setTeethImages] = useState<TeethImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showImageUpload, setShowImageUpload] = useState(false)
-  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   useEffect(() => {
     if (!token || !patientId) return
@@ -112,22 +110,13 @@ export default function PatientDocumentsPage() {
 
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Documents & Images</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowImageUpload(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Upload className="w-4 h-4" />
-            Upload Images
-          </button>
-          <button
-            onClick={() => setShowDocumentUpload(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            <Upload className="w-4 h-4" />
-            Upload Document
-          </button>
-        </div>
+        <button
+          onClick={() => setShowUploadModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          <Upload className="w-4 h-4" />
+          Upload Document
+        </button>
       </div>
 
       <div className="space-y-6">
@@ -238,58 +227,17 @@ export default function PatientDocumentsPage() {
         </div>
       </div>
 
-      {/* Upload Modals */}
-      {showImageUpload && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Upload Teeth Images & X-rays</h3>
-                <button
-                  onClick={() => setShowImageUpload(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-              <TeethImageUpload
-                patientId={Number.parseInt(patientId)}
-                patientName={`${patient.first_name} ${patient.last_name}`}
-                onClose={() => {
-                  setShowImageUpload(false)
-                  fetchData()
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDocumentUpload && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Upload Documents</h3>
-                <button
-                  onClick={() => setShowDocumentUpload(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-              <DocumentUpload
-                patientId={Number.parseInt(patientId)}
-                patientName={`${patient.first_name} ${patient.last_name}`}
-                onUploadSuccess={() => {
-                  setShowDocumentUpload(false)
-                  fetchData()
-                }}
-                onClose={() => setShowDocumentUpload(false)}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Upload Modal */}
+      {showUploadModal && patient && (
+        <UnifiedDocumentUpload
+          patientId={Number.parseInt(patientId)}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          onClose={() => setShowUploadModal(false)}
+          onUploadSuccess={() => {
+            setShowUploadModal(false)
+            fetchData()
+          }}
+        />
       )}
     </div>
   )

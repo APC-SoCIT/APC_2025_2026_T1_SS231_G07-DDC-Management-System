@@ -974,9 +974,18 @@ class DentalRecordViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = DentalRecord.objects.all()
+        
+        # If user is a patient, only show their own records
         if user.user_type == 'patient':
-            return DentalRecord.objects.filter(patient=user)
-        return DentalRecord.objects.all()
+            queryset = queryset.filter(patient=user)
+        # For staff/owner, allow filtering by patient query parameter
+        else:
+            patient_id = self.request.query_params.get('patient', None)
+            if patient_id is not None:
+                queryset = queryset.filter(patient_id=patient_id)
+        
+        return queryset
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -985,9 +994,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = Document.objects.all()
+        
+        # If user is a patient, only show their own documents
         if user.user_type == 'patient':
-            return Document.objects.filter(patient=user)
-        return Document.objects.all()
+            queryset = queryset.filter(patient=user)
+        # For staff/owner, allow filtering by patient query parameter
+        else:
+            patient_id = self.request.query_params.get('patient', None)
+            if patient_id is not None:
+                queryset = queryset.filter(patient_id=patient_id)
+        
+        return queryset
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
