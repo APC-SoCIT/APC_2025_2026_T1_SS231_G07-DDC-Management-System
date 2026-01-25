@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X } from "lucide-react"
 import { api } from "@/lib/api"
 
@@ -23,13 +23,50 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [emailError, setEmailError] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
+
+  // Reset form when modal closes or opens
+  useEffect(() => {
+    if (!isOpen) {
+      // Clear form data when modal closes
+      setFormData({
+        firstName: "",
+        lastName: "",
+        birthday: "",
+        email: "",
+        phone: "",
+        address: "",
+        password: "",
+      })
+      setError("")
+      setEmailError(false)
+      setShowSuccess(false)
+    }
+  }, [isOpen])
+
+  // Handle Escape key press to close modal
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscapeKey)
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscapeKey)
+    }
+  }, [isOpen, onClose])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setEmailError(false)
     setIsLoading(true)
-
-    console.log("[RegisterModal] Registration form data:", formData)
 
     try {
       const registrationData = {
@@ -44,10 +81,11 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         user_type: "patient",
       }
 
-      console.log("[RegisterModal] Sending registration data:", registrationData)
       const response = await api.register(registrationData)
-      console.log("[RegisterModal] Registration response:", response)
 
+      // Show success message
+      setShowSuccess(true)
+      
       // Reset form
       setFormData({
         firstName: "",
@@ -59,38 +97,26 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         password: "",
       })
       
-      // Close modal first
-      onClose()
-      
-      // Show success message
-      alert("Registration successful! Please login with your email and password.")
+      // Close modal after showing success for 2 seconds
+      setTimeout(() => {
+        onClose()
+      }, 2000)
       
     } catch (err: any) {
-      console.error("[RegisterModal] Registration error:", err)
-      
       // Parse error message
       let errorMessage = "Registration failed. Please try again."
       
       // Check if error has data property (from api.ts)
       const errorData = err.data || {}
-      console.error("[RegisterModal] Parsed error data:", errorData)
       
-      const errors = []
-      if (errorData.username) {
-        errors.push(errorData.username.join(", "))
-      }
-      if (errorData.email) {
-        errors.push(errorData.email.join(", "))
-      }
-      if (errorData.password) {
-        errors.push(errorData.password.join(", "))
-      }
-      if (errorData.detail) {
-        errors.push(errorData.detail)
-      }
-      
-      if (errors.length > 0) {
-        errorMessage = errors.join(". ")
+      // Check for email-related errors
+      if (errorData.email || errorData.username) {
+        errorMessage = "Email already registered. Please log in or use a different email."
+        setEmailError(true)
+      } else if (errorData.password) {
+        errorMessage = errorData.password.join(", ")
+      } else if (errorData.detail) {
+        errorMessage = errorData.detail
       } else if (err.message && err.message !== "Registration failed") {
         errorMessage = err.message
       }
@@ -105,6 +131,19 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      {showSuccess ? (
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-[var(--color-primary)] mb-2">Registration Successful!</h3>
+          <p className="text-[var(--color-text)]">You may now log in.</p>
+        </div>
+      ) : (
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
           <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Register as Patient</h2>
@@ -122,6 +161,8 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <input
                 type="text"
                 required
+                pattern="[A-Za-z\s]+"
+                title="Please enter letters only"
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
@@ -133,6 +174,8 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <input
                 type="text"
                 required
+                pattern="[A-Za-z\s]+"
+                title="Please enter letters only"
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
@@ -144,6 +187,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <input
                 type="date"
                 required
+                max={new Date().toISOString().split('T')[0]}
                 value={formData.birthday}
                 onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
                 className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
@@ -156,8 +200,16 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                 type="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value })
+                  setEmailError(false)
+                  setError("")
+                }}
+                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${
+                  emailError
+                    ? "border-red-500 bg-red-50 focus:ring-red-500"
+                    : "border-[var(--color-border)] focus:ring-[var(--color-primary)]"
+                }`}
               />
             </div>
 
@@ -166,10 +218,16 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <input
                 type="tel"
                 required
+                pattern="09[0-9]{9}"
+                title="Invalid contact number. Please enter a valid 11-digit mobile number."
+                maxLength={11}
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "")
+                  setFormData({ ...formData, phone: value })
+                }}
                 className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                placeholder="+63"
+                placeholder="09XXXXXXXXX"
               />
             </div>
           </div>
@@ -216,6 +274,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
           </div>
         </form>
       </div>
+      )}
     </div>
   )
 }
