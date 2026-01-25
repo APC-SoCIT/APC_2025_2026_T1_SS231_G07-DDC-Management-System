@@ -34,17 +34,13 @@ export const api = {
   },
 
   register: async (data: any) => {
-    console.log("[v0] Attempting registration to:", `${API_BASE_URL}/register/`)
-    console.log("[v0] Registration data:", data)
     const response = await fetch(`${API_BASE_URL}/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     })
-    console.log("[v0] Registration response status:", response.status)
     if (!response.ok) {
       const error = await response.json()
-      console.error("[v0] Registration error:", error)
       // Create a custom error object that preserves the error data
       const err: any = new Error("Registration failed")
       err.data = error
