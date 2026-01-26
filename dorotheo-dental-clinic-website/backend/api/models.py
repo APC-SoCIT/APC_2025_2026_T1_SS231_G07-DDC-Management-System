@@ -156,9 +156,12 @@ class Document(models.Model):
         ('xray', 'X-Ray'),
         ('scan', 'Tooth Scan'),
         ('report', 'Report'),
+        ('medical_certificate', 'Medical Certificate'),
+        ('note', 'Note'),
         ('other', 'Other'),
     )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
+    appointment = models.ForeignKey('Appointment', on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
     file = models.FileField(upload_to='documents/')
     title = models.CharField(max_length=200)

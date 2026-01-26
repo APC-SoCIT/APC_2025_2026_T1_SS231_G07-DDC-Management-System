@@ -66,6 +66,11 @@ class DentalRecordSerializer(serializers.ModelSerializer):
 
 class DocumentSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    appointment_id = serializers.IntegerField(source='appointment.id', read_only=True)
+    appointment_date = serializers.DateField(source='appointment.date', read_only=True)
+    appointment_time = serializers.TimeField(source='appointment.time', read_only=True)
+    service_name = serializers.CharField(source='appointment.service.name', read_only=True)
+    dentist_name = serializers.CharField(source='appointment.dentist.get_full_name', read_only=True)
 
     class Meta:
         model = Document
