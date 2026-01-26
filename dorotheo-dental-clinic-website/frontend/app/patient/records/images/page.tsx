@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Camera, Download } from "lucide-react"
+import { Camera, Download, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -21,20 +21,28 @@ export default function TeethImages() {
   const [latestImage, setLatestImage] = useState<TeethImage | null>(null)
   const [previousImages, setPreviousImages] = useState<TeethImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.id || !token) return
+      if (!user?.id || !token) {
+        console.log("Missing user or token", { userId: user?.id, hasToken: !!token })
+        return
+      }
 
       try {
         setIsLoading(true)
         
+        console.log("Fetching teeth images for patient:", user.id)
+        
         // Fetch latest teeth image
         const latest = await api.getLatestTeethImage(user.id, token)
+        console.log("Latest teeth image:", latest)
         setLatestImage(latest)
 
         // Fetch all patient teeth images
         const allImages = await api.getPatientTeethImages(user.id, token)
+        console.log("All teeth images:", allImages)
         setPreviousImages(allImages.filter((img: TeethImage) => !img.is_latest))
       } catch (error) {
         console.error("Error fetching teeth images:", error)
@@ -47,12 +55,29 @@ export default function TeethImages() {
   }, [user?.id, token])
 
   const handleDownloadImage = (imageUrl: string, filename: string) => {
-    const link = document.createElement('a')
-    link.href = imageUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+    fetch(imageUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      })
+      .catch(error => {
+        console.error('Download failed:', error)
+        // Fallback to direct link
+        const link = document.createElement('a')
+        link.href = imageUrl
+        link.download = filename
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      })
   }
 
   return (
@@ -76,14 +101,17 @@ export default function TeethImages() {
                   <h2 className="text-xl font-semibold text-gray-900">Current Image</h2>
                   <button 
                     onClick={() => handleDownloadImage(latestImage.image_url, `teeth-${latestImage.uploaded_at}.jpg`)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
                     Download
                   </button>
                 </div>
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="relative rounded-lg overflow-hidden mb-3 bg-gray-100">
+                  <div 
+                    className="relative rounded-lg overflow-hidden mb-3 bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setSelectedImage(latestImage)}
+                  >
                     <img 
                       src={latestImage.image_url} 
                       alt="Current teeth condition" 
@@ -118,7 +146,10 @@ export default function TeethImages() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {previousImages.map((image) => (
                     <div key={image.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
-                      <div className="relative rounded overflow-hidden mb-2 bg-gray-100">
+                      <div 
+                        className="relative rounded overflow-hidden mb-2 bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setSelectedImage(image)}
+                      >
                         <img 
                           src={image.image_url} 
                           alt={`Teeth from ${new Date(image.uploaded_at).toLocaleDateString()}`} 
@@ -138,7 +169,7 @@ export default function TeethImages() {
                       )}
                       <button
                         onClick={() => handleDownloadImage(image.image_url, `teeth-${image.uploaded_at}.jpg`)}
-                        className="w-full flex items-center justify-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                        className="w-full flex items-center justify-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                       >
                         <Download className="w-3 h-3" />
                         Download
@@ -157,6 +188,65 @@ export default function TeethImages() {
           </div>
         )}
       </div>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div 
+            className="relative max-w-5xl w-full bg-white rounded-xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-4 right-4 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-700" />
+            </button>
+
+            <div className="p-6">
+              <div className="mb-4">
+                <img 
+                  src={selectedImage.image_url} 
+                  alt="Teeth image" 
+                  className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">
+                      <strong>Uploaded:</strong> {new Date(selectedImage.uploaded_at).toLocaleDateString()}
+                    </p>
+                    {selectedImage.uploaded_by_name && (
+                      <p className="text-sm text-gray-500">
+                        <strong>Uploaded by:</strong> Dr. {selectedImage.uploaded_by_name}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDownloadImage(selectedImage.image_url, `teeth-${selectedImage.uploaded_at}.jpg`)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                </div>
+
+                {selectedImage.notes && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 mb-1">Notes:</p>
+                    <p className="text-sm text-gray-600">{selectedImage.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

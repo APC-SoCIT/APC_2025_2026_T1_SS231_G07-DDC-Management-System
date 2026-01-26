@@ -2,21 +2,50 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, User, Calendar, FileText, CreditCard, LogOut, Menu, X, ChevronDown, ChevronRight, Camera, FolderOpen, Activity } from "lucide-react"
 import { useAuth } from "@/lib/auth"
+import { api } from "@/lib/api"
 import ChatbotWidget from "@/components/chatbot-widget"
 import NotificationBell from "@/components/notification-bell"
 
 export default function PatientLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname()
   const router = useRouter()
-  const { logout, user } = useAuth()
+  const { logout, user, token } = useAuth()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isDentalRecordsOpen, setIsDentalRecordsOpen] = useState(false)
+  const [hasDocuments, setHasDocuments] = useState(false)
+  const [hasImages, setHasImages] = useState(false)
+  const [hasTreatmentHistory, setHasTreatmentHistory] = useState(false)
+
+  // Check if user has data in each section
+  useEffect(() => {
+    const checkDataAvailability = async () => {
+      if (!user?.id || !token) return
+
+      try {
+        // Check for documents
+        const docs = await api.getDocuments(user.id, token)
+        setHasDocuments(docs && docs.length > 0)
+
+        // Check for images
+        const images = await api.getPatientTeethImages(user.id, token)
+        setHasImages(images && images.length > 0)
+
+        // Check for treatment history (dental records)
+        const records = await api.getDentalRecords(user.id, token)
+        setHasTreatmentHistory(records && records.length > 0)
+      } catch (error) {
+        console.error("Error checking data availability:", error)
+      }
+    }
+
+    checkDataAvailability()
+  }, [user?.id, token])
 
   const navigation = [
     { name: "Overview", href: "/patient/dashboard", icon: LayoutDashboard },
@@ -24,9 +53,9 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
   ]
 
   const dentalRecordsSubItems = [
-    { name: "Treatment History", href: "/patient/records/treatment", icon: Activity },
-    { name: "Documents", href: "/patient/records/documents", icon: FolderOpen },
-    { name: "Teeth & X-Ray Images", href: "/patient/records/images", icon: Camera },
+    { name: "Treatment History", href: "/patient/records/treatment", icon: Activity, hasData: hasTreatmentHistory },
+    { name: "Documents", href: "/patient/records/documents", icon: FolderOpen, hasData: hasDocuments },
+    { name: "Teeth & X-Ray Images", href: "/patient/records/images", icon: Camera, hasData: hasImages },
   ]
 
   const handleLogout = () => {
@@ -141,7 +170,7 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
             <div>
               <button
                 onClick={() => setIsDentalRecordsOpen(!isDentalRecordsOpen)}
-                className={`flex items-center justify-between gap-3 px-4 py-3 w-full rounded-lg transition-colors ${
+                className={`flex items-center justify-between gap-3 px-4 py-3 w-full rounded-lg transition-colors cursor-pointer ${
                   pathname.startsWith("/patient/records")
                     ? "bg-[var(--color-primary)] text-white"
                     : "text-[var(--color-text)] hover:bg-[var(--color-background)]"
@@ -168,10 +197,12 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
                         key={subItem.name}
                         href={subItem.href}
                         onClick={() => setIsSidebarOpen(false)}
-                        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
                           isActive
                             ? "bg-[var(--color-accent)] text-white"
-                            : "text-[var(--color-text-muted)] hover:bg-[var(--color-background)]"
+                            : subItem.hasData
+                            ? "text-[var(--color-text)] hover:bg-[var(--color-background)] hover:text-[var(--color-primary)]"
+                            : "text-[var(--color-text-muted)] hover:bg-[var(--color-background)] hover:text-[var(--color-primary)]"
                         }`}
                       >
                         <subItem.icon className="w-4 h-4" />

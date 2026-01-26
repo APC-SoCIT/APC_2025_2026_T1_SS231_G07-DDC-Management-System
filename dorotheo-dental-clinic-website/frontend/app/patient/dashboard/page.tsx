@@ -28,11 +28,16 @@ export default function PatientDashboard() {
         setIsLoading(true)
         const data = await api.getAppointments(token)
         
-        // Filter upcoming appointments (today or future, not cancelled)
+        // Filter upcoming appointments (today or future, not cancelled/completed/missed)
         const todayDate = new Date()
         const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`
         const upcoming = data
-          .filter((apt: Appointment) => apt.date >= today && apt.status !== 'cancelled')
+          .filter((apt: Appointment) => {
+            // Only show confirmed appointments that are today or in the future
+            const isUpcoming = apt.date >= today
+            const isActiveStatus = apt.status === 'confirmed' || apt.status === 'pending'
+            return isUpcoming && isActiveStatus
+          })
           .sort((a: Appointment, b: Appointment) => {
             const dateCompare = a.date.localeCompare(b.date)
             if (dateCompare !== 0) return dateCompare

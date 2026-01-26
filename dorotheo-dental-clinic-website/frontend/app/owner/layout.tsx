@@ -130,7 +130,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
 
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {navigation.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link
                   key={item.name}

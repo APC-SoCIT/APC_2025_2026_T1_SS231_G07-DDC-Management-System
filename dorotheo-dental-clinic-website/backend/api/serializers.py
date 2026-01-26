@@ -125,11 +125,16 @@ class TeethImageSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source=PATIENT_FULL_NAME, read_only=True)
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
     image_url = serializers.SerializerMethodField()
+    appointment = serializers.PrimaryKeyRelatedField(
+        queryset=Appointment.objects.all(),
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = TeethImage
         fields = ['id', 'patient', 'patient_name', 'image', 'image_url', 'notes', 
-                  'uploaded_by', 'uploaded_by_name', 'is_latest', 'uploaded_at']
+                  'uploaded_by', 'uploaded_by_name', 'is_latest', 'uploaded_at', 'appointment']
         read_only_fields = ['uploaded_at']
 
     def get_image_url(self, obj):
@@ -139,6 +144,13 @@ class TeethImageSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.image.url)
             return obj.image.url
         return None
+
+    def to_representation(self, instance):
+        """Return appointment as integer ID in responses"""
+        data = super().to_representation(instance)
+        if instance.appointment:
+            data['appointment'] = instance.appointment.id
+        return data
 
 
 class StaffAvailabilitySerializer(serializers.ModelSerializer):

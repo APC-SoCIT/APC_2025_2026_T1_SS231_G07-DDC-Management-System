@@ -18,6 +18,8 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import ConfirmationModal from "@/components/confirmation-modal"
+import AppointmentSuccessModal from "@/components/appointment-success-modal"
 
 interface Appointment {
   id: number
@@ -96,18 +98,37 @@ export default function OwnerAppointments() {
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([]) 
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
-
-  // Generate time slots based on service duration from 10:00 AM to 8:00 PM
-  const generateTimeSlots = (durationMinutes: number = 30) => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    title: string
+    message: string
+    onConfirm: () => void
+    variant?: "danger" | "warning" | "info" | "success"
+  } | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
+  const generateTimeSlots = (durationMinutes: number = 30, selectedDate?: string) => {
     const slots: { value: string; display: string }[] = []
     const startHour = 10 // 10:00 AM
     const endHour = 20 // 8:00 PM
     const startMinutes = startHour * 60 // Convert to minutes
     const endMinutes = endHour * 60
     
+    // Check if selected date is today
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const selectedDateObj = selectedDate ? new Date(selectedDate) : null
+    const isToday = selectedDateObj && selectedDateObj.getTime() === today.getTime()
+    const currentTimeInMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : 0
+    
     for (let totalMinutes = startMinutes; totalMinutes < endMinutes; totalMinutes += durationMinutes) {
       const hour = Math.floor(totalMinutes / 60)
       const minute = totalMinutes % 60
+      
+      // Skip past times if selected date is today
+      if (isToday && totalMinutes <= currentTimeInMinutes) {
+        continue
+      }
       
       const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
       
@@ -343,7 +364,22 @@ export default function OwnerAppointments() {
 
       const createdAppointment = await api.createAppointment(appointmentData, token)
       setAppointments([createdAppointment, ...appointments])
+      
+      // Prepare success modal details
+      const patient = patients.find(p => p.id === selectedPatientId)
+      const service = services.find(s => s.id === Number.parseInt(newAppointment.service))
+      const dentist = staff.find(s => s.id === Number.parseInt(newAppointment.dentist))
+      
+      setSuccessAppointmentDetails({
+        patientName: patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown Patient',
+        date: newAppointment.date,
+        time: newAppointment.time,
+        service: service?.name,
+        dentist: dentist ? `Dr. ${dentist.first_name} ${dentist.last_name}` : undefined
+      })
+      
       setShowAddModal(false)
+      setShowSuccessModal(true)
       setSelectedPatientId(null)
       setNewAppointment({
         patient: "",
@@ -355,7 +391,6 @@ export default function OwnerAppointments() {
       })
       setSelectedDate(undefined)
       setBookedSlots([])
-      alert("Appointment created successfully!")
     } catch (error: any) {
       console.error("Error creating appointment:", error)
       // Check if it's a double booking error from backend
@@ -468,76 +503,89 @@ export default function OwnerAppointments() {
   const handleMarkComplete = async (appointment: Appointment) => {
     if (!token) return
     
-    if (!confirm("Mark this appointment as completed?")) return
-    
-    try {
-      await api.updateAppointment(appointment.id, { status: "completed" }, token)
-      // Update the appointment status in the list
-      setAppointments(appointments.map(apt => 
-        apt.id === appointment.id ? { ...apt, status: "completed" as const } : apt
-      ))
-      alert("Appointment marked as completed!")
-    } catch (error) {
-      console.error("Error marking appointment as complete:", error)
-      alert("Failed to mark appointment as complete.")
-    }
+    setConfirmModalConfig({
+      title: "Mark as Completed?",
+      message: "Are you sure you want to mark this appointment as completed?",
+      variant: "success",
+      onConfirm: async () => {
+        try {
+          await api.updateAppointment(appointment.id, { status: "completed" }, token)
+          setAppointments(appointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, status: "completed" as const } : apt
+          ))
+        } catch (error) {
+          console.error("Error marking appointment as complete:", error)
+          alert("Failed to mark appointment as complete.")
+        }
+      }
+    })
+    setShowConfirmModal(true)
   }
 
   const handleMarkMissed = async (appointment: Appointment) => {
     if (!token) return
     
-    if (!confirm("Mark this appointment as missed?")) return
-    
-    try {
-      await api.markAppointmentMissed(appointment.id, token)
-      // Update the appointment status in the list
-      setAppointments(appointments.map(apt => 
-        apt.id === appointment.id ? { ...apt, status: "missed" as const } : apt
-      ))
-      alert("Appointment marked as missed.")
-    } catch (error) {
-      console.error("Error marking appointment as missed:", error)
-      alert("Failed to mark appointment as missed.")
-    }
+    setConfirmModalConfig({
+      title: "Mark as Missed?",
+      message: "Are you sure you want to mark this appointment as missed?",
+      variant: "warning",
+      onConfirm: async () => {
+        try {
+          await api.markAppointmentMissed(appointment.id, token)
+          setAppointments(appointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, status: "missed" as const } : apt
+          ))
+        } catch (error) {
+          console.error("Error marking appointment as missed:", error)
+          alert("Failed to mark appointment as missed.")
+        }
+      }
+    })
+    setShowConfirmModal(true)
   }
 
   const handleCancelAppointment = async (appointment: Appointment) => {
     if (!token) return
     
-    const reason = prompt("Please provide a reason for cancellation (optional):", "")
-    if (reason === null) return // User cancelled
-    
-    if (!confirm("Are you sure you want to cancel this appointment?")) return
-    
-    try {
-      await api.updateAppointment(appointment.id, { status: "cancelled" }, token)
-      // Update the appointment status in the list
-      setAppointments(appointments.map(apt => 
-        apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
-      ))
-      alert("Appointment cancelled successfully.")
-    } catch (error) {
-      console.error("Error cancelling appointment:", error)
-      alert("Failed to cancel appointment.")
-    }
+    setConfirmModalConfig({
+      title: "Cancel Appointment?",
+      message: "Are you sure you want to cancel this appointment?",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await api.updateAppointment(appointment.id, { status: "cancelled" }, token)
+          setAppointments(appointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
+          ))
+        } catch (error) {
+          console.error("Error cancelling appointment:", error)
+          alert("Failed to cancel appointment.")
+        }
+      }
+    })
+    setShowConfirmModal(true)
   }
 
   const handleApprove = async (appointmentId: number) => {
     if (!token) return
     
-    if (!confirm("Approve this appointment?")) return
-    
-    try {
-      await api.updateAppointment(appointmentId, { status: "confirmed" }, token)
-      // Update the appointment status in the list
-      setAppointments(appointments.map(apt => 
-        apt.id === appointmentId ? { ...apt, status: "confirmed" as const } : apt
-      ))
-      alert("Appointment approved successfully!")
-    } catch (error) {
-      console.error("Error approving appointment:", error)
-      alert("Failed to approve appointment.")
-    }
+    setConfirmModalConfig({
+      title: "Approve Appointment?",
+      message: "Are you sure you want to approve this appointment?",
+      variant: "success",
+      onConfirm: async () => {
+        try {
+          await api.updateAppointment(appointmentId, { status: "confirmed" }, token)
+          setAppointments(appointments.map(apt => 
+            apt.id === appointmentId ? { ...apt, status: "confirmed" as const } : apt
+          ))
+        } catch (error) {
+          console.error("Error approving appointment:", error)
+          alert("Failed to approve appointment.")
+        }
+      }
+    })
+    setShowConfirmModal(true)
   }
 
   const handleRowClick = (appointmentId: number) => {
@@ -1318,7 +1366,7 @@ export default function OwnerAppointments() {
                     {(() => {
                       const selectedService = services.find(s => s.id === Number(newAppointment.service))
                       const duration = selectedService?.duration || 30
-                      return generateTimeSlots(duration).map((slot) => {
+                      return generateTimeSlots(duration, newAppointment.date).map((slot) => {
                         const isBooked = isTimeSlotBooked(newAppointment.date, slot.value, duration)
                         const isSelected = newAppointment.time === slot.value
                         return (
@@ -1405,6 +1453,30 @@ export default function OwnerAppointments() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmModalConfig && (
+        <ConfirmationModal
+          isOpen={showConfirmModal}
+          onClose={() => {
+            setShowConfirmModal(false)
+            setConfirmModalConfig(null)
+          }}
+          onConfirm={confirmModalConfig.onConfirm}
+          title={confirmModalConfig.title}
+          message={confirmModalConfig.message}
+          variant={confirmModalConfig.variant}
+        />
+      )}
+
+      {/* Success Modal */}
+      {successAppointmentDetails && (
+        <AppointmentSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          appointmentDetails={successAppointmentDetails}
+        />
       )}
     </div>
   )
