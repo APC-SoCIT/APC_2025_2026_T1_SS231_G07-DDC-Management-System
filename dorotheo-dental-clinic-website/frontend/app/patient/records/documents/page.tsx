@@ -45,10 +45,6 @@ export default function Documents() {
       }
     }
 
-        case 'medical_certificate':
-          return 'Medical Certificate'
-        case 'dental_image':
-          return 'Dental Image'
     fetchData()
   }, [user?.id, token])
 
@@ -64,37 +60,35 @@ export default function Documents() {
 
   const getDocumentTypeLabel = (type: string) => {
     switch (type) {
-        case 'medical_certificate':
-          return 'bg-orange-100 text-orange-700'
-        case 'dental_image':
-          return 'bg-teal-100 text-teal-700'
       case 'xray':
         return 'X-Ray'
       case 'scan':
         return 'Scan'
       case 'report':
         return 'Report'
-
-    const formatAppointmentDateTime = (date?: string | null, time?: string | null) => {
-      if (!date) return null
-      const dtString = time ? `${date}T${time}` : date
-      const dt = new Date(dtString)
-      if (Number.isNaN(dt.getTime())) return null
-      return dt.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    }
       case 'medical_certificate':
         return 'Medical Certificate'
+      case 'dental_image':
+        return 'Dental Image'
       case 'note':
         return 'Note'
       default:
         return 'Document'
     }
+  }
+
+  const formatAppointmentDateTime = (date?: string | null, time?: string | null) => {
+    if (!date) return null
+    const dtString = time ? `${date}T${time}` : date
+    const dt = new Date(dtString)
+    if (Number.isNaN(dt.getTime())) return null
+    return dt.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
   }
 
   const getDocumentTypeColor = (type: string) => {
@@ -107,6 +101,8 @@ export default function Documents() {
         return 'bg-green-100 text-green-700'
       case 'medical_certificate':
         return 'bg-orange-100 text-orange-700'
+      case 'dental_image':
+        return 'bg-teal-100 text-teal-700'
       case 'note':
         return 'bg-yellow-100 text-yellow-700'
       default:

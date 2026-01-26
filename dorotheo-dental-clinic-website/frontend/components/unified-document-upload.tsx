@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Upload, AlertCircle } from "lucide-react"
+import { X, Upload, AlertCircle, Activity, Scan, FileText, FileHeart, StickyNote, Image } from "lucide-react"
 import { api } from "@/lib/api"
 
 interface Appointment {
@@ -19,7 +19,7 @@ interface UnifiedDocumentUploadProps {
   onUploadSuccess: () => void
 }
 
-type DocumentType = 'xray' | 'scan' | 'report' | 'medical_certificate' | 'note'
+type DocumentType = 'xray' | 'scan' | 'report' | 'medical_certificate' | 'note' | 'picture'
 
 export default function UnifiedDocumentUpload({
   patientId,
@@ -68,11 +68,12 @@ export default function UnifiedDocumentUpload({
   }, [token, patientId])
 
   const documentTypeConfig = {
-    xray: { label: 'X-Ray', color: 'bg-blue-100 text-blue-900' },
-    scan: { label: 'Dental Scan', color: 'bg-green-100 text-green-900' },
-    report: { label: 'Report', color: 'bg-yellow-100 text-yellow-900' },
-    medical_certificate: { label: 'Medical Certificate', color: 'bg-red-100 text-red-900' },
-    note: { label: 'Notes (PDF)', color: 'bg-purple-100 text-purple-900' },
+    xray: { label: 'X-Ray', color: 'bg-blue-100 text-blue-900', icon: Activity },
+    scan: { label: 'Dental Scan', color: 'bg-green-100 text-green-900', icon: Scan },
+    picture: { label: 'Dental Pictures', color: 'bg-teal-100 text-teal-900', icon: Image },
+    report: { label: 'Report', color: 'bg-yellow-100 text-yellow-900', icon: FileText },
+    medical_certificate: { label: 'Medical Certificate', color: 'bg-red-100 text-red-900', icon: FileHeart },
+    note: { label: 'Notes (PDF)', color: 'bg-purple-100 text-purple-900', icon: StickyNote },
   }
 
   const handleAppointmentSelect = (appointmentId: number) => {
@@ -110,7 +111,7 @@ export default function UnifiedDocumentUpload({
       return
     }
 
-    if (selectedType !== 'xray' && selectedType !== 'scan' && !title) {
+    if (selectedType !== 'xray' && selectedType !== 'scan' && selectedType !== 'picture' && !title) {
       setError('Please enter a title for this document')
       return
     }
@@ -119,7 +120,7 @@ export default function UnifiedDocumentUpload({
     setError('')
 
     try {
-      if (selectedType === 'xray' || selectedType === 'scan') {
+      if (selectedType === 'xray' || selectedType === 'scan' || selectedType === 'picture') {
         // Upload as teeth image
         await api.uploadTeethImage(
           patientId,
@@ -216,24 +217,6 @@ export default function UnifiedDocumentUpload({
                   </select>
                 )}
               </div>
-              
-              {appointments.length > 0 && (
-                <div className="flex justify-end gap-3 pt-4">
-                  <button
-                    onClick={onClose}
-                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => selectedAppointment && setStep('type')}
-                    disabled={!selectedAppointment}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -242,15 +225,19 @@ export default function UnifiedDocumentUpload({
               <p className="text-gray-600 mb-4">Select document type:</p>
               <div className="grid grid-cols-2 gap-3">
                 {(Object.entries(documentTypeConfig) as Array<[DocumentType, any]>).map(
-                  ([type, config]) => (
-                    <button
-                      key={type}
-                      onClick={() => handleTypeSelect(type)}
-                      className={`p-4 rounded-lg border-2 hover:border-blue-500 transition-all ${config.color}`}
-                    >
-                      <p className="font-medium">{config.label}</p>
-                    </button>
-                  )
+                  ([type, config]) => {
+                    const Icon = config.icon
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => handleTypeSelect(type)}
+                        className={`p-4 rounded-lg border-2 hover:border-blue-500 transition-all ${config.color} flex flex-col items-center gap-2`}
+                      >
+                        <Icon className="w-8 h-8" />
+                        <p className="font-medium">{config.label}</p>
+                      </button>
+                    )
+                  }
                 )}
               </div>
             </div>
@@ -316,7 +303,7 @@ export default function UnifiedDocumentUpload({
                     type="file"
                     onChange={handleFileChange}
                     accept={
-                      selectedType === 'xray' || selectedType === 'scan'
+                      selectedType === 'xray' || selectedType === 'scan' || selectedType === 'picture'
                         ? 'image/*'
                         : '.pdf,application/pdf'
                     }
@@ -329,7 +316,7 @@ export default function UnifiedDocumentUpload({
                       {file ? file.name : 'Click to upload or drag and drop'}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {selectedType === 'xray' || selectedType === 'scan'
+                      {selectedType === 'xray' || selectedType === 'scan' || selectedType === 'picture'
                         ? 'PNG, JPG, GIF, JPEG'
                         : 'PDF files only'}
                     </p>
@@ -350,7 +337,11 @@ export default function UnifiedDocumentUpload({
           </button>
           <button
             onClick={
-              step === 'appointment' ? undefined : step === 'type' ? undefined : handleUpload
+              step === 'appointment' 
+                ? () => selectedAppointment && setStep('type')
+                : step === 'type' 
+                ? undefined 
+                : handleUpload
             }
             disabled={
               (step === 'appointment' && !selectedAppointment) ||

@@ -262,6 +262,7 @@ class TeethImage(models.Model):
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_teeth_images')
     is_latest = models.BooleanField(default=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    appointment = models.ForeignKey('Appointment', on_delete=models.SET_NULL, null=True, blank=True, related_name='teeth_images')
 
     class Meta:
         ordering = ['-uploaded_at']

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar as CalendarIcon, Clock, User, Plus, X, Edit, XCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, User, Plus, X, Edit, XCircle, ChevronDown, ChevronUp, FileText, Camera, Download } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -29,6 +29,21 @@ interface Appointment {
   cancel_reason: string
   created_at: string
   updated_at: string
+}
+
+interface Document {
+  id: number
+  title: string
+  document_type: string
+  file_url: string
+  uploaded_at: string
+}
+
+interface TeethImage {
+  id: number
+  image_url: string
+  uploaded_at: string
+  notes: string
 }
 
 interface Staff {
@@ -60,6 +75,10 @@ export default function PatientAppointments() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [expandedAppointmentId, setExpandedAppointmentId] = useState<number | null>(null)
+  const [appointmentDocuments, setAppointmentDocuments] = useState<Record<number, Document[]>>({})
+  const [appointmentImages, setAppointmentImages] = useState<Record<number, TeethImage[]>>({})
+  const [loadingFiles, setLoadingFiles] = useState<Record<number, boolean>>({})
   const [newAppointment, setNewAppointment] = useState({
     date: "",
     time: "",
@@ -111,6 +130,11 @@ export default function PatientAppointments() {
     const startMinutes = startHour * 60 + startMinute
     const endMinutes = endHour * 60 + endMinute
 
+    // Check if selected date is today
+    const today = new Date()
+    const isToday = newAppointment.date === today.toISOString().split('T')[0]
+    const currentMinutes = isToday ? today.getHours() * 60 + today.getMinutes() : -1
+
     // Generate slots with the specified duration interval
     for (let totalMinutes = startMinutes; totalMinutes < endMinutes; totalMinutes += durationMinutes) {
       const hour = Math.floor(totalMinutes / 60)
@@ -118,6 +142,11 @@ export default function PatientAppointments() {
       
       // Skip lunch break (11:30 AM - 12:30 PM)
       if ((hour === 11 && minute === 30) || (hour === 12 && minute === 0)) {
+        continue
+      }
+
+      // Skip time slots that have already passed today
+      if (isToday && totalMinutes <= currentMinutes) {
         continue
       }
       
@@ -194,11 +223,20 @@ export default function PatientAppointments() {
     let currentMinute = startMinute
 
     // Add first time slot
+    // Check if selected date is today
+    const today = new Date()
+    const isToday = rescheduleData.date === today.toISOString().split('T')[0]
+    const currentMinutes = isToday ? today.getHours() * 60 + today.getMinutes() : -1
+
     const firstTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
     const firstHour12 = currentHour > 12 ? currentHour - 12 : currentHour === 0 ? 12 : currentHour
     const firstAmpm = currentHour >= 12 ? 'PM' : 'AM'
     const firstDisplayStr = `${firstHour12}:${currentMinute.toString().padStart(2, '0')} ${firstAmpm}`
-    slots.push({ value: firstTimeStr, display: firstDisplayStr })
+    
+    const firstTotalMinutes = currentHour * 60 + currentMinute
+    if (!isToday || firstTotalMinutes > currentMinutes) {
+      slots.push({ value: firstTimeStr, display: firstDisplayStr })
+    }
 
     // Generate 30-minute interval slots, skipping 11:30 AM - 12:30 PM (lunch)
     while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
@@ -217,6 +255,12 @@ export default function PatientAppointments() {
       // Don't go beyond end time
       if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
         break
+      }
+
+      // Skip time slots that have already passed today
+      const totalMinutes = currentHour * 60 + currentMinute
+      if (isToday && totalMinutes <= currentMinutes) {
+        continue
       }
 
       const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
@@ -648,6 +692,74 @@ export default function PatientAppointments() {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  // Function to toggle appointment expansion and load files
+  const toggleAppointmentExpansion = async (appointmentId: number) => {
+    if (expandedAppointmentId === appointmentId) {
+      setExpandedAppointmentId(null)
+      return
+    }
+
+    setExpandedAppointmentId(appointmentId)
+    setLoadingFiles({ ...loadingFiles, [appointmentId]: true })
+
+    try {
+      if (!user?.id || !token) return
+
+      // Always fetch fresh data when expanding
+      const allDocs = await api.getDocuments(user.id, token)
+      console.log('[APPOINTMENT FILES] All documents:', allDocs)
+      console.log('[APPOINTMENT FILES] Looking for appointment ID:', appointmentId)
+      
+      const aptDocs = allDocs.filter((doc: any) => {
+        console.log('[APPOINTMENT FILES] Document appointment:', doc.appointment, 'Target:', appointmentId)
+        return doc.appointment === appointmentId
+      })
+      console.log('[APPOINTMENT FILES] Filtered documents for appointment:', aptDocs)
+      
+      // Fetch images for this appointment
+      const allImages = await api.getPatientTeethImages(user.id, token)
+      console.log('[APPOINTMENT FILES] All images:', allImages)
+      
+      const aptImages = allImages.filter((img: any) => {
+        console.log('[APPOINTMENT FILES] Image appointment:', img.appointment, 'Target:', appointmentId)
+        return img.appointment === appointmentId
+      })
+      console.log('[APPOINTMENT FILES] Filtered images for appointment:', aptImages)
+
+      setAppointmentDocuments({ ...appointmentDocuments, [appointmentId]: aptDocs })
+      setAppointmentImages({ ...appointmentImages, [appointmentId]: aptImages })
+    } catch (error) {
+      console.error("Error loading appointment files:", error)
+    } finally {
+      setLoadingFiles({ ...loadingFiles, [appointmentId]: false })
+    }
+  }
+
+  const handleDownloadFile = (fileUrl: string, filename: string) => {
+    fetch(fileUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      })
+      .catch(error => {
+        console.error('Download failed:', error)
+        const link = document.createElement('a')
+        link.href = fileUrl
+        link.download = filename
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      })
+  }
+
   // Separate appointments into upcoming and past
   const now = new Date()
   console.log("Current time:", now)
@@ -771,20 +883,32 @@ export default function PatientAppointments() {
           </div>
         ) : (
           appointments.map((appointment) => (
-            <div key={appointment.id} className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-xl font-semibold text-[var(--color-text)]">
-                      {appointment.service_name || "General Consultation"}
-                    </h3>
-                    {/* Only show status badge for non-confirmed appointments */}
-                    {appointment.status !== "confirmed" && (
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                        {formatStatus(appointment.status)}
-                      </span>
-                    )}
-                  </div>
+            <div key={appointment.id} className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+              {/* Main appointment card - clickable */}
+              <div 
+                className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => toggleAppointmentExpansion(appointment.id)}
+              >
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-xl font-semibold text-[var(--color-text)]">
+                        {appointment.service_name || "General Consultation"}
+                      </h3>
+                      {/* Only show status badge for non-confirmed appointments */}
+                      {appointment.status !== "confirmed" && (
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                          {formatStatus(appointment.status)}
+                        </span>
+                      )}
+                      <button className="ml-auto text-gray-500">
+                        {expandedAppointmentId === appointment.id ? (
+                          <ChevronUp className="w-5 h-5" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
@@ -833,9 +957,9 @@ export default function PatientAppointments() {
                   )}
                 </div>
                 
-                {/* Action buttons for confirmed and missed appointments */}
+                {/* Action buttons for confirmed and missed appointments - prevent click propagation */}
                 {appointment.status === "confirmed" && activeTab === "upcoming" && (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleRequestReschedule(appointment)}
                       className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
@@ -858,7 +982,7 @@ export default function PatientAppointments() {
 
                 {/* Reschedule button for missed appointments */}
                 {appointment.status === "missed" && (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleRequestReschedule(appointment)}
                       className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
@@ -875,14 +999,90 @@ export default function PatientAppointments() {
                     Reschedule pending approval...
                   </div>
                 )}
-
-                {/* Info for cancel requested appointments */}
-                {appointment.status === "cancel_requested" && (
-                  <div className="text-sm text-red-600 font-medium">
-                    Cancellation pending approval...
-                  </div>
-                )}
               </div>
+              </div>
+
+              {/* Expanded section with documents and images */}
+              {expandedAppointmentId === appointment.id && (
+                <div className="px-6 pb-6 border-t border-[var(--color-border)] bg-gray-50">
+                  <div className="pt-4 space-y-4">
+                    <h4 className="font-semibold text-[var(--color-text)] mb-3">Appointment Records</h4>
+                    
+                    {loadingFiles[appointment.id] ? (
+                      <p className="text-sm text-[var(--color-text-muted)]">Loading files...</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Documents */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="w-4 h-4 text-[var(--color-primary)]" />
+                            <h5 className="font-medium text-sm">Documents</h5>
+                          </div>
+                          {appointmentDocuments[appointment.id]?.length > 0 ? (
+                            <div className="space-y-2">
+                              {appointmentDocuments[appointment.id].map((doc) => (
+                                <div key={doc.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-[var(--color-border)]">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-[var(--color-text)]">{doc.title}</p>
+                                    <p className="text-xs text-[var(--color-text-muted)]">
+                                      {new Date(doc.uploaded_at).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDownloadFile(doc.file_url, doc.title)}
+                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                  >
+                                    <Download className="w-4 h-4 text-[var(--color-primary)]" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-[var(--color-text-muted)] italic">No documents uploaded</p>
+                          )}
+                        </div>
+
+                        {/* Images */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Camera className="w-4 h-4 text-[var(--color-primary)]" />
+                            <h5 className="font-medium text-sm">Images</h5>
+                          </div>
+                          {appointmentImages[appointment.id]?.length > 0 ? (
+                            <div className="space-y-2">
+                              {appointmentImages[appointment.id].map((img) => (
+                                <div key={img.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-[var(--color-border)]">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <img 
+                                      src={img.image_url} 
+                                      alt="Dental" 
+                                      className="w-12 h-12 object-cover rounded"
+                                    />
+                                    <div>
+                                      <p className="text-sm font-medium text-[var(--color-text)]">Dental Image</p>
+                                      <p className="text-xs text-[var(--color-text-muted)]">
+                                        {new Date(img.uploaded_at).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDownloadFile(img.image_url, `dental-image-${img.id}.jpg`)}
+                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                  >
+                                    <Download className="w-4 h-4 text-[var(--color-primary)]" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-[var(--color-text-muted)] italic">No images uploaded</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}

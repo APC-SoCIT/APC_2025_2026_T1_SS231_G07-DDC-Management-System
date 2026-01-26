@@ -233,10 +233,15 @@ export default function PatientDetailPage() {
         </div>
         <div className="p-8">
           {(() => {
+            const now = new Date()
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            
             const upcoming = appointments.filter((apt) => {
+              const appointmentDate = new Date(apt.date)
               const appointmentDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`)
-              const now = new Date()
-              return appointmentDateTime > now && 
+              
+              // Show if appointment date is today or in the future, and status is not completed/cancelled/missed
+              return (appointmentDate >= today || appointmentDateTime > now) && 
                      apt.status !== "completed" && 
                      apt.status !== "cancelled" && 
                      apt.status !== "missed"
