@@ -158,14 +158,17 @@ class Document(models.Model):
         ('report', 'Report'),
         ('medical_certificate', 'Medical Certificate'),
         ('note', 'Note'),
+        ('dental_image', 'Dental Image'),
         ('other', 'Other'),
     )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
-    appointment = models.ForeignKey('Appointment', on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
     file = models.FileField(upload_to='documents/')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    appointment = models.ForeignKey(
+        'Appointment', on_delete=models.SET_NULL, null=True, blank=True, related_name='documents'
+    )
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_documents')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
