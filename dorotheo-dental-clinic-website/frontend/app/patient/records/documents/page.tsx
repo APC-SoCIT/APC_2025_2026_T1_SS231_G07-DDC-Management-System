@@ -16,6 +16,11 @@ interface Document {
   uploaded_by: number
   uploaded_by_name?: string
   uploaded_at: string
+  appointment_id?: number
+  appointment_date?: string
+  appointment_time?: string
+  service_name?: string
+  dentist_name?: string
 }
 
 export default function Documents() {
@@ -155,6 +160,20 @@ export default function Documents() {
                   <Calendar className="w-3 h-3" />
                   <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
                 </div>
+
+                {(doc.appointment_date || doc.service_name || doc.dentist_name) && (
+                  <div className="mt-2 space-y-1 text-xs text-gray-600 bg-gray-50 rounded-lg p-2">
+                    {doc.appointment_date && (
+                      <p><strong>Date:</strong> {new Date(doc.appointment_date).toLocaleDateString()} {doc.appointment_time ? `at ${doc.appointment_time}` : ''}</p>
+                    )}
+                    {doc.service_name && (
+                      <p><strong>Service:</strong> {doc.service_name}</p>
+                    )}
+                    {doc.dentist_name && (
+                      <p><strong>Dentist:</strong> {doc.dentist_name}</p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -177,6 +196,20 @@ export default function Documents() {
                 {selectedDocument.description && (
                   <p className="text-sm text-gray-600">{selectedDocument.description}</p>
                 )}
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-600">
+                    <span className={`px-2 py-1 rounded-full ${getDocumentTypeColor(selectedDocument.document_type)}`}>
+                      {getDocumentTypeLabel(selectedDocument.document_type)}
+                    </span>
+                    <span>Uploaded: {new Date(selectedDocument.uploaded_at).toLocaleString()}</span>
+                    {selectedDocument.service_name && <span>Service: {selectedDocument.service_name}</span>}
+                    {selectedDocument.dentist_name && <span>Dentist: {selectedDocument.dentist_name}</span>}
+                    {selectedDocument.appointment_date && (
+                      <span>
+                        Appointment: {new Date(selectedDocument.appointment_date).toLocaleDateString()}
+                        {selectedDocument.appointment_time ? ` at ${selectedDocument.appointment_time}` : ''}
+                      </span>
+                    )}
+                  </div>
               </div>
               <button
                 onClick={() => setSelectedDocument(null)}
