@@ -5,6 +5,7 @@ Run this after clearing the database to get started quickly.
 """
 import os
 import sys
+from datetime import date
 import django
 
 # Setup Django
@@ -79,6 +80,31 @@ def create_initial_accounts():
     else:
         print("- Dentist account already exists")
 
+    # Create demo patient account
+    if not User.objects.filter(email='airoravinera@gmail.com').exists():
+        patient = User.objects.create_user(
+            username='airoravinera@gmail.com',
+            email='airoravinera@gmail.com',
+            password='Airo2546!',
+            user_type='patient',
+            first_name='Airo',
+            last_name='Ravinera',
+            phone='09171091048',
+            address='The Grand Towers Manila, P. Ocampo Sr Street Malate Manila',
+            birthday=date(2004, 9, 10),
+        )
+        print("✓ Patient account created:")
+        print("  Email: airoravinera@gmail.com")
+        print("  Password: Airo2546!")
+        print(f"  Name: {patient.get_full_name()}")
+    else:
+        patient = User.objects.get(email='airoravinera@gmail.com')
+        patient.phone = '09171091048'
+        patient.address = 'The Grand Towers Manila, P. Ocampo Sr Street Malate Manila'
+        patient.birthday = date(2004, 9, 10)
+        patient.save(update_fields=['phone', 'address', 'birthday'])
+        print("- Patient account already exists (updated phone/address/birthday)")
+
     print("\n" + "=" * 60)
     print("INITIAL ACCOUNTS CREATED SUCCESSFULLY!")
     print("=" * 60)
@@ -86,6 +112,7 @@ def create_initial_accounts():
     print("  Owner: owner@admin.dorotheo.com / owner123")
     print("  Receptionist: receptionist@gmail.com / Receptionist2546!")
     print("  Dentist: dentist@gmail.com / Dentist2546!")
+    print("  Patient: airoravinera@gmail.com / Airo2546!")
     print("\nPatients can register through the website.\n")
 
 if __name__ == '__main__':
