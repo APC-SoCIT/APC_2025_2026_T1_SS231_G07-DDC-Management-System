@@ -50,9 +50,13 @@ export default function UnifiedDocumentUpload({
     const fetchAppointments = async () => {
       try {
         const allAppointments = await api.getAppointments(token)
-        const completedAppointments = allAppointments.filter(
-          (apt: any) => apt.patient?.id === patientId && apt.status === 'completed'
-        )
+
+        const completedAppointments = allAppointments.filter((apt: any) => {
+          const patientIdFromApi = typeof apt.patient === 'object' ? apt.patient?.id : apt.patient
+          const status = (apt.status || '').toLowerCase()
+          return patientIdFromApi === patientId && status === 'completed'
+        })
+
         setAppointments(completedAppointments)
       } catch (err) {
         console.error('Failed to fetch appointments:', err)
@@ -180,42 +184,54 @@ export default function UnifiedDocumentUpload({
           )}
 
           {step === 'appointment' && (
-            <div className="space-y-3">
-              <p className="text-gray-600 mb-4">
-                Select a completed appointment to upload documents for:
-              </p>
-              {appointments.length === 0 ? (
-                <div className="p-6 bg-gray-50 rounded-lg text-center">
-                  <p className="text-gray-500">
-                    No completed appointments found for {patientName}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  {appointments.map((apt) => (
-                    <button
-                      key={apt.id}
-                      onClick={() => handleAppointmentSelect(apt.id)}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {new Date(apt.date).toLocaleDateString('en-US', {
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}{' '}
-                            at {apt.time}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">{apt.service_name}</p>
-                        </div>
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
-                          Completed
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="appointment-select" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select a completed appointment to upload documents for:
+                </label>
+                {appointments.length === 0 ? (
+                  <div className="p-6 bg-gray-50 rounded-lg text-center">
+                    <p className="text-gray-500">
+                      No completed appointments found for {patientName}
+                    </p>
+                  </div>
+                ) : (
+                  <select
+                    id="appointment-select"
+                    value={selectedAppointment || ''}
+                    onChange={(e) => setSelectedAppointment(Number(e.target.value))}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">-- Choose an appointment --</option>
+                    {appointments.map((apt) => (
+                      <option key={apt.id} value={apt.id}>
+                        {new Date(apt.date).toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}{' '}
+                        at {apt.time} - {apt.service_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              
+              {appointments.length > 0 && (
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => selectedAppointment && setStep('type')}
+                    disabled={!selectedAppointment}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>
