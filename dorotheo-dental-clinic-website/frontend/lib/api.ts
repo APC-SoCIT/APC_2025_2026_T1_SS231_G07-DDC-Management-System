@@ -936,6 +936,17 @@ export const api = {
     if (!response.ok) throw new Error('Failed to export patient records')
     return response.json()
   },
+
+  // Chatbot endpoint
+  chatbotQuery: async (message: string, conversationHistory: Array<{ role: string; content: string }>) => {
+    const response = await fetch(`${API_BASE_URL}/chatbot/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, conversation_history: conversationHistory }),
+    })
+    if (!response.ok) throw new Error('Failed to query chatbot')
+    return response.json()
+  },
 }
 
 // Export all API functions
@@ -1024,4 +1035,5 @@ export const {
   restorePatient,
   getArchivedPatients,
   exportPatientRecords,
+  chatbotQuery,
 } = api
