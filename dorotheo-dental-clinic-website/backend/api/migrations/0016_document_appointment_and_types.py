@@ -1,7 +1,9 @@
 from django.db import migrations, models
+import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ('api', '0015_service_duration'),
     ]
@@ -10,21 +12,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='document',
             name='appointment',
-            field=models.ForeignKey(blank=True, null=True, on_delete=models.SET_NULL, related_name='documents', to='api.appointment'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='documents', to='api.appointment'),
         ),
         migrations.AlterField(
             model_name='document',
             name='document_type',
-            field=models.CharField(
-                choices=[
-                    ('xray', 'X-Ray'),
-                    ('scan', 'Tooth Scan'),
-                    ('report', 'Report'),
-                    ('medical_certificate', 'Medical Certificate'),
-                    ('note', 'Note'),
-                    ('other', 'Other'),
-                ],
-                max_length=20,
-            ),
+            field=models.CharField(choices=[('xray', 'X-Ray'), ('scan', 'Tooth Scan'), ('report', 'Report'), ('medical_certificate', 'Medical Certificate'), ('note', 'Note'), ('dental_image', 'Dental Image'), ('other', 'Other')], max_length=20),
         ),
     ]

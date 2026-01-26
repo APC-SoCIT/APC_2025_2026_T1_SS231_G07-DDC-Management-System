@@ -66,15 +66,28 @@ class DentalRecordSerializer(serializers.ModelSerializer):
 
 class DocumentSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
-    appointment_id = serializers.IntegerField(source='appointment.id', read_only=True)
     appointment_date = serializers.DateField(source='appointment.date', read_only=True)
     appointment_time = serializers.TimeField(source='appointment.time', read_only=True)
     service_name = serializers.CharField(source='appointment.service.name', read_only=True)
     dentist_name = serializers.CharField(source='appointment.dentist.get_full_name', read_only=True)
+    file_url = serializers.SerializerMethodField()
+    document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
 
     class Meta:
         model = Document
-        fields = '__all__'
+        fields = [
+            'id', 'patient', 'document_type', 'document_type_display', 'file', 'file_url',
+            'title', 'description', 'appointment', 'appointment_date', 'appointment_time',
+            'service_name', 'dentist_name', 'uploaded_by', 'uploaded_by_name', 'uploaded_at'
+        ]
+
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
