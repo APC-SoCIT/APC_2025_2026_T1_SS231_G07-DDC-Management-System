@@ -16,8 +16,8 @@ interface Appointment {
   id: number
   date: string
   time: string
-  service: { name: string }
-  dentist: { first_name: string; last_name: string }
+  service_name?: string
+  dentist_name?: string
   status: string
   notes: string
 }
@@ -174,7 +174,7 @@ export default function PatientTreatmentHistoryPage() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <h4 className="font-semibold text-gray-900">
-                          {apt.service?.name || "Appointment"}
+                          {apt.service_name || "Appointment"}
                         </h4>
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           Completed
@@ -187,11 +187,11 @@ export default function PatientTreatmentHistoryPage() {
                             {new Date(apt.date).toLocaleDateString()} at {apt.time}
                           </p>
                         </div>
-                        {apt.dentist && (
+                        {apt.dentist_name && (
                           <div>
                             <p className="text-sm text-gray-500">Dentist</p>
                             <p className="font-medium text-gray-900">
-                              Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                              {apt.dentist_name}
                             </p>
                           </div>
                         )}
@@ -216,7 +216,7 @@ export default function PatientTreatmentHistoryPage() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <h4 className="font-semibold text-gray-900">
-                        {apt.service?.name || "Appointment"}
+                        {apt.service_name || "Appointment"}
                       </h4>
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                         Missed
@@ -229,11 +229,11 @@ export default function PatientTreatmentHistoryPage() {
                           {new Date(apt.date).toLocaleDateString()} at {apt.time}
                         </p>
                       </div>
-                      {apt.dentist && (
+                      {apt.dentist_name && (
                         <div>
                           <p className="text-sm text-gray-500">Dentist</p>
                           <p className="font-medium text-gray-900">
-                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                            {apt.dentist_name}
                           </p>
                         </div>
                       )}
@@ -257,7 +257,7 @@ export default function PatientTreatmentHistoryPage() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <h4 className="font-semibold text-gray-900">
-                        {apt.service?.name || "Appointment"}
+                        {apt.service_name || "Appointment"}
                       </h4>
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         Cancelled
@@ -270,11 +270,11 @@ export default function PatientTreatmentHistoryPage() {
                           {new Date(apt.date).toLocaleDateString()} at {apt.time}
                         </p>
                       </div>
-                      {apt.dentist && (
+                      {apt.dentist_name && (
                         <div>
                           <p className="text-sm text-gray-500">Dentist</p>
                           <p className="font-medium text-gray-900">
-                            Dr. {apt.dentist.first_name} {apt.dentist.last_name}
+                            {apt.dentist_name}
                           </p>
                         </div>
                       )}
