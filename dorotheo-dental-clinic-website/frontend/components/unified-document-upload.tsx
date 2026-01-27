@@ -131,11 +131,10 @@ export default function UnifiedDocumentUpload({
         )
       } else {
         // Upload as document
-        const documentType = selectedType === 'note' ? 'other' : selectedType
         await api.uploadDocument(
           patientId,
           file,
-          documentType,
+          selectedType,
           title,
           '', // description
           token,

@@ -125,16 +125,22 @@ class TeethImageSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source=PATIENT_FULL_NAME, read_only=True)
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
     image_url = serializers.SerializerMethodField()
+    image_type_display = serializers.CharField(source='get_image_type_display', read_only=True)
     appointment = serializers.PrimaryKeyRelatedField(
         queryset=Appointment.objects.all(),
         required=False,
         allow_null=True
     )
+    appointment_date = serializers.DateField(source='appointment.date', read_only=True)
+    appointment_time = serializers.TimeField(source='appointment.time', read_only=True)
+    service_name = serializers.CharField(source='appointment.service.name', read_only=True)
+    dentist_name = serializers.CharField(source='appointment.dentist.get_full_name', read_only=True)
 
     class Meta:
         model = TeethImage
-        fields = ['id', 'patient', 'patient_name', 'image', 'image_url', 'notes', 
-                  'uploaded_by', 'uploaded_by_name', 'is_latest', 'uploaded_at', 'appointment']
+        fields = ['id', 'patient', 'patient_name', 'image', 'image_url', 'image_type', 'image_type_display', 'notes', 
+                  'uploaded_by', 'uploaded_by_name', 'is_latest', 'uploaded_at', 'appointment',
+                  'appointment_date', 'appointment_time', 'service_name', 'dentist_name']
         read_only_fields = ['uploaded_at']
 
     def get_image_url(self, obj):

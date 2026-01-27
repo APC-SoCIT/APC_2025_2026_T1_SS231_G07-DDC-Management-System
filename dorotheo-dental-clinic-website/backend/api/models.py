@@ -256,8 +256,18 @@ class TreatmentPlan(models.Model):
 
 class TeethImage(models.Model):
     """Model for storing patient teeth images"""
+    IMAGE_TYPE_CHOICES = [
+        ('xray', 'X-Ray'),
+        ('intraoral', 'Intraoral'),
+        ('extraoral', 'Extraoral'),
+        ('panoramic', 'Panoramic'),
+        ('dental', 'Dental Image'),
+        ('other', 'Other'),
+    ]
+    
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teeth_images')
     image = models.ImageField(upload_to='teeth_images/')
+    image_type = models.CharField(max_length=20, choices=IMAGE_TYPE_CHOICES, default='dental')
     notes = models.TextField(blank=True)
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_teeth_images')
     is_latest = models.BooleanField(default=True)

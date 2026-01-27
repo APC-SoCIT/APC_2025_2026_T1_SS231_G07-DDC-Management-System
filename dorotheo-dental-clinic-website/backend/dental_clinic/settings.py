@@ -109,6 +109,9 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
 CORS_ALLOW_CREDENTIALS = True
 
+# Allow media files to be embedded in iframes
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # If you want to specify allowed origins in production, use:
 # CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
 # For now, allowing all origins for easier setup
