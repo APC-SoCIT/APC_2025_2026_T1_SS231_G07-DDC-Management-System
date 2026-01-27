@@ -107,6 +107,12 @@ export default function OwnerAppointments() {
   } | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
+  const parseDateOnly = (dateStr?: string) => {
+    if (!dateStr) return null
+    const [year, month, day] = dateStr.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
   const generateTimeSlots = (durationMinutes: number = 30, selectedDate?: string) => {
     const slots: { value: string; display: string }[] = []
     const startHour = 10 // 10:00 AM
@@ -117,15 +123,15 @@ export default function OwnerAppointments() {
     // Check if selected date is today
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const selectedDateObj = selectedDate ? new Date(selectedDate) : null
-    const isToday = selectedDateObj && selectedDateObj.getTime() === today.getTime()
+    const selectedDateObj = parseDateOnly(selectedDate)
+    const isToday = selectedDateObj?.getTime() === today.getTime()
     const currentTimeInMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : 0
     
     for (let totalMinutes = startMinutes; totalMinutes < endMinutes; totalMinutes += durationMinutes) {
       const hour = Math.floor(totalMinutes / 60)
       const minute = totalMinutes % 60
       
-      // Skip past times if selected date is today
+      // Skip past times if selected date is today (hide any slot that has already started)
       if (isToday && totalMinutes <= currentTimeInMinutes) {
         continue
       }
