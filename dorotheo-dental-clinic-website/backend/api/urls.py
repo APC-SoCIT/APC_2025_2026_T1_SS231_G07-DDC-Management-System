@@ -6,6 +6,7 @@ from .views import (
     ClinicLocationViewSet, TreatmentPlanViewSet, TeethImageViewSet,
     StaffAvailabilityViewSet, DentistAvailabilityViewSet, DentistNotificationViewSet, AppointmentNotificationViewSet,
     PatientIntakeFormViewSet, FileAttachmentViewSet, ClinicalNoteViewSet, TreatmentAssignmentViewSet,
+    BlockedTimeSlotViewSet,
     register, login, logout, current_user, analytics, 
     request_password_reset, reset_password, chatbot_query
 )
@@ -24,6 +25,7 @@ router.register('treatment-plans', TreatmentPlanViewSet)
 router.register('teeth-images', TeethImageViewSet)
 router.register('staff-availability', StaffAvailabilityViewSet)
 router.register('dentist-availability', DentistAvailabilityViewSet)
+router.register('blocked-time-slots', BlockedTimeSlotViewSet)
 router.register('notifications', DentistNotificationViewSet)
 router.register('appointment-notifications', AppointmentNotificationViewSet)
 router.register('intake-forms', PatientIntakeFormViewSet)

@@ -4,7 +4,7 @@ from .models import (
     User, Service, Appointment, ToothChart, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability,
-    DentistNotification, AppointmentNotification, PasswordResetToken
+    DentistNotification, AppointmentNotification, PasswordResetToken, BlockedTimeSlot
 )
 
 
@@ -133,6 +133,14 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
     search_fields = ('user__email', 'user__username', 'token')
     ordering = ('-created_at',)
     readonly_fields = ('created_at',)
+
+@admin.register(BlockedTimeSlot)
+class BlockedTimeSlotAdmin(admin.ModelAdmin):
+    list_display = ('date', 'start_time', 'end_time', 'reason', 'created_by', 'created_at')
+    list_filter = ('date', 'created_at', 'created_by')
+    search_fields = ('reason', 'created_by__username')
+    ordering = ('-date', 'start_time')
+    date_hierarchy = 'date'
 
 admin.site.site_header = "Dental Clinic Administration"
 admin.site.site_title = "Dental Clinic Admin"

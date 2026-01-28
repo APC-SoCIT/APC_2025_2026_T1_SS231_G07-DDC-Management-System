@@ -4,7 +4,7 @@ from .models import (
     Document, InventoryItem, Billing, ClinicLocation, 
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification, 
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
-    FileAttachment, ClinicalNote, TreatmentAssignment
+    FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot
 )
 
 # Constants for repeated string literals
@@ -42,6 +42,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_email = serializers.CharField(source='patient.email', read_only=True)
     dentist_name = serializers.CharField(source='dentist.get_full_name', read_only=True)
     service_name = serializers.CharField(source='service.name', read_only=True)
+    service_color = serializers.CharField(source='service.color', read_only=True)
     reschedule_service_name = serializers.CharField(source='reschedule_service.name', read_only=True)
     reschedule_dentist_name = serializers.CharField(source='reschedule_dentist.get_full_name', read_only=True)
 
@@ -178,6 +179,23 @@ class DentistAvailabilitySerializer(serializers.ModelSerializer):
         fields = ['id', 'dentist', 'dentist_name', 'date', 'start_time', 'end_time',
                   'is_available', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, data):
+        """Ensure end_time is after start_time"""
+        if 'start_time' in data and 'end_time' in data:
+            if data['end_time'] <= data['start_time']:
+                raise serializers.ValidationError("End time must be after start time")
+        return data
+
+
+class BlockedTimeSlotSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = BlockedTimeSlot
+        fields = ['id', 'date', 'start_time', 'end_time', 'reason', 
+                  'created_by', 'created_by_name', 'created_at', 'updated_at']
+        read_only_fields = ['created_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         """Ensure end_time is after start_time"""

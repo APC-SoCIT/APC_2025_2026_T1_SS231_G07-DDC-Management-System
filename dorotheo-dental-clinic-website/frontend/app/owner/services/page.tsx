@@ -13,6 +13,7 @@ interface Service {
   description: string
   category: string
   duration: number
+  color: string
   image: string
   created_at: string
 }
@@ -41,6 +42,7 @@ export default function ServicesPage() {
     description: "",
     category: "all",
     duration: 30,
+    color: "#10b981",
     image: null as File | null,
   })
   const [imagePreview, setImagePreview] = useState("")
@@ -94,6 +96,7 @@ export default function ServicesPage() {
       data.append("description", formData.description)
       data.append("category", formData.category)
       data.append("duration", formData.duration.toString())
+      data.append("color", formData.color)
       if (formData.image) {
         data.append("image", formData.image)
       }
@@ -109,7 +112,7 @@ export default function ServicesPage() {
       }
 
       // Reset form
-      setFormData({ name: "", description: "", category: "all", duration: 30, image: null })
+      setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null })
       setImagePreview("")
       setEditingService(null)
       setIsModalOpen(false)
@@ -126,6 +129,7 @@ export default function ServicesPage() {
       description: service.description,
       category: service.category,
       duration: service.duration || 30,
+      color: service.color || "#10b981",
       image: null,
     })
     setImagePreview(service.image)
@@ -148,7 +152,7 @@ export default function ServicesPage() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingService(null)
-    setFormData({ name: "", description: "", category: "all", duration: 30, image: null })
+    setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null })
     setImagePreview("")
   }
 
@@ -198,8 +202,15 @@ export default function ServicesPage() {
             <div className="p-6">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-xl font-semibold text-[var(--color-primary)] mb-1">{service.name}</h3>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xl font-semibold mb-1">
+                    <span 
+                      className="px-3 py-1 rounded-lg"
+                      style={{ backgroundColor: service.color, color: '#ffffff' }}
+                    >
+                      {service.name}
+                    </span>
+                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap mt-2">
                     <span className="inline-block px-3 py-1 bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-xs rounded-full">
                       {categories.find((c) => c.value === service.category)?.label}
                     </span>
@@ -285,6 +296,26 @@ export default function ServicesPage() {
                   className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   placeholder="e.g., 30"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Color</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="w-16 h-12 border border-[var(--color-border)] rounded-lg cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="flex-1 px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono"
+                    placeholder="#10b981"
+                    pattern="^#[0-9A-Fa-f]{6}$"
+                  />
+                </div>
               </div>
 
               <div>

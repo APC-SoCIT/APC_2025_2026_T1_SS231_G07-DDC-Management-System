@@ -13,13 +13,15 @@ import {
   Trash2,
   Calendar as CalendarIcon,
   Clock,
-  FileText
+  FileText,
+  Ban
 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import ConfirmationModal from "@/components/confirmation-modal"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
+import BlockTimeModal from "@/components/block-time-modal"
 
 interface Appointment {
   id: number
@@ -30,6 +32,7 @@ interface Appointment {
   dentist_name: string | null
   service: number | null
   service_name: string | null
+  service_color: string | null
   date: string
   time: string
   status: "confirmed" | "pending" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
@@ -61,6 +64,7 @@ interface Service {
   category: string
   description: string
   duration: number
+  color: string
 }
 
 interface Staff {
@@ -74,7 +78,7 @@ interface Staff {
 export default function OwnerAppointments() {
   const { token } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "missed" | "cancelled" | "completed">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "pending" | "completed" | "missed" | "cancelled">("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [editingRow, setEditingRow] = useState<number | null>(null)
@@ -107,6 +111,16 @@ export default function OwnerAppointments() {
   } | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
+  const [showBlockTimeModal, setShowBlockTimeModal] = useState(false)
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<Array<{
+    id: number
+    date: string
+    start_time: string
+    end_time: string
+    reason: string
+    created_by: number
+    created_by_name: string
+  }>>([])
   const parseDateOnly = (dateStr?: string) => {
     if (!dateStr) return null
     const [year, month, day] = dateStr.split('-').map(Number)
@@ -186,7 +200,28 @@ export default function OwnerAppointments() {
       return overlaps
     })
     
-    return isBooked
+    // Check for overlap with blocked time slots
+    const isBlocked = blockedTimeSlots.some(blockedSlot => {
+      // Only check blocked slots on the same date
+      if (blockedSlot.date !== date) return false
+      
+      // Get the blocked time range
+      const [blockStartHour, blockStartMinute] = blockedSlot.start_time.split(':').map(Number)
+      const [blockEndHour, blockEndMinute] = blockedSlot.end_time.split(':').map(Number)
+      const blockStart = blockStartHour * 60 + blockStartMinute
+      const blockEnd = blockEndHour * 60 + blockEndMinute
+      
+      // Check for overlap
+      const overlaps = (proposedStart < blockEnd) && (proposedEnd > blockStart)
+      
+      if (overlaps) {
+        console.log(`[OWNER] Time slot ${time} (${proposedStart}-${proposedEnd}) overlaps with blocked slot (${blockStart}-${blockEnd})`)
+      }
+      
+      return overlaps
+    })
+    
+    return isBooked || isBlocked
   }
 
   // Format dentist name with Dr. prefix
@@ -250,6 +285,31 @@ export default function OwnerAppointments() {
     }
 
     fetchAppointments()
+  }, [token])
+
+  // Fetch blocked time slots
+  useEffect(() => {
+    const fetchBlockedTimeSlots = async () => {
+      if (!token) return
+      
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+          headers: {
+            'Authorization': `Token ${token}`,
+          },
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setBlockedTimeSlots(data)
+          console.log("Fetched blocked time slots:", data)
+        }
+      } catch (error) {
+        console.error("Error fetching blocked time slots:", error)
+      }
+    }
+
+    fetchBlockedTimeSlots()
   }, [token])
 
   // Fetch dentist availability when dentist is selected
@@ -408,10 +468,45 @@ export default function OwnerAppointments() {
     }
   }
 
+  const handleBlockTimeSlot = async (blockData: {
+    date: string
+    start_time: string
+    end_time: string
+    reason: string
+  }) => {
+    if (!token) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify(blockData),
+      })
+
+      if (response.ok) {
+        const newBlockedSlot = await response.json()
+        setBlockedTimeSlots([...blockedTimeSlots, newBlockedSlot])
+        alert("Time slot blocked successfully!")
+        setShowBlockTimeModal(false)
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || "Failed to block time slot. Please try again.")
+      }
+    } catch (error) {
+      console.error("Error blocking time slot:", error)
+      alert("Failed to block time slot. Please try again.")
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
         return "bg-green-100 text-green-700"
+      case "waiting":
+        return "bg-purple-100 text-purple-700"
       case "pending":
         return "bg-yellow-100 text-yellow-700"
       case "cancelled":
@@ -437,6 +532,8 @@ export default function OwnerAppointments() {
         return "Cancellation Requested"
       case "confirmed":
         return "Confirmed"
+      case "waiting":
+        return "Waiting"
       case "pending":
         return "Pending"
       case "cancelled":
@@ -685,13 +782,22 @@ export default function OwnerAppointments() {
           <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
           <p className="text-[var(--color-text-muted)]">Manage patient appointments and schedules</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Add Appointment
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowBlockTimeModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <Ban className="w-5 h-5" />
+            Block Time
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Add Appointment
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -722,6 +828,16 @@ export default function OwnerAppointments() {
             All Patients
           </button>
           <button
+            onClick={() => setStatusFilter("waiting")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "waiting"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Waiting
+          </button>
+          <button
             onClick={() => setStatusFilter("pending")}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
               statusFilter === "pending"
@@ -732,14 +848,14 @@ export default function OwnerAppointments() {
             Pending
           </button>
           <button
-            onClick={() => setStatusFilter("confirmed")}
+            onClick={() => setStatusFilter("completed")}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              statusFilter === "confirmed"
+              statusFilter === "completed"
                 ? "bg-[var(--color-primary)] text-white"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            Confirmed
+            Completed
           </button>
           <button
             onClick={() => setStatusFilter("missed")}
@@ -760,16 +876,6 @@ export default function OwnerAppointments() {
             }`}
           >
             Cancelled
-          </button>
-          <button
-            onClick={() => setStatusFilter("completed")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              statusFilter === "completed"
-                ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            Completed
           </button>
         </div>
       </div>
@@ -810,7 +916,17 @@ export default function OwnerAppointments() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.service_name || "General Consultation"}</td>
+                    <td className="px-6 py-4">
+                      <span 
+                        className="px-3 py-1 rounded-lg"
+                        style={{ 
+                          backgroundColor: apt.service_color || '#10b981',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {apt.service_name || "General Consultation"}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
@@ -1215,7 +1331,7 @@ export default function OwnerAppointments() {
       {/* Add Appointment Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
               <h2 className="text-2xl font-bold text-[var(--color-primary)]">Book Appointment</h2>
               <button
@@ -1233,204 +1349,213 @@ export default function OwnerAppointments() {
               </button>
             </div>
 
-            <form onSubmit={handleAddAppointment} className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <form onSubmit={handleAddAppointment} className="p-6 space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
                   <strong>Note:</strong> The appointment will be confirmed immediately.
                 </p>
               </div>
 
-              {/* Patient Search/Select */}
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Patient <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Search patient by name or email..."
-                  value={patientSearchQuery}
-                  onChange={(e) => setPatientSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] mb-2"
-                />
-                <select
-                  value={selectedPatientId || ""}
-                  onChange={(e) => setSelectedPatientId(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
-                >
-                  <option value="">Select a patient...</option>
-                  {patients
-                    .filter((patient) => {
-                      if (!patientSearchQuery) return true
-                      const query = patientSearchQuery.toLowerCase()
-                      return (
-                        patient.first_name.toLowerCase().includes(query) ||
-                        patient.last_name.toLowerCase().includes(query) ||
-                        patient.email.toLowerCase().includes(query)
-                      )
-                    })
-                    .map((patient) => (
-                      <option key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} - {patient.email}
-                      </option>
-                    ))}
-                </select>
-                {patients.length === 0 && (
-                  <p className="text-sm text-amber-600 mt-1">No patients registered yet.</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Preferred Dentist <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newAppointment.dentist}
-                  onChange={(e) => {
-                    setNewAppointment({ ...newAppointment, dentist: e.target.value, date: "", time: "" })
-                    setSelectedDate(undefined)
-                  }}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
-                >
-                  <option value="">Select a dentist first...</option>
-                  {staff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {formatDentistName(s)}
-                    </option>
-                  ))}
-                </select>
-                {newAppointment.dentist && (
-                  <p className="text-xs text-green-600 mt-1">
-                    ✓ Available dates are highlighted in the calendar below
-                  </p>
-                )}
-              </div>
-
-              {/* Calendar for date selection */}
-              {newAppointment.dentist && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                    Select Date <span className="text-red-500">*</span>
-                  </label>
-                  <div className="border border-[var(--color-border)] rounded-lg p-4 bg-white">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => {
-                        // Disable past dates (but allow today)
-                        const today = new Date()
-                        today.setHours(0, 0, 0, 0)
-                        const checkDate = new Date(date)
-                        checkDate.setHours(0, 0, 0, 0)
-                        if (checkDate < today) return true
-                        
-                        // Disable dates beyond 90 days
-                        const maxDate = new Date(today)
-                        maxDate.setDate(today.getDate() + 90)
-                        if (checkDate > maxDate) return true
-                        
-                        // Disable dates when dentist is not available (use local date formatting)
-                        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                        return !availableDates.has(dateStr)
-                      }}
-                      modifiers={{
-                        available: (date) => {
-                          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                          return availableDates.has(dateStr)
-                        }
-                      }}
-                      modifiersClassNames={{
-                        available: "bg-green-100 text-green-900 font-semibold hover:bg-green-200"
-                      }}
-                      className="mx-auto"
+              {/* Two-column grid for better layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  {/* Patient Search/Select */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                      Patient <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Search patient by name or email..."
+                      value={patientSearchQuery}
+                      onChange={(e) => setPatientSearchQuery(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] mb-2"
                     />
-                    {availableDates.size === 0 && (
-                      <p className="text-sm text-amber-600 mt-2 text-center">
-                        ⚠️ This dentist has no available schedule set. Please contact admin.
+                    <select
+                      value={selectedPatientId || ""}
+                      onChange={(e) => setSelectedPatientId(Number(e.target.value))}
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      required
+                    >
+                      <option value="">Select a patient...</option>
+                      {patients
+                        .filter((patient) => {
+                          if (!patientSearchQuery) return true
+                          const query = patientSearchQuery.toLowerCase()
+                          return (
+                            patient.first_name.toLowerCase().includes(query) ||
+                            patient.last_name.toLowerCase().includes(query) ||
+                            patient.email.toLowerCase().includes(query)
+                          )
+                        })
+                        .map((patient) => (
+                          <option key={patient.id} value={patient.id}>
+                            {patient.first_name} {patient.last_name} - {patient.email}
+                          </option>
+                        ))}
+                    </select>
+                    {patients.length === 0 && (
+                      <p className="text-sm text-amber-600 mt-1">No patients registered yet.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                      Preferred Dentist <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newAppointment.dentist}
+                      onChange={(e) => {
+                        setNewAppointment({ ...newAppointment, dentist: e.target.value, date: "", time: "" })
+                        setSelectedDate(undefined)
+                      }}
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      required
+                    >
+                      <option value="">Select a dentist first...</option>
+                      {staff.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {formatDentistName(s)}
+                        </option>
+                      ))}
+                    </select>
+                    {newAppointment.dentist && (
+                      <p className="text-xs text-green-600 mt-1">
+                        ✓ Available dates are highlighted in the calendar below
                       </p>
                     )}
                   </div>
-                </div>
-              )}
 
-              {/* Time selection - only show if date AND service are selected */}
-              {selectedDate && newAppointment.service && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                    Preferred Time <span className="text-red-500">*</span>
-                  </label>
-                  <p className="text-xs text-gray-600 mb-2">
-                    {(() => {
-                      const selectedService = services.find(s => s.id === Number(newAppointment.service))
-                      const duration = selectedService?.duration || 30
-                      return `Select a ${duration}-minute time slot (10:00 AM - 8:00 PM). Grayed out times conflict with existing appointments.`
-                    })()}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 border border-[var(--color-border)] rounded-lg">
-                    {(() => {
-                      const selectedService = services.find(s => s.id === Number(newAppointment.service))
-                      const duration = selectedService?.duration || 30
-                      return generateTimeSlots(duration, newAppointment.date).map((slot) => {
-                        const isBooked = isTimeSlotBooked(newAppointment.date, slot.value, duration)
-                        const isSelected = newAppointment.time === slot.value
-                        return (
-                          <button
-                            key={slot.value}
-                            type="button"
-                            onClick={() => !isBooked && setNewAppointment({ ...newAppointment, time: slot.value })}
-                            disabled={isBooked}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              isSelected
-                                ? 'bg-[var(--color-primary)] text-white'
-                                : isBooked
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
-                                : 'bg-white border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-text)]'
-                            }`}
-                          >
-                            {slot.display}
-                          </button>
-                        )
-                      })
-                    })()}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                      Treatment/Service <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newAppointment.service}
+                      onChange={(e) => setNewAppointment({ ...newAppointment, service: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      required
+                    >
+                      <option value="">Select a treatment...</option>
+                      {services.map((service) => (
+                        <option key={service.id} value={service.id}>
+                          {service.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  {!newAppointment.time && (
-                    <p className="text-xs text-red-600 mt-1">* Please select a time slot</p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                      Additional Notes
+                    </label>
+                    <textarea
+                      value={newAppointment.notes}
+                      onChange={(e) => setNewAppointment({ ...newAppointment, notes: e.target.value })}
+                      rows={6}
+                      placeholder="Any special requests or information..."
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-4">
+                  {/* Calendar for date selection */}
+                  {newAppointment.dentist && (
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                        Select Date <span className="text-red-500">*</span>
+                      </label>
+                      <div className="border border-[var(--color-border)] rounded-lg p-4 bg-white">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={setSelectedDate}
+                          disabled={(date) => {
+                            // Disable past dates (but allow today)
+                            const today = new Date()
+                            today.setHours(0, 0, 0, 0)
+                            const checkDate = new Date(date)
+                            checkDate.setHours(0, 0, 0, 0)
+                            if (checkDate < today) return true
+                            
+                            // Disable dates beyond 90 days
+                            const maxDate = new Date(today)
+                            maxDate.setDate(today.getDate() + 90)
+                            if (checkDate > maxDate) return true
+                            
+                            // Disable dates when dentist is not available (use local date formatting)
+                            const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                            return !availableDates.has(dateStr)
+                          }}
+                          modifiers={{
+                            available: (date) => {
+                              const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                              return availableDates.has(dateStr)
+                            }
+                          }}
+                          modifiersClassNames={{
+                            available: "bg-green-100 text-green-900 font-semibold hover:bg-green-200"
+                          }}
+                          className="mx-auto"
+                        />
+                        {availableDates.size === 0 && (
+                          <p className="text-sm text-amber-600 mt-2 text-center">
+                            ⚠️ This dentist has no available schedule set. Please contact admin.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Time selection - only show if date AND service are selected */}
+                  {selectedDate && newAppointment.service && (
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                        Preferred Time <span className="text-red-500">*</span>
+                      </label>
+                      <p className="text-xs text-gray-600 mb-2">
+                        {(() => {
+                          const selectedService = services.find(s => s.id === Number(newAppointment.service))
+                          const duration = selectedService?.duration || 30
+                          return `Select a ${duration}-minute time slot (10:00 AM - 8:00 PM). Grayed out times conflict with existing appointments.`
+                        })()}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 max-h-80 overflow-y-auto p-2 border border-[var(--color-border)] rounded-lg">
+                        {(() => {
+                          const selectedService = services.find(s => s.id === Number(newAppointment.service))
+                          const duration = selectedService?.duration || 30
+                          return generateTimeSlots(duration, newAppointment.date).map((slot) => {
+                            const isBooked = isTimeSlotBooked(newAppointment.date, slot.value, duration)
+                            const isSelected = newAppointment.time === slot.value
+                            return (
+                              <button
+                                key={slot.value}
+                                type="button"
+                                onClick={() => !isBooked && setNewAppointment({ ...newAppointment, time: slot.value })}
+                                disabled={isBooked}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                  isSelected
+                                    ? 'bg-[var(--color-primary)] text-white'
+                                    : isBooked
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                    : 'bg-white border border-[var(--color-border)] hover:bg-[var(--color-background)] text-[var(--color-text)]'
+                                }`}
+                              >
+                                {slot.display}
+                              </button>
+                            )
+                          })
+                        })()}
+                      </div>
+                      {!newAppointment.time && (
+                        <p className="text-xs text-red-600 mt-1">* Please select a time slot</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Treatment/Service <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newAppointment.service}
-                  onChange={(e) => setNewAppointment({ ...newAppointment, service: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
-                >
-                  <option value="">Select a treatment...</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Additional Notes
-                </label>
-                <textarea
-                  value={newAppointment.notes}
-                  onChange={(e) => setNewAppointment({ ...newAppointment, notes: e.target.value })}
-                  rows={4}
-                  placeholder="Any special requests or information..."
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -1475,6 +1600,13 @@ export default function OwnerAppointments() {
           variant={confirmModalConfig.variant}
         />
       )}
+
+      {/* Block Time Modal */}
+      <BlockTimeModal
+        isOpen={showBlockTimeModal}
+        onClose={() => setShowBlockTimeModal(false)}
+        onBlock={handleBlockTimeSlot}
+      />
 
       {/* Success Modal */}
       {successAppointmentDetails && (
