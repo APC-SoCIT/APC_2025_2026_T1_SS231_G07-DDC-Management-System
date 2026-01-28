@@ -79,6 +79,7 @@ class Service(models.Model):
     category = models.CharField(max_length=50, choices=CATEGORIES)
     description = models.TextField()
     duration = models.IntegerField(default=30, help_text="Duration in minutes")
+    color = models.CharField(max_length=7, default='#10b981', help_text="Hex color code (e.g., #10b981)")
     image = models.ImageField(upload_to='services/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -90,6 +91,7 @@ class Appointment(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
+        ('waiting', 'Waiting'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
         ('missed', 'Missed'),
@@ -361,6 +363,40 @@ class DentistAvailability(models.Model):
             raise ValidationError('Availability can only be set for staff or owner')
         if self.dentist.user_type == 'staff' and self.dentist.role != 'dentist':
             raise ValidationError('Availability can only be set for dentists')
+
+
+class BlockedTimeSlot(models.Model):
+    """Time slots blocked by staff to prevent patient bookings"""
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    reason = models.CharField(max_length=200, blank=True, help_text="Optional reason for blocking")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='blocked_slots',
+        limit_choices_to={'user_type__in': ['staff', 'owner']}
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date', 'start_time']
+        verbose_name = 'Blocked Time Slot'
+        verbose_name_plural = 'Blocked Time Slots'
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['date', 'start_time', 'end_time']),
+        ]
+
+    def __str__(self):
+        return f"Blocked: {self.date} ({self.start_time} - {self.end_time})"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # Ensure end_time is after start_time
+        if self.end_time <= self.start_time:
+            raise ValidationError('End time must be after start time')
 
 
 class AppointmentNotification(models.Model):

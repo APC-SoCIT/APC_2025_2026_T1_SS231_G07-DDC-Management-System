@@ -15,13 +15,15 @@ import {
   Clock,
   User,
   FileText,
-  Mail
+  Mail,
+  Ban
 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
+import BlockTimeModal from "@/components/block-time-modal"
 
 interface Appointment {
   id: number
@@ -32,9 +34,10 @@ interface Appointment {
   dentist_name: string | null
   service: number | null
   service_name: string | null
+  service_color: string | null
   date: string
   time: string
-  status: "confirmed" | "pending" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
+  status: "confirmed" | "pending" | "waiting" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
   notes: string
   reschedule_date: string | null
   reschedule_time: string | null
@@ -63,6 +66,7 @@ interface Service {
   category: string
   description: string
   duration: number
+  color: string
 }
 
 interface Staff {
@@ -76,7 +80,7 @@ interface Staff {
 export default function StaffAppointments() {
   const { token } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "missed" | "cancelled" | "completed">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "pending" | "completed" | "missed" | "cancelled">("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [editingRow, setEditingRow] = useState<number | null>(null)
@@ -109,6 +113,17 @@ export default function StaffAppointments() {
     onConfirm: () => void
     variant?: "danger" | "warning" | "info" | "success"
   } | null>(null)
+  const [showBlockTimeModal, setShowBlockTimeModal] = useState(false)
+  const [blockedTimeSlots, setBlockedTimeSlots] = useState<Array<{
+    id: number
+    date: string
+    start_time: string
+    end_time: string
+    reason: string
+    created_by: number
+    created_by_name: string
+  }>>([])
+
 
   // Generate time slots based on service duration from 10:00 AM to 8:00 PM
   const parseDateOnly = (dateStr?: string) => {
@@ -152,7 +167,7 @@ export default function StaffAppointments() {
     return slots
   }
 
-  // Check if a time slot overlaps with any existing appointments
+  // Check if a time slot overlaps with any existing appointments OR blocked time slots
   // This considers the duration of the service being booked
   const isTimeSlotBooked = (date: string, time: string, durationMinutes: number = 30) => {
     // Parse the proposed start time
@@ -160,6 +175,7 @@ export default function StaffAppointments() {
     const proposedStart = startHour * 60 + startMinute // in minutes from midnight
     const proposedEnd = proposedStart + durationMinutes
     
+    // Check for overlap with existing appointments
     const isBooked = bookedSlots.some(slot => {
       // Only check appointments on the same date
       if (slot.date !== date) return false
@@ -190,7 +206,28 @@ export default function StaffAppointments() {
       return overlaps
     })
     
-    return isBooked
+    // Check for overlap with blocked time slots
+    const isBlocked = blockedTimeSlots.some(blockedSlot => {
+      // Only check blocked slots on the same date
+      if (blockedSlot.date !== date) return false
+      
+      // Get the blocked time range
+      const [blockStartHour, blockStartMinute] = blockedSlot.start_time.split(':').map(Number)
+      const [blockEndHour, blockEndMinute] = blockedSlot.end_time.split(':').map(Number)
+      const blockStart = blockStartHour * 60 + blockStartMinute
+      const blockEnd = blockEndHour * 60 + blockEndMinute
+      
+      // Check for overlap
+      const overlaps = (proposedStart < blockEnd) && (proposedEnd > blockStart)
+      
+      if (overlaps) {
+        console.log(`[STAFF] Time slot ${time} (${proposedStart}-${proposedEnd}) overlaps with blocked slot (${blockStart}-${blockEnd})`)
+      }
+      
+      return overlaps
+    })
+    
+    return isBooked || isBlocked
   }
 
   // Format dentist name with Dr. prefix
@@ -255,6 +292,32 @@ export default function StaffAppointments() {
 
     fetchAppointments()
   }, [token])
+
+  // Fetch blocked time slots
+  useEffect(() => {
+    const fetchBlockedTimeSlots = async () => {
+      if (!token) return
+      
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+          headers: {
+            'Authorization': `Token ${token}`,
+          },
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setBlockedTimeSlots(data)
+          console.log("Fetched blocked time slots:", data)
+        }
+      } catch (error) {
+        console.error("Error fetching blocked time slots:", error)
+      }
+    }
+
+    fetchBlockedTimeSlots()
+  }, [token])
+
 
   // Fetch dentist availability when dentist is selected
   useEffect(() => {
@@ -412,10 +475,45 @@ export default function StaffAppointments() {
     }
   }
 
+  const handleBlockTimeSlot = async (blockData: {
+    date: string
+    start_time: string
+    end_time: string
+    reason: string
+  }) => {
+    if (!token) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify(blockData),
+      })
+
+      if (response.ok) {
+        const newBlockedSlot = await response.json()
+        setBlockedTimeSlots([...blockedTimeSlots, newBlockedSlot])
+        alert("Time slot blocked successfully!")
+        setShowBlockTimeModal(false)
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || "Failed to block time slot. Please try again.")
+      }
+    } catch (error) {
+      console.error("Error blocking time slot:", error)
+      alert("Failed to block time slot. Please try again.")
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
         return "bg-green-100 text-green-700"
+      case "waiting":
+        return "bg-purple-100 text-purple-700"
       case "pending":
         return "bg-yellow-100 text-yellow-700"
       case "reschedule_requested":
@@ -439,6 +537,8 @@ export default function StaffAppointments() {
         return "Reschedule Requested"
       case "cancel_requested":
         return "Cancellation Requested"
+      case "waiting":
+        return "Waiting"
       default:
         return status.charAt(0).toUpperCase() + status.slice(1)
     }
@@ -679,13 +779,22 @@ export default function StaffAppointments() {
           <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
           <p className="text-[var(--color-text-muted)]">Manage patient appointments and schedules</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Add Appointment
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowBlockTimeModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <Ban className="w-5 h-5" />
+            Block Time
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Add Appointment
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -716,6 +825,16 @@ export default function StaffAppointments() {
             All Patients
           </button>
           <button
+            onClick={() => setStatusFilter("waiting")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "waiting"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Waiting
+          </button>
+          <button
             onClick={() => setStatusFilter("pending")}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
               statusFilter === "pending"
@@ -726,14 +845,14 @@ export default function StaffAppointments() {
             Pending
           </button>
           <button
-            onClick={() => setStatusFilter("confirmed")}
+            onClick={() => setStatusFilter("completed")}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              statusFilter === "confirmed"
+              statusFilter === "completed"
                 ? "bg-[var(--color-primary)] text-white"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            Confirmed
+            Completed
           </button>
           <button
             onClick={() => setStatusFilter("missed")}
@@ -754,16 +873,6 @@ export default function StaffAppointments() {
             }`}
           >
             Cancelled
-          </button>
-          <button
-            onClick={() => setStatusFilter("completed")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              statusFilter === "completed"
-                ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            Completed
           </button>
         </div>
       </div>
@@ -804,7 +913,17 @@ export default function StaffAppointments() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.service_name || "General Consultation"}</td>
+                    <td className="px-6 py-4">
+                      <span 
+                        className="px-3 py-1 rounded-lg"
+                        style={{ 
+                          backgroundColor: apt.service_color || '#10b981',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {apt.service_name || "General Consultation"}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
@@ -1462,6 +1581,13 @@ export default function StaffAppointments() {
           appointmentDetails={successAppointmentDetails}
         />
       )}
+
+      {/* Block Time Modal */}
+      <BlockTimeModal
+        isOpen={showBlockTimeModal}
+        onClose={() => setShowBlockTimeModal(false)}
+        onBlock={handleBlockTimeSlot}
+      />
 
       {/* Confirmation Modal */}
       {confirmModalConfig && (

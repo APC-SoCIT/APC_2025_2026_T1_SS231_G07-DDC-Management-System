@@ -17,7 +17,7 @@ from .models import (
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification,
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
-    FileAttachment, ClinicalNote, TreatmentAssignment
+    FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot
 )
 from .serializers import (
     UserSerializer, ServiceSerializer, AppointmentSerializer,
@@ -26,7 +26,7 @@ from .serializers import (
     TreatmentPlanSerializer, TeethImageSerializer, StaffAvailabilitySerializer,
     DentistAvailabilitySerializer, DentistNotificationSerializer, AppointmentNotificationSerializer, 
     PasswordResetTokenSerializer, PatientIntakeFormSerializer,
-    FileAttachmentSerializer, ClinicalNoteSerializer, TreatmentAssignmentSerializer
+    FileAttachmentSerializer, ClinicalNoteSerializer, TreatmentAssignmentSerializer, BlockedTimeSlotSerializer
 )
 
 
@@ -1394,6 +1394,65 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         return Response({
             'message': f'Deleted {deleted_count} availability records'
         })
+
+
+class BlockedTimeSlotViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing blocked time slots to prevent patient bookings.
+    Staff and owners can block specific time ranges on specific dates.
+    """
+    queryset = BlockedTimeSlot.objects.all()
+    serializer_class = BlockedTimeSlotSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter by date range if specified"""
+        queryset = BlockedTimeSlot.objects.all()
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        date = self.request.query_params.get('date', None)
+        
+        if date:
+            queryset = queryset.filter(date=date)
+        elif start_date and end_date:
+            queryset = queryset.filter(date__gte=start_date, date__lte=end_date)
+        elif start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(date__lte=end_date)
+        
+        return queryset.order_by('date', 'start_time')
+
+    def perform_create(self, serializer):
+        """Set the created_by field to the current user"""
+        serializer.save(created_by=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        """Override create to ensure only staff/owner can block slots"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can block time slots'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure only staff/owner can modify blocks"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can modify blocked time slots'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to ensure only staff/owner can delete blocks"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can delete blocked time slots'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class DentistNotificationViewSet(viewsets.ModelViewSet):
