@@ -755,6 +755,31 @@ export default function OwnerAppointments() {
     setEditedData({})
   }
 
+  // Helper function to darken a hex color for better text readability
+  const darkenColor = (hex: string, percent: number = 40): string => {
+    // Remove the hash if present
+    const color = hex.replace('#', '')
+    
+    // Parse RGB values
+    const r = parseInt(color.substring(0, 2), 16)
+    const g = parseInt(color.substring(2, 4), 16)
+    const b = parseInt(color.substring(4, 6), 16)
+    
+    // Darken by reducing each component
+    const darkenAmount = 1 - (percent / 100)
+    const newR = Math.round(r * darkenAmount)
+    const newG = Math.round(g * darkenAmount)
+    const newB = Math.round(b * darkenAmount)
+    
+    // Convert back to hex
+    const toHex = (n: number) => {
+      const hex = n.toString(16)
+      return hex.length === 1 ? '0' + hex : hex
+    }
+    
+    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`
+  }
+
   const handleDelete = async (appointmentId: number, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm("Are you sure you want to delete this appointment?")) return
@@ -1049,10 +1074,11 @@ export default function OwnerAppointments() {
                     </td>
                     <td className="px-6 py-4">
                       <span 
-                        className="px-3 py-1 rounded-lg"
+                        className="px-3 py-1 rounded-lg font-medium"
                         style={{ 
-                          backgroundColor: apt.service_color || '#10b981',
-                          color: '#ffffff'
+                          color: darkenColor(apt.service_color || '#10b981', 40),
+                          backgroundColor: `${apt.service_color || '#10b981'}15`,
+                          border: `1px solid ${apt.service_color || '#10b981'}40`
                         }}
                       >
                         {apt.service_name || "General Consultation"}

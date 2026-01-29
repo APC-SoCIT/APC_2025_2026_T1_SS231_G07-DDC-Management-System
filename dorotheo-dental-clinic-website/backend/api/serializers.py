@@ -22,9 +22,11 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def get_last_appointment_date(self, obj):
-        """Get the last appointment date for patients"""
+        """Get the last appointment datetime for patients (returns full datetime for accurate sorting)"""
         if obj.user_type == 'patient':
-            return obj.get_last_appointment_date()
+            last_datetime = obj.get_last_appointment_date()
+            # Return the datetime as is - DRF will serialize it properly as ISO format
+            return last_datetime
         return None
 
     def create(self, validated_data):
