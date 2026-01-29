@@ -622,8 +622,15 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     
     def perform_update(self, serializer):
         """Update patient status and create dental record when appointment is completed"""
+        from django.utils import timezone
+        
         old_status = self.get_object().status
         appointment = serializer.save()
+        
+        # Set completed_at timestamp when status changes to completed
+        if old_status != 'completed' and appointment.status == 'completed':
+            appointment.completed_at = timezone.now()
+            appointment.save(update_fields=['completed_at'])
         
         if appointment.patient:
             appointment.patient.update_patient_status()

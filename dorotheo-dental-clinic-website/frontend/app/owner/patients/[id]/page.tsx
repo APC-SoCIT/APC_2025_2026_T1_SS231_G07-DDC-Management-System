@@ -89,6 +89,24 @@ export default function PatientDetailPage() {
     fetchPatientData()
   }, [token, patientId])
 
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedImage) {
+          setSelectedImage(null)
+        } else if (selectedDocument) {
+          setSelectedDocument(null)
+        } else if (showUploadModal) {
+          setShowUploadModal(false)
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [selectedImage, selectedDocument, showUploadModal])
+
   useEffect(() => {
     if (selectedDocument) {
       // Fetch PDF as blob and create object URL
@@ -479,11 +497,14 @@ export default function PatientDetailPage() {
                               {new Date(apt.date).toLocaleDateString()} at {formatTime(apt.time)}
                             </p>
                           </div>
-                          {((apt as any).dentist_name || apt.dentist) && (
+                          {(((apt as any).dentist_name && (apt as any).dentist_name.trim()) || apt.dentist) && (
                             <div>
                               <p className="text-sm text-gray-500">Dentist</p>
                               <p className="font-medium text-gray-900">
-                                {(apt as any).dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
+                                {((apt as any).dentist_name && (apt as any).dentist_name.trim()) || 
+                                  (apt.dentist?.first_name && apt.dentist?.last_name 
+                                    ? `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}` 
+                                    : apt.dentist?.username || 'Dr. N/A')}
                               </p>
                             </div>
                           )}

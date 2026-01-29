@@ -67,6 +67,22 @@ export default function UnifiedDocumentUpload({
     fetchAppointments()
   }, [token, patientId])
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (step === 'appointment') {
+          onClose()
+        } else {
+          handleBackStep()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [step, onClose])
+
   const documentTypeConfig = {
     xray: { label: 'X-Ray', color: 'bg-blue-100 text-blue-900', icon: Activity },
     scan: { label: 'Dental Scan', color: 'bg-green-100 text-green-900', icon: Scan },

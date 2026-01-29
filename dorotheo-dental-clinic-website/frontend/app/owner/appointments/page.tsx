@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Fragment, useEffect } from "react"
+import { useState, Fragment, useEffect, useRef } from "react"
 import { 
   Plus, 
   Eye, 
@@ -14,7 +14,8 @@ import {
   Calendar as CalendarIcon,
   Clock,
   FileText,
-  Ban
+  Ban,
+  Hourglass
 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
@@ -39,6 +40,7 @@ interface Appointment {
   notes: string
   created_at: string
   updated_at: string
+  completed_at: string | null
   reschedule_date: string | null
   reschedule_time: string | null
   reschedule_service: number | null
@@ -102,6 +104,8 @@ export default function OwnerAppointments() {
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([]) 
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
+  const patientDropdownRef = useRef<HTMLDivElement>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
     title: string
@@ -121,6 +125,8 @@ export default function OwnerAppointments() {
     created_by: number
     created_by_name: string
   }>>([])
+  const [sortColumn, setSortColumn] = useState<'patient' | 'treatment' | 'date' | 'time' | 'dentist' | 'status' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const parseDateOnly = (dateStr?: string) => {
     if (!dateStr) return null
     const [year, month, day] = dateStr.split('-').map(Number)
@@ -286,6 +292,18 @@ export default function OwnerAppointments() {
 
     fetchAppointments()
   }, [token])
+
+  // Handle clicking outside patient dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (patientDropdownRef.current && !patientDropdownRef.current.contains(event.target as Node)) {
+        setShowPatientDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Fetch blocked time slots
   useEffect(() => {
@@ -673,18 +691,18 @@ export default function OwnerAppointments() {
     if (!token) return
     
     setConfirmModalConfig({
-      title: "Approve Appointment?",
-      message: "Are you sure you want to approve this appointment?",
+      title: "Complete Appointment?",
+      message: "Are you sure you want to complete this appointment?",
       variant: "success",
       onConfirm: async () => {
         try {
-          await api.updateAppointment(appointmentId, { status: "confirmed" }, token)
+          await api.updateAppointment(appointmentId, { status: "completed" }, token)
           setAppointments(appointments.map(apt => 
-            apt.id === appointmentId ? { ...apt, status: "confirmed" as const } : apt
+            apt.id === appointmentId ? { ...apt, status: "completed" as const } : apt
           ))
         } catch (error) {
-          console.error("Error approving appointment:", error)
-          alert("Failed to approve appointment.")
+          console.error("Error completing appointment:", error)
+          alert("Failed to complete appointment.")
         }
       }
     })
@@ -762,18 +780,71 @@ export default function OwnerAppointments() {
     )
   }
 
-  const filteredAppointments = appointments.filter((apt) => {
-    // Filter by search query
-    const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    // Filter by status
-    const matchesStatus = statusFilter === "all" || apt.status === statusFilter
-    
-    return matchesSearch && matchesStatus
-  })
+  const handleSort = (column: 'patient' | 'treatment' | 'date' | 'time' | 'dentist' | 'status') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const getSortedAppointments = (appointmentsToSort: Appointment[]) => {
+    if (!sortColumn) return appointmentsToSort
+
+    return [...appointmentsToSort].sort((a, b) => {
+      let aValue: string | number = ''
+      let bValue: string | number = ''
+
+      switch (sortColumn) {
+        case 'patient':
+          aValue = (a.patient_name || '').toLowerCase()
+          bValue = (b.patient_name || '').toLowerCase()
+          break
+        case 'treatment':
+          aValue = (a.service_name || '').toLowerCase()
+          bValue = (b.service_name || '').toLowerCase()
+          break
+        case 'date':
+          aValue = a.date || '0000-00-00'
+          bValue = b.date || '0000-00-00'
+          break
+        case 'time':
+          aValue = a.time || '00:00'
+          bValue = b.time || '00:00'
+          break
+        case 'dentist':
+          aValue = (a.dentist_name || '').toLowerCase()
+          bValue = (b.dentist_name || '').toLowerCase()
+          break
+        case 'status':
+          aValue = (a.status || '').toLowerCase()
+          bValue = (b.status || '').toLowerCase()
+          break
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  const filteredAppointments = getSortedAppointments(
+    appointments.filter((apt) => {
+      // Filter by search query
+      const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      // Filter by status
+      const matchesStatus = statusFilter === "all" || apt.status === statusFilter
+      
+      return matchesSearch && matchesStatus
+    })
+  )
 
   return (
     <div className="space-y-6">
@@ -886,12 +957,72 @@ export default function OwnerAppointments() {
           <table className="w-full">
             <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Patient</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Treatment</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Date</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Time</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Dentist</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
+                <th 
+                  onClick={() => handleSort('patient')}
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Patient
+                    {sortColumn === 'patient' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('treatment')}
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Treatment
+                    {sortColumn === 'treatment' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('date')}
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Date
+                    {sortColumn === 'date' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('time')}
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Time
+                    {sortColumn === 'time' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('dentist')}
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Dentist
+                    {sortColumn === 'dentist' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('status')}
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Status
+                    {sortColumn === 'status' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
               </tr>
             </thead>
@@ -937,19 +1068,48 @@ export default function OwnerAppointments() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        {/* Approve Button - Only for pending appointments */}
+                        {/* Mark as Waiting Button - Only for appointments that aren't already waiting, pending, or done */}
+                        {apt.status !== "waiting" && apt.status !== "pending" && apt.status !== "completed" && apt.status !== "missed" && apt.status !== "cancelled" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleStatusChange(apt.id, "waiting")
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-sm"
+                            title="Mark as Waiting"
+                          >
+                            <Clock className="w-4 h-4" />
+                            <span>Waiting</span>
+                          </button>
+                        )}
+                        {/* Mark as Pending Button - Only for appointments that aren't already pending or done */}
+                        {apt.status !== "pending" && apt.status !== "completed" && apt.status !== "missed" && apt.status !== "cancelled" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleStatusChange(apt.id, "pending")
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg transition-colors font-medium text-sm"
+                            title="Mark as Pending"
+                          >
+                            <Hourglass className="w-4 h-4" />
+                            <span>Pending</span>
+                          </button>
+                        )}
+                        {/* Complete Button - For pending appointments */}
                         {apt.status === "pending" && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
                               handleApprove(apt.id)
                             }}
-                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Approve Appointment"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors font-medium text-sm"
+                            title="Complete Appointment"
                           >
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
+                            <span>Complete</span>
                           </button>
                         )}
                         {/* Complete Button - Only for confirmed appointments */}
@@ -959,12 +1119,13 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleMarkComplete(apt)
                             }}
-                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors font-medium text-sm"
                             title="Mark as Complete"
                           >
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
+                            <span>Complete</span>
                           </button>
                         )}
                         {/* Mark as Missed Button - Only for confirmed appointments */}
@@ -974,12 +1135,13 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleMarkMissed(apt)
                             }}
-                            className="p-2 hover:bg-yellow-50 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded-lg transition-colors font-medium text-sm"
                             title="Mark as Missed"
                           >
-                            <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
+                            <span>Missed</span>
                           </button>
                         )}
                         {/* Cancel Button - Only for pending and confirmed appointments */}
@@ -989,28 +1151,31 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleCancelAppointment(apt)
                             }}
-                            className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors font-medium text-sm"
                             title="Cancel Appointment"
                           >
-                            <X className="w-4 h-4 text-red-600" />
+                            <X className="w-4 h-4" />
+                            <span>Cancel</span>
                           </button>
                         )}
                         {/* Edit Button - Only for pending and confirmed appointments (for rescheduling) */}
                         {(apt.status === "pending" || apt.status === "confirmed") && (
                           <button
                             onClick={(e) => handleEdit(apt, e)}
-                            className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-sm"
                             title="Reschedule"
                           >
-                            <Edit2 className="w-4 h-4 text-blue-600" />
+                            <Edit2 className="w-4 h-4" />
+                            <span>Reschedule</span>
                           </button>
                         )}
                         <button
                           onClick={(e) => handleDelete(apt.id, e)}
-                          className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors font-medium text-sm"
                           title="Delete"
                         >
-                          <Trash2 className="w-4 h-4 text-red-600" />
+                          <Trash2 className="w-4 h-4" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </td>
@@ -1288,6 +1453,12 @@ export default function OwnerAppointments() {
                                         {formatStatus(apt.status)}
                                       </span>
                                     </div>
+                                    {apt.status === "completed" && apt.completed_at && (
+                                      <div className="pt-3 border-t border-[var(--color-border)]">
+                                        <p className="text-[var(--color-text-muted)] mb-0.5">Completed At</p>
+                                        <p className="font-medium text-green-600">{new Date(apt.completed_at).toLocaleString()}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -1365,39 +1536,96 @@ export default function OwnerAppointments() {
                     <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                       Patient <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Search patient by name or email..."
-                      value={patientSearchQuery}
-                      onChange={(e) => setPatientSearchQuery(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] mb-2"
-                    />
-                    <select
-                      value={selectedPatientId || ""}
-                      onChange={(e) => setSelectedPatientId(Number(e.target.value))}
-                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                      required
-                    >
-                      <option value="">Select a patient...</option>
-                      {patients
-                        .filter((patient) => {
-                          if (!patientSearchQuery) return true
-                          const query = patientSearchQuery.toLowerCase()
-                          return (
-                            patient.first_name.toLowerCase().includes(query) ||
-                            patient.last_name.toLowerCase().includes(query) ||
-                            patient.email.toLowerCase().includes(query)
-                          )
-                        })
-                        .map((patient) => (
-                          <option key={patient.id} value={patient.id}>
-                            {patient.first_name} {patient.last_name} - {patient.email}
-                          </option>
-                        ))}
-                    </select>
+                    <div className="relative" ref={patientDropdownRef}>
+                      <input
+                        type="text"
+                        placeholder="Search patient by name or email..."
+                        value={patientSearchQuery}
+                        onChange={(e) => {
+                          setPatientSearchQuery(e.target.value)
+                          setShowPatientDropdown(true)
+                        }}
+                        onFocus={() => setShowPatientDropdown(true)}
+                        className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
+                      {showPatientDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--color-border)] rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {patients
+                            .filter((patient) => {
+                              if (!patientSearchQuery) return true
+                              const query = patientSearchQuery.toLowerCase()
+                              return (
+                                patient.first_name.toLowerCase().includes(query) ||
+                                patient.last_name.toLowerCase().includes(query) ||
+                                patient.email.toLowerCase().includes(query)
+                              )
+                            })
+                            .sort((a, b) => {
+                              // Get most recent completed appointment for each patient
+                              const getLastCompletedDate = (patientId: number) => {
+                                const completedApts = appointments
+                                  .filter(apt => apt.patient === patientId && apt.status === 'completed')
+                                  .sort((apt1, apt2) => {
+                                    const date1 = new Date(`${apt1.date}T${apt1.time}`)
+                                    const date2 = new Date(`${apt2.date}T${apt2.time}`)
+                                    return date2.getTime() - date1.getTime()
+                                  })
+                                return completedApts.length > 0 ? new Date(`${completedApts[0].date}T${completedApts[0].time}`) : null
+                              }
+
+                              const aLastCompleted = getLastCompletedDate(a.id)
+                              const bLastCompleted = getLastCompletedDate(b.id)
+
+                              // Patients with recent completed appointments come first
+                              if (aLastCompleted && bLastCompleted) {
+                                return bLastCompleted.getTime() - aLastCompleted.getTime()
+                              }
+                              if (aLastCompleted && !bLastCompleted) return -1
+                              if (!aLastCompleted && bLastCompleted) return 1
+
+                              // If neither has completed appointments, sort alphabetically by name
+                              return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+                            })
+                            .map((patient) => (
+                              <div
+                                key={patient.id}
+                                onClick={() => {
+                                  setSelectedPatientId(patient.id)
+                                  setPatientSearchQuery(`${patient.first_name} ${patient.last_name} - ${patient.email}`)
+                                  setShowPatientDropdown(false)
+                                }}
+                                className={`px-4 py-2.5 cursor-pointer hover:bg-gray-100 ${
+                                  selectedPatientId === patient.id ? 'bg-blue-50' : ''
+                                }`}
+                              >
+                                <div className="font-medium">{patient.first_name} {patient.last_name}</div>
+                                <div className="text-sm text-gray-500">{patient.email}</div>
+                              </div>
+                            ))}
+                          {patients.filter((patient) => {
+                            if (!patientSearchQuery) return true
+                            const query = patientSearchQuery.toLowerCase()
+                            return (
+                              patient.first_name.toLowerCase().includes(query) ||
+                              patient.last_name.toLowerCase().includes(query) ||
+                              patient.email.toLowerCase().includes(query)
+                            )
+                          }).length === 0 && (
+                            <div className="px-4 py-2.5 text-gray-500 text-center">
+                              No patients found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     {patients.length === 0 && (
                       <p className="text-sm text-amber-600 mt-1">No patients registered yet.</p>
                     )}
+                    <input
+                      type="hidden"
+                      value={selectedPatientId || ""}
+                      required
+                    />
                   </div>
 
                   <div>
