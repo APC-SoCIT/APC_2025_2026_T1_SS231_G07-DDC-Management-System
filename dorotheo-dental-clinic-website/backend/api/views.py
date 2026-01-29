@@ -12,6 +12,9 @@ from django.utils import timezone
 from django.conf import settings
 from datetime import date, timedelta
 import secrets
+import logging
+
+logger = logging.getLogger(__name__)
 from .models import (
     User, Service, Appointment, ToothChart, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
@@ -112,19 +115,19 @@ def create_patient_notification(appointment, notification_type, custom_message=N
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
-    print("[Django] Registration request received:", request.data)
+    logger.info("[Django] Registration request received: %s", request.data)
     
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
-        print("[Django] Serializer is valid, creating user")
+        logger.info("[Django] Serializer is valid, creating user")
         user = serializer.save()
         user.set_password(request.data.get('password'))
         user.save()
         token, _ = Token.objects.get_or_create(user=user)
-        print("[Django] User created successfully:", user.username)
+        logger.info("[Django] User created successfully: %s", user.username)
         return Response({'token': token.key, 'user': serializer.data}, status=status.HTTP_201_CREATED)
     
-    print("[Django] Serializer errors:", serializer.errors)
+    logger.error("[Django] Serializer errors: %s", serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -133,7 +136,7 @@ def register(request):
 def login(request):
     username = request.data.get('username')
     password = request.data.get('password')
-    print(f"[Django] Login attempt for username: {username}")
+    logger.info("[Django] Login attempt for username: %s", username)
     
     # Try to authenticate with username first
     user = authenticate(username=username, password=password)
@@ -143,17 +146,17 @@ def login(request):
         try:
             user_obj = User.objects.get(email=username)
             user = authenticate(username=user_obj.username, password=password)
-            print(f"[Django] Found user by email: {username}, trying with username: {user_obj.username}")
+            logger.info("[Django] Found user by email: %s, trying with username: %s", username, user_obj.username)
         except User.DoesNotExist:
-            print(f"[Django] No user found with email: {username}")
+            logger.info("[Django] No user found with email: %s", username)
     
     if user:
         token, _ = Token.objects.get_or_create(user=user)
         serializer = UserSerializer(user)
-        print(f"[Django] Login successful for: {username}")
+        logger.info("[Django] Login successful for: %s", username)
         return Response({'token': token.key, 'user': serializer.data})
     
-    print(f"[Django] Login failed for: {username}")
+    logger.warning("[Django] Login failed for: %s", username)
     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -168,13 +171,13 @@ def logout(request):
 def request_password_reset(request):
     """Request a password reset token"""
     email = request.data.get('email')
-    print(f"[Password Reset] Request received for email: {email}")
+    logger.info("[Password Reset] Request received for email: %s", email)
     if not email:
         return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         user = User.objects.get(email=email)
-        print(f"[Password Reset] User found: {user.username}")
+        logger.info("[Password Reset] User found: %s", user.username)
         # Invalidate any existing active tokens for this user
         PasswordResetToken.objects.filter(user=user, is_used=False, expires_at__gt=timezone.now()).update(is_used=True)
         
@@ -191,11 +194,11 @@ def request_password_reset(request):
         # Build reset link to frontend login page with token as query param
         frontend_base = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')
         reset_link = f"{frontend_base}/login?reset_token={token}"
-        print(f"[Password Reset] Token generated: {token}")
-        print(f"[Password Reset] Reset link: {reset_link}")
+        logger.info("[Password Reset] Token generated: %s", token)
+        logger.info("[Password Reset] Reset link: %s", reset_link)
 
         # Send reset email (uses console backend locally by default)
-        print(f"[Password Reset] Attempting to send email to {email}...")
+        logger.info("[Password Reset] Attempting to send email to %s...", email)
         try:
             send_mail(
                 subject='Dorotheo Dental Clinic - Password Reset',
@@ -209,9 +212,9 @@ def request_password_reset(request):
                 recipient_list=[email],
                 fail_silently=False,  # Show errors for debugging
             )
-            print(f"[Password Reset] Email sent successfully!")
+            logger.info("[Password Reset] Email sent successfully!")
         except Exception as e:
-            print(f"[Password Reset] Email error: {str(e)}")
+            logger.error("[Password Reset] Email error: %s", str(e))
 
         # Return a generic message (token included for dev convenience)
         response_data = {
@@ -227,7 +230,7 @@ def request_password_reset(request):
     
     except User.DoesNotExist:
         # Don't reveal if email exists or not
-        print(f"[Password Reset] Email not found in database: {email}")
+        logger.info("[Password Reset] Email not found in database: %s", email)
         return Response({
             'message': 'If the email exists, a password reset link will be sent'
         })
@@ -541,7 +544,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         missed_count = past_appointments.update(status='missed')
         
         if missed_count > 0:
-            print(f"[Django] Auto-marked {missed_count} appointments as missed")
+            logger.info("[Django] Auto-marked %d appointments as missed", missed_count)
         
         return missed_count
     
@@ -654,9 +657,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             )
             
             if created:
-                print(f"[Django] Created dental record for completed appointment: {appointment.id}")
+                logger.info("[Django] Created dental record for completed appointment: %s", appointment.id)
             else:
-                print(f"[Django] Dental record already exists for appointment: {appointment.id}")
+                logger.info("[Django] Dental record already exists for appointment: %s", appointment.id)
 
     @action(detail=False, methods=['get'])
     def today(self, request):
@@ -711,7 +714,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(appointment)
             return Response(serializer.data)
         except Exception as e:
-            print(f"[ERROR] Failed to process reschedule request: {str(e)}")
+            logger.error("[ERROR] Failed to process reschedule request: %s", str(e))
             import traceback
             traceback.print_exc()
             return Response(
@@ -790,10 +793,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment = self.get_object()
         
         # Debug logging
-        print(f"[DEBUG] request.user: {request.user} (ID: {request.user.id}, type: {request.user.user_type})")
-        print(f"[DEBUG] appointment.patient: {appointment.patient} (ID: {appointment.patient.id})")
-        print(f"[DEBUG] Are they equal? {request.user == appointment.patient}")
-        print(f"[DEBUG] IDs equal? {request.user.id == appointment.patient.id}")
+        logger.debug("[DEBUG] request.user: %s (ID: %s, type: %s)", request.user, request.user.id, request.user.user_type)
+        logger.debug("[DEBUG] appointment.patient: %s (ID: %s)", appointment.patient, appointment.patient.id)
+        logger.debug("[DEBUG] Are they equal? %s", request.user == appointment.patient)
+        logger.debug("[DEBUG] IDs equal? %s", request.user.id == appointment.patient.id)
         
         # Check if user is the patient (compare by ID to be safe)
         if request.user.id != appointment.patient.id:
