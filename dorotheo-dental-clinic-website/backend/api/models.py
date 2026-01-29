@@ -59,15 +59,18 @@ class User(AbstractUser):
     def get_last_appointment_date(self):
         """Get the date of the last completed appointment"""
         try:
-            # Get completed appointments ordered by date (most recent first)
-            completed_appointments = self.appointments.filter(status='completed').order_by('-date', '-time')
+            # Get completed appointments ordered by completion time (most recent first)
+            # Use completed_at if available for accurate sorting, otherwise fallback to date+time
+            completed_appointments = self.appointments.filter(status='completed').order_by('-completed_at', '-date', '-time')
             
             if completed_appointments.exists():
                 last_appointment = completed_appointments.first()
-                # Return completed_at date if available, otherwise use appointment date
+                # Return completed_at datetime if available for accurate sorting
                 if hasattr(last_appointment, 'completed_at') and last_appointment.completed_at:
-                    return last_appointment.completed_at.date()
-                return last_appointment.date
+                    return last_appointment.completed_at
+                # Fallback: combine date and time into a datetime
+                from datetime import datetime
+                return datetime.combine(last_appointment.date, last_appointment.time)
             return None
         except Exception as e:
             # If appointments relationship doesn't exist yet, return None

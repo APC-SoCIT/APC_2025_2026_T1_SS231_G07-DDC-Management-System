@@ -144,7 +144,7 @@ export default function OwnerPatients() {
             name: `${user.first_name} ${user.last_name}`,
             email: user.email,
             phone: user.phone || "N/A",
-            lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
+            lastVisit: user.last_appointment_date || user.created_at || "N/A",
             status: status,
             address: user.address || "N/A",
             dateOfBirth: user.birthday || "N/A",
@@ -169,7 +169,7 @@ export default function OwnerPatients() {
           name: `${user.first_name} ${user.last_name}`,
           email: user.email,
           phone: user.phone || "N/A",
-          lastVisit: user.last_appointment_date || user.created_at?.split('T')[0] || "N/A",
+          lastVisit: user.last_appointment_date || user.created_at || "N/A",
           status: "archived" as const,
           address: user.address || "N/A",
           dateOfBirth: user.birthday || "N/A",
@@ -275,7 +275,7 @@ export default function OwnerPatients() {
           bValue = b.phone.toLowerCase()
           break
         case 'lastVisit':
-          // Handle "N/A" and dates
+          // Handle "N/A" and datetime strings - ISO format strings sort correctly
           aValue = a.lastVisit === 'N/A' ? '0000-00-00' : a.lastVisit
           bValue = b.lastVisit === 'N/A' ? '0000-00-00' : b.lastVisit
           break
@@ -289,6 +289,13 @@ export default function OwnerPatients() {
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
       return 0
     })
+  }
+
+  // Helper function to format datetime to date only for display
+  const formatLastVisit = (lastVisit: string): string => {
+    if (lastVisit === 'N/A') return 'N/A'
+    // Extract just the date part from ISO datetime string
+    return lastVisit.split('T')[0]
   }
 
   const filteredPatients = getSortedPatients(
@@ -592,7 +599,7 @@ export default function OwnerPatients() {
                     </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.email}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.phone}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.lastVisit}</td>
+                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatLastVisit(patient.lastVisit)}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-medium ${
