@@ -24,6 +24,8 @@ export default function ServicesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingService, setEditingService] = useState<Service | null>(null)
+  const [tempColor, setTempColor] = useState("#10b981")
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   // Format duration to show hours and minutes
   const formatDuration = (minutes: number) => {
@@ -124,14 +126,16 @@ export default function ServicesPage() {
 
   const handleEdit = (service: Service) => {
     setEditingService(service)
+    const serviceColor = service.color || "#10b981"
     setFormData({
       name: service.name,
       description: service.description,
       category: service.category,
       duration: service.duration || 30,
-      color: service.color || "#10b981",
+      color: serviceColor,
       image: null,
     })
+    setTempColor(serviceColor)
     setImagePreview(service.image)
     setIsModalOpen(true)
   }
@@ -154,7 +158,35 @@ export default function ServicesPage() {
     setEditingService(null)
     setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null })
     setImagePreview("")
+    setShowColorPicker(false)
+    setTempColor("#10b981")
   }
+
+  const handleColorConfirm = () => {
+    setFormData({ ...formData, color: tempColor })
+    setShowColorPicker(false)
+  }
+
+  const handleColorCancel = () => {
+    setTempColor(formData.color)
+    setShowColorPicker(false)
+  }
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isModalOpen) {
+        if (showColorPicker) {
+          handleColorCancel()
+        } else {
+          closeModal()
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [isModalOpen, showColorPicker, formData.color])
 
   if (isLoading) {
     return (
@@ -300,21 +332,59 @@ export default function ServicesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="w-16 h-12 border border-[var(--color-border)] rounded-lg cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="flex-1 px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono"
-                    placeholder="#10b981"
-                    pattern="^#[0-9A-Fa-f]{6}$"
-                  />
+                <div className="relative">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempColor(formData.color)
+                        setShowColorPicker(true)
+                      }}
+                      className="w-16 h-12 border border-[var(--color-border)] rounded-lg cursor-pointer"
+                      style={{ backgroundColor: formData.color }}
+                    />
+                    <input
+                      type="text"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      className="flex-1 px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono"
+                      placeholder="#10b981"
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                    />
+                  </div>
+
+                  {/* Color Picker Modal */}
+                  {showColorPicker && (
+                    <div className="absolute top-0 left-0 z-10 bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-4">
+                      <div className="flex flex-col gap-3">
+                        <input
+                          type="color"
+                          value={tempColor}
+                          onChange={(e) => setTempColor(e.target.value)}
+                          className="w-48 h-32 border border-[var(--color-border)] rounded-lg cursor-pointer"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono text-[var(--color-text-muted)]">{tempColor}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleColorCancel}
+                            className="flex-1 px-4 py-2 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleColorConfirm}
+                            className="flex-1 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors text-sm"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

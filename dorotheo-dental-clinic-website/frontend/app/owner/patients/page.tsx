@@ -81,6 +81,8 @@ export default function OwnerPatients() {
     address: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sortColumn, setSortColumn] = useState<'name' | 'email' | 'phone' | 'lastVisit' | 'status' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   // Fetch real patients and appointments from API
   useEffect(() => {
@@ -240,21 +242,72 @@ export default function OwnerPatients() {
 
   // Remove mock patients - only use real patient data from API
   const displayPatients = activeTab === "archived" ? archivedPatients : activeTab === "all" ? [...patients, ...archivedPatients] : patients
-  const filteredPatients = displayPatients.filter((patient) => {
-    const matchesSearch =
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.phone.toLowerCase().includes(searchQuery.toLowerCase())
+  
+  const handleSort = (column: 'name' | 'email' | 'phone' | 'lastVisit' | 'status') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "archived" && patient.status === "archived") ||
-      (activeTab === "active" && patient.status === "active") ||
-      (activeTab === "inactive" && patient.status === "inactive") ||
-      (activeTab === "new" && patient.status !== "archived" && new Date(patient.lastVisit).getMonth() === new Date().getMonth())
+  const getSortedPatients = (patientsToSort: Patient[]) => {
+    if (!sortColumn) return patientsToSort
 
-    return matchesSearch && matchesTab
-  })
+    return [...patientsToSort].sort((a, b) => {
+      let aValue: string | number = ''
+      let bValue: string | number = ''
+
+      switch (sortColumn) {
+        case 'name':
+          aValue = a.name.toLowerCase()
+          bValue = b.name.toLowerCase()
+          break
+        case 'email':
+          aValue = a.email.toLowerCase()
+          bValue = b.email.toLowerCase()
+          break
+        case 'phone':
+          aValue = a.phone.toLowerCase()
+          bValue = b.phone.toLowerCase()
+          break
+        case 'lastVisit':
+          // Handle "N/A" and dates
+          aValue = a.lastVisit === 'N/A' ? '0000-00-00' : a.lastVisit
+          bValue = b.lastVisit === 'N/A' ? '0000-00-00' : b.lastVisit
+          break
+        case 'status':
+          aValue = a.status.toLowerCase()
+          bValue = b.status.toLowerCase()
+          break
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  const filteredPatients = getSortedPatients(
+    displayPatients.filter((patient) => {
+      const matchesSearch =
+        patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.phone.toLowerCase().includes(searchQuery.toLowerCase())
+
+      const matchesTab =
+        activeTab === "all" ||
+        (activeTab === "archived" && patient.status === "archived") ||
+        (activeTab === "active" && patient.status === "active") ||
+        (activeTab === "inactive" && patient.status === "inactive") ||
+        (activeTab === "new" && patient.status !== "archived" && new Date(patient.lastVisit).getMonth() === new Date().getMonth())
+
+      return matchesSearch && matchesTab
+    })
+  )
 
   const handleRowClick = (patientId: number) => {
     // Navigate to patient detail page
@@ -468,11 +521,61 @@ export default function OwnerPatients() {
           <table className="w-full">
             <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Name</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Email</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Phone</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Last Visit</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center gap-2">
+                    Name
+                    {sortColumn === 'name' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('email')}
+                >
+                  <div className="flex items-center gap-2">
+                    Email
+                    {sortColumn === 'email' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('phone')}
+                >
+                  <div className="flex items-center gap-2">
+                    Phone
+                    {sortColumn === 'phone' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('lastVisit')}
+                >
+                  <div className="flex items-center gap-2">
+                    Last Visit
+                    {sortColumn === 'lastVisit' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center gap-2">
+                    Status
+                    {sortColumn === 'status' && (
+                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
               </tr>
             </thead>

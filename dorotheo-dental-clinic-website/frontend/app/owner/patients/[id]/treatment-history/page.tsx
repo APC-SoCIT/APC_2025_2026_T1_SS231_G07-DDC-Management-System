@@ -187,11 +187,14 @@ export default function PatientTreatmentHistoryPage() {
                             {new Date(apt.date).toLocaleDateString()} at {apt.time}
                           </p>
                         </div>
-                        {apt.dentist_name && (
+                        {((apt.dentist_name && apt.dentist_name.trim()) || (apt as any).dentist) && (
                           <div>
                             <p className="text-sm text-gray-500">Dentist</p>
                             <p className="font-medium text-gray-900">
-                              {apt.dentist_name}
+                              {(apt.dentist_name && apt.dentist_name.trim()) || 
+                                ((apt as any).dentist?.first_name && (apt as any).dentist?.last_name 
+                                  ? `Dr. ${(apt as any).dentist.first_name} ${(apt as any).dentist.last_name}` 
+                                  : (apt as any).dentist?.username || 'Dr. N/A')}
                             </p>
                           </div>
                         )}
@@ -229,11 +232,14 @@ export default function PatientTreatmentHistoryPage() {
                           {new Date(apt.date).toLocaleDateString()} at {apt.time}
                         </p>
                       </div>
-                      {apt.dentist_name && (
+                      {((apt.dentist_name && apt.dentist_name.trim()) || (apt as any).dentist) && (
                         <div>
                           <p className="text-sm text-gray-500">Dentist</p>
                           <p className="font-medium text-gray-900">
-                            {apt.dentist_name}
+                            {(apt.dentist_name && apt.dentist_name.trim()) || 
+                              ((apt as any).dentist?.first_name && (apt as any).dentist?.last_name 
+                                ? `Dr. ${(apt as any).dentist.first_name} ${(apt as any).dentist.last_name}` 
+                                : (apt as any).dentist?.username || 'Dr. N/A')}
                           </p>
                         </div>
                       )}
@@ -270,11 +276,14 @@ export default function PatientTreatmentHistoryPage() {
                           {new Date(apt.date).toLocaleDateString()} at {apt.time}
                         </p>
                       </div>
-                      {apt.dentist_name && (
+                      {((apt.dentist_name && apt.dentist_name.trim()) || (apt as any).dentist) && (
                         <div>
                           <p className="text-sm text-gray-500">Dentist</p>
                           <p className="font-medium text-gray-900">
-                            {apt.dentist_name}
+                            {(apt.dentist_name && apt.dentist_name.trim()) || 
+                              ((apt as any).dentist?.first_name && (apt as any).dentist?.last_name 
+                                ? `Dr. ${(apt as any).dentist.first_name} ${(apt as any).dentist.last_name}` 
+                                : (apt as any).dentist?.username || 'Dr. N/A')}
                           </p>
                         </div>
                       )}

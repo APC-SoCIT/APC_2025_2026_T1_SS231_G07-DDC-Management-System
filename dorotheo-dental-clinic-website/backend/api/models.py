@@ -38,7 +38,7 @@ class User(AbstractUser):
         
         try:
             # Get last appointment
-            last_appointment = self.patient_appointments.order_by('-date').first()
+            last_appointment = self.appointments.order_by('-date').first()
             
             if last_appointment:
                 # Calculate if last appointment was more than 2 years ago
@@ -53,16 +53,24 @@ class User(AbstractUser):
             
             self.save(update_fields=['is_active_patient'])
         except Exception:
-            # If patient_appointments relationship doesn't exist yet, keep as active
+            # If appointments relationship doesn't exist yet, keep as active
             self.is_active_patient = True
     
     def get_last_appointment_date(self):
-        """Get the date of the last appointment"""
+        """Get the date of the last completed appointment"""
         try:
-            last_appointment = self.patient_appointments.order_by('-date').first()
-            return last_appointment.date if last_appointment else None
-        except Exception:
-            # If patient_appointments relationship doesn't exist yet, return None
+            # Get completed appointments ordered by date (most recent first)
+            completed_appointments = self.appointments.filter(status='completed').order_by('-date', '-time')
+            
+            if completed_appointments.exists():
+                last_appointment = completed_appointments.first()
+                # Return completed_at date if available, otherwise use appointment date
+                if hasattr(last_appointment, 'completed_at') and last_appointment.completed_at:
+                    return last_appointment.completed_at.date()
+                return last_appointment.date
+            return None
+        except Exception as e:
+            # If appointments relationship doesn't exist yet, return None
             return None
 
 
@@ -116,6 +124,9 @@ class Appointment(models.Model):
     # Cancel request fields
     cancel_reason = models.TextField(blank=True)
     cancel_requested_at = models.DateTimeField(null=True, blank=True)
+    
+    # Completion timestamp
+    completed_at = models.DateTimeField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

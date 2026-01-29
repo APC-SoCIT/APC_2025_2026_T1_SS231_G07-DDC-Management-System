@@ -65,6 +65,24 @@ export default function PatientDocumentsPage() {
     fetchData()
   }, [token, patientId])
 
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedImage) {
+          setSelectedImage(null)
+        } else if (selectedDocument) {
+          setSelectedDocument(null)
+        } else if (showUploadModal) {
+          setShowUploadModal(false)
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [selectedImage, selectedDocument, showUploadModal])
+
   useEffect(() => {
     if (selectedDocument) {
       // Fetch PDF as blob and create object URL
