@@ -3,12 +3,22 @@
 import { useState, useEffect } from "react"
 import { Camera } from "lucide-react"
 import DentistCalendarAvailability from "@/components/dentist-calendar-availability"
+import QuickAvailabilityModal from "@/components/quick-availability-modal"
+import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 
 export default function OwnerProfile() {
   const { user, token, setUser } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
+  const [showQuickAvailability, setShowQuickAvailability] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successData, setSuccessData] = useState<{
+    mode: 'specific' | 'recurring';
+    dateCount?: number;
+    daysOfWeek?: string[];
+    monthYear?: string;
+  }>({ mode: 'specific' })
   const [profile, setProfile] = useState({
     firstName: "",
     lastName: "",
@@ -169,9 +179,127 @@ export default function OwnerProfile() {
 
       {/* Calendar-Based Availability Schedule (Owner is also a dentist) */}
       <div className="mt-8">
-        <h2 className="text-2xl font-semibold text-[var(--color-text)] mb-4">My Schedule</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-semibold text-[var(--color-text)]">My Schedule</h2>
+          <button
+            onClick={() => setShowQuickAvailability(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Set Availability
+          </button>
+        </div>
         <DentistCalendarAvailability dentistId={user?.id} />
       </div>
+
+      {/* Quick Availability Modal */}
+      <QuickAvailabilityModal
+        isOpen={showQuickAvailability}
+        onClose={() => setShowQuickAvailability(false)}
+        onSave={async (data) => {
+          if (!token || !user) return;
+
+          try {
+            if (data.mode === 'specific') {
+              // Save specific dates
+              const promises = data.dates!.map(date =>
+                fetch('http://127.0.0.1:8000/api/dentist-availability/', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    dentist: user.id,
+                    date,
+                    start_time: data.startTime,
+                    end_time: data.endTime,
+                  }),
+                })
+              );
+              await Promise.all(promises);
+              
+              // Get month and year from first date
+              const firstDate = new Date(data.dates![0]);
+              const monthYear = firstDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+              
+              // Show success modal
+              setSuccessData({
+                mode: 'specific',
+                dateCount: data.dates!.length,
+                monthYear
+              });
+              setShowQuickAvailability(false);
+              setShowSuccessModal(true);
+            } else {
+              // Save recurring schedule (days of week)
+              // Generate dates for the next 3 months based on selected days
+              const dates: string[] = [];
+              const today = new Date();
+              const threeMonthsLater = new Date();
+              threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+
+              let currentDate = new Date(today);
+              while (currentDate <= threeMonthsLater) {
+                if (data.daysOfWeek!.includes(currentDate.getDay())) {
+                  dates.push(currentDate.toISOString().split('T')[0]);
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+
+              const promises = dates.map(date =>
+                fetch('http://127.0.0.1:8000/api/dentist-availability/', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    dentist: user.id,
+                    date,
+                    start_time: data.startTime,
+                    end_time: data.endTime,
+                  }),
+                })
+              );
+              await Promise.all(promises);
+              
+              const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const selectedDayNames = data.daysOfWeek!.map(d => dayNames[d]);
+              
+              // Show success modal
+              setSuccessData({
+                mode: 'recurring',
+                dateCount: dates.length,
+                daysOfWeek: selectedDayNames
+              });
+              setShowQuickAvailability(false);
+              setShowSuccessModal(true);
+            }
+            
+            // Refresh the calendar
+            window.location.reload();
+          } catch (error) {
+            console.error('Error saving availability:', error);
+            alert('Failed to save availability. Please try again.');
+          }
+        }}
+      />
+      
+      {/* Success Modal */}
+      <QuickAvailabilitySuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          window.location.reload();
+        }}
+        mode={successData.mode}
+        dateCount={successData.dateCount}
+        daysOfWeek={successData.daysOfWeek}
+        monthYear={successData.monthYear}
+      />
     </div>
   )
 }
