@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { X } from "lucide-react"
+import { X, Eye, EyeOff } from "lucide-react"
 import { api } from "@/lib/api"
 
 interface RegisterModalProps {
@@ -19,6 +19,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
     phone: "",
     address: "",
     password: "",
+    confirmPassword: "",
   })
 
   const [isLoading, setIsLoading] = useState(false)
@@ -28,6 +29,8 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
   const [missingFields, setMissingFields] = useState<string[]>([])
   const [invalidFields, setInvalidFields] = useState<string[]>([])
   const [phoneError, setPhoneError] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   // State for numeric month input
   const [monthInput, setMonthInput] = useState("")
@@ -49,10 +52,13 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         phone: "",
         address: "",
         password: "",
+        confirmPassword: "",
       })
       setError("")
       setEmailError(false)
       setPhoneError(false)
+      setShowPassword(false)
+      setShowConfirmPassword(false)
       setShowSuccess(false)
       setMissingFields([])
       setInvalidFields([])
@@ -106,6 +112,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
     if (!formData.phone) missing.push('phone')
     if (!formData.address) missing.push('address')
     if (!formData.password) missing.push('password')
+    if (!formData.confirmPassword) missing.push('confirmPassword')
 
     // Validate filled fields
     const emailRegex = /^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
@@ -180,10 +187,10 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       errors.push('Password must be at least 8 characters')
     }
 
-    // Validate password length if provided
-    if (formData.password && formData.password.length < 8) {
-      invalid.push('password')
-      errors.push('Password must be at least 8 characters')
+    // Validate password match
+    if (formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      invalid.push('confirmPassword')
+      errors.push('Passwords do not match')
     }
 
     // If there are any missing or invalid fields, show error
@@ -629,19 +636,54 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Password</label>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
-                missingFields.includes('password') || invalidFields.includes('password') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
-              }`}
-              placeholder="Minimum 8 characters"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className={`w-full px-4 py-2.5 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    missingFields.includes('password') || invalidFields.includes('password') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
+                  }`}
+                  placeholder="Minimum 8 characters"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className={`w-full px-4 py-2.5 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    missingFields.includes('confirmPassword') || invalidFields.includes('confirmPassword') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
+                  }`}
+                  placeholder="Re-enter password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">
