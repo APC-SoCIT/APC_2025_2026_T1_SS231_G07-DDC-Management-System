@@ -50,6 +50,7 @@ interface Appointment {
   cancel_reason: string
   created_at: string
   updated_at: string
+  completed_at?: string | null
 }
 
 interface Patient {
@@ -507,7 +508,7 @@ export default function StaffAppointments() {
         
         // Set block time success details
         setBlockTimeSuccessDetails({
-          dentistName: dentist?.user_name || 'Dentist',
+          dentistName: dentist ? `${dentist.first_name} ${dentist.last_name}` : 'Dentist',
           date: newBlockedSlot.date,
           startTime: newBlockedSlot.start_time,
           endTime: newBlockedSlot.end_time,
