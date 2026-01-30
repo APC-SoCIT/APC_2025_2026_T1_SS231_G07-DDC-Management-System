@@ -15,6 +15,12 @@ django.setup()
 
 from api.models import User
 
+# Email constants
+OWNER_EMAIL = 'owner@admin.dorotheo.com'
+RECEPTIONIST_EMAIL = 'receptionist@gmail.com'
+DENTIST_EMAIL = 'dentist@gmail.com'
+PATIENT_EMAIL = 'airoravinera@gmail.com'
+
 def create_initial_accounts():
     """Create initial owner and staff accounts"""
     print("=" * 60)
@@ -22,10 +28,10 @@ def create_initial_accounts():
     print("=" * 60)
     
     # Create owner account
-    if not User.objects.filter(email='owner@admin.dorotheo.com').exists():
+    if not User.objects.filter(email=OWNER_EMAIL).exists():
         owner = User.objects.create_user(
-            username='owner@admin.dorotheo.com',
-            email='owner@admin.dorotheo.com',
+            username=OWNER_EMAIL,
+            email=OWNER_EMAIL,
             password='owner123',
             user_type='owner',
             first_name='Marvin',
@@ -41,10 +47,10 @@ def create_initial_accounts():
         print("- Owner account already exists")
 
     # Create receptionist account
-    if not User.objects.filter(email='receptionist@gmail.com').exists():
+    if not User.objects.filter(email=RECEPTIONIST_EMAIL).exists():
         receptionist = User.objects.create_user(
-            username='receptionist@gmail.com',
-            email='receptionist@gmail.com',
+            username=RECEPTIONIST_EMAIL,
+            email=RECEPTIONIST_EMAIL,
             password='Receptionist2546!',
             user_type='staff',
             role='receptionist',
@@ -61,10 +67,10 @@ def create_initial_accounts():
         print("- Receptionist account already exists")
 
     # Create dentist account
-    if not User.objects.filter(email='dentist@gmail.com').exists():
+    if not User.objects.filter(email=DENTIST_EMAIL).exists():
         dentist = User.objects.create_user(
-            username='dentist@gmail.com',
-            email='dentist@gmail.com',
+            username=DENTIST_EMAIL,
+            email=DENTIST_EMAIL,
             password='Dentist2546!',
             user_type='staff',
             role='dentist',
@@ -81,10 +87,10 @@ def create_initial_accounts():
         print("- Dentist account already exists")
 
     # Create demo patient account
-    if not User.objects.filter(email='airoravinera@gmail.com').exists():
+    if not User.objects.filter(email=PATIENT_EMAIL).exists():
         patient = User.objects.create_user(
-            username='airoravinera@gmail.com',
-            email='airoravinera@gmail.com',
+            username=PATIENT_EMAIL,
+            email=PATIENT_EMAIL,
             password='Airo2546!',
             user_type='patient',
             first_name='Airo',
@@ -98,7 +104,7 @@ def create_initial_accounts():
         print("  Password: Airo2546!")
         print(f"  Name: {patient.get_full_name()}")
     else:
-        patient = User.objects.get(email='airoravinera@gmail.com')
+        patient = User.objects.get(email=PATIENT_EMAIL)
         patient.phone = '09171091048'
         patient.address = 'The Grand Towers Manila, P. Ocampo Sr Street Malate Manila'
         patient.birthday = date(2004, 9, 10)
