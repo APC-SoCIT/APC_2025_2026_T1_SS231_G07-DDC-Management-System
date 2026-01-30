@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
+import BlockTimeSuccessModal from "@/components/block-time-success-modal"
 
 interface Appointment {
   id: number
@@ -106,6 +107,8 @@ export default function StaffAppointments() {
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
+  const [showBlockTimeSuccessModal, setShowBlockTimeSuccessModal] = useState(false)
+  const [blockTimeSuccessDetails, setBlockTimeSuccessDetails] = useState<any>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
     title: string
@@ -453,6 +456,8 @@ export default function StaffAppointments() {
       
       setShowAddModal(false)
       setShowSuccessModal(true)
+      
+      // Clear all form data including selected patient
       setSelectedPatientId(null)
       setNewAppointment({
         patient: "",
@@ -496,8 +501,23 @@ export default function StaffAppointments() {
       if (response.ok) {
         const newBlockedSlot = await response.json()
         setBlockedTimeSlots([...blockedTimeSlots, newBlockedSlot])
-        alert("Time slot blocked successfully!")
+        
+        // Get dentist name
+        const dentist = staff.find(s => s.id === newBlockedSlot.created_by)
+        
+        // Set block time success details
+        setBlockTimeSuccessDetails({
+          dentistName: dentist?.user_name || 'Dentist',
+          date: newBlockedSlot.date,
+          startTime: newBlockedSlot.start_time,
+          endTime: newBlockedSlot.end_time,
+          reason: newBlockedSlot.reason
+        })
+        
         setShowBlockTimeModal(false)
+        setTimeout(() => {
+          setShowBlockTimeSuccessModal(true)
+        }, 100)
       } else {
         const errorData = await response.json()
         alert(errorData.error || "Failed to block time slot. Please try again.")
@@ -506,6 +526,41 @@ export default function StaffAppointments() {
       console.error("Error blocking time slot:", error)
       alert("Failed to block time slot. Please try again.")
     }
+  }
+
+  const handleUnblockTimeSlot = async (blockId: number) => {
+    if (!token) return
+
+    setConfirmModalConfig({
+      title: "Unblock Time Slot",
+      message: "Are you sure you want to unblock this time slot? Patients will be able to book appointments during this time.",
+      variant: "warning",
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/${blockId}/`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Token ${token}`,
+            },
+          })
+
+          if (response.ok) {
+            setBlockedTimeSlots(blockedTimeSlots.filter(slot => slot.id !== blockId))
+            alert("Time slot unblocked successfully!")
+          } else {
+            const errorData = await response.json()
+            alert(errorData.error || "Failed to unblock time slot. Please try again.")
+          }
+        } catch (error) {
+          console.error("Error unblocking time slot:", error)
+          alert("Failed to unblock time slot. Please try again.")
+        } finally {
+          setShowConfirmModal(false)
+          setConfirmModalConfig(null)
+        }
+      }
+    })
+    setShowConfirmModal(true)
   }
 
   const getStatusColor = (status: string) => {
@@ -747,19 +802,26 @@ export default function StaffAppointments() {
     )
   }
 
-  const filteredAppointments = appointments.filter((apt) => {
-    // Filter by search query
-    const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.patient_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    // Filter by status
-    const matchesStatus = statusFilter === "all" || apt.status === statusFilter
-    
-    return matchesSearch && matchesStatus
-  })
+  const filteredAppointments = appointments
+    .filter((apt) => {
+      // Filter by search query
+      const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.patient_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      // Filter by status
+      const matchesStatus = statusFilter === "all" || apt.status === statusFilter
+      
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      // Sort by updated_at in descending order (most recent first)
+      const aDate = new Date(a.updated_at || a.created_at).getTime()
+      const bDate = new Date(b.updated_at || b.created_at).getTime()
+      return bDate - aDate
+    })
 
   if (isLoading) {
     return (
@@ -810,6 +872,80 @@ export default function StaffAppointments() {
           />
         </div>
       </div>
+
+      {/* Blocked Time Slots Section */}
+      {blockedTimeSlots.length > 0 && (
+        <div className="bg-white rounded-xl border-2 border-red-200 overflow-hidden">
+          <div className="p-6 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-200">
+            <h2 className="text-xl font-bold text-red-700 flex items-center gap-2">
+              <Ban className="w-5 h-5" />
+              Blocked Time Slots ({blockedTimeSlots.length})
+            </h2>
+            <p className="text-sm text-red-600 mt-1">
+              Manage blocked time frames to prevent patient bookings
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-red-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Time Range</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Reason</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Blocked By</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-100">
+                {blockedTimeSlots.map((slot) => (
+                  <tr key={slot.id} className="hover:bg-red-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="w-4 h-4 text-red-500" />
+                        <span className="font-medium text-gray-900">
+                          {new Date(slot.date).toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-orange-500" />
+                        <span className="font-medium text-gray-700">
+                          {slot.start_time} - {slot.end_time}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-gray-700">
+                        {slot.reason || 'No reason provided'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-gray-700">
+                        {slot.created_by_name || 'Unknown'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleUnblockTimeSlot(slot.id)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Unblock
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Status Filter Tabs */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] p-2">
@@ -915,7 +1051,7 @@ export default function StaffAppointments() {
                     </td>
                     <td className="px-6 py-4">
                       <span 
-                        className="px-3 py-1 rounded-lg"
+                        className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                         style={{ 
                           backgroundColor: apt.service_color || '#10b981',
                           color: '#ffffff'
@@ -1381,6 +1517,32 @@ export default function StaffAppointments() {
                         patient.email.toLowerCase().includes(query)
                       )
                     })
+                    .sort((a, b) => {
+                      // Get most recent completed appointment for each patient
+                      const getLastCompletedDate = (patientId: number) => {
+                        const completedApts = appointments
+                          .filter(apt => apt.patient === patientId && apt.status === 'completed' && apt.completed_at)
+                          .sort((apt1, apt2) => {
+                            const date1 = new Date(apt1.completed_at!).getTime()
+                            const date2 = new Date(apt2.completed_at!).getTime()
+                            return date2 - date1 // Most recent first
+                          })
+                        return completedApts.length > 0 ? new Date(completedApts[0].completed_at!) : null
+                      }
+
+                      const aLastCompleted = getLastCompletedDate(a.id)
+                      const bLastCompleted = getLastCompletedDate(b.id)
+
+                      // Patients with recent completed appointments come first
+                      if (aLastCompleted && bLastCompleted) {
+                        return bLastCompleted.getTime() - aLastCompleted.getTime()
+                      }
+                      if (aLastCompleted && !bLastCompleted) return -1
+                      if (!aLastCompleted && bLastCompleted) return 1
+
+                      // If neither has completed appointments, sort alphabetically by name
+                      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+                    })
                     .map((patient) => (
                       <option key={patient.id} value={patient.id}>
                         {patient.first_name} {patient.last_name} - {patient.email}
@@ -1579,6 +1741,15 @@ export default function StaffAppointments() {
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
           appointmentDetails={successAppointmentDetails}
+        />
+      )}
+
+      {/* Block Time Success Modal */}
+      {blockTimeSuccessDetails && (
+        <BlockTimeSuccessModal
+          isOpen={showBlockTimeSuccessModal}
+          onClose={() => setShowBlockTimeSuccessModal(false)}
+          blockDetails={blockTimeSuccessDetails}
         />
       )}
 
