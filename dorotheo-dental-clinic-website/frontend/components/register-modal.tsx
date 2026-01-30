@@ -271,6 +271,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         phone: "",
         address: "",
         password: "",
+        confirmPassword: "",
       })
       
       // Close modal after showing success for 2 seconds

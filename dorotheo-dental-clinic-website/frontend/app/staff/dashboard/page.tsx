@@ -13,6 +13,7 @@ interface Appointment {
   patient_name: string
   dentist_name: string
   service_name: string | null
+  service_color: string | null
   status: string
 }
 
@@ -205,26 +206,31 @@ export default function StaffDashboard() {
                 key={apt.id}
                 className="flex items-center justify-between p-4 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
                   <div className="text-center min-w-[60px]">
                     <p className="text-lg font-bold text-[var(--color-primary)]">{apt.time}</p>
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="font-semibold text-[var(--color-text)]">{apt.patient_name}</p>
-                    <p className="text-sm text-[var(--color-text-muted)]">
-                      {apt.service_name || "General Consultation"}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span
+                        className="px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: apt.service_color || '#6B7280' }}
+                      >
+                        {apt.service_name || "Consultation"}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  className={`px-3 py-1 rounded-md text-xs font-semibold border-2 ${
                     apt.status === "confirmed"
-                      ? "bg-green-100 text-green-700"
+                      ? "border-green-600 text-green-700 bg-green-50"
                       : apt.status === "pending"
-                      ? "bg-yellow-100 text-yellow-700"
+                      ? "border-yellow-600 text-yellow-700 bg-yellow-50"
                       : apt.status === "completed"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-100 text-gray-700"
+                      ? "border-blue-600 text-blue-700 bg-blue-50"
+                      : "border-gray-600 text-gray-700 bg-gray-50"
                   }`}
                 >
                   {apt.status}
