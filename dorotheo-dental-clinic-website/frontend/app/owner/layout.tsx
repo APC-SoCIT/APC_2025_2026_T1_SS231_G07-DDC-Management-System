@@ -63,7 +63,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
             >
               <User className="w-5 h-5 text-white" />
             </button>
-            {isProfileOpen && (
+            {isProfileOpen && pathname !== "/owner/profile" && (
               <div className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
                 <Link
                   href="/owner/profile"
@@ -101,7 +101,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
               <ChevronDown className={`w-4 h-4 transition-transform ${isProfileOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {isProfileOpen && (
+            {isProfileOpen && pathname !== "/owner/profile" && (
               <div className="absolute right-0 top-14 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
                 <Link
                   href="/owner/profile"

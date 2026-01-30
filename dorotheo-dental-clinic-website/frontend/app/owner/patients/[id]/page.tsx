@@ -333,7 +333,7 @@ export default function PatientDetailPage() {
             className="text-lg font-semibold text-gray-900 flex items-center gap-2 hover:text-blue-600 transition-colors"
           >
             <Calendar className="w-5 h-5 text-blue-600" />
-            Upcoming Appointments
+            Appointments
             <span className="text-sm text-gray-500 ml-2">View all</span>
           </button>
         </div>

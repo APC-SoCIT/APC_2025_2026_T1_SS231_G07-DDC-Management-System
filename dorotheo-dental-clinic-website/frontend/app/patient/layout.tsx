@@ -81,7 +81,7 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
             >
               <User className="w-5 h-5 text-white" />
             </button>
-            {isProfileOpen && (
+            {isProfileOpen && pathname !== "/patient/profile" && (
               <div className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
                 <Link
                   href="/patient/profile"
@@ -119,7 +119,7 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
               </div>
             </button>
 
-            {isProfileOpen && (
+            {isProfileOpen && pathname !== "/patient/profile" && (
               <div className="absolute right-0 top-14 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
                 <Link
                   href="/patient/profile"
