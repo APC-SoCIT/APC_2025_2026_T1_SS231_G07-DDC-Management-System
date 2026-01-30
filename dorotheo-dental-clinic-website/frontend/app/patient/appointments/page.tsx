@@ -5,6 +5,7 @@ import { Calendar as CalendarIcon, Clock, User, Plus, X, Edit, XCircle, ChevronD
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import AppointmentSuccessModal from "@/components/appointment-success-modal"
 
 interface Appointment {
   id: number
@@ -73,6 +74,8 @@ export default function PatientAppointments() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showRescheduleModal, setShowRescheduleModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
   const [cancelReason, setCancelReason] = useState("")
   const [staff, setStaff] = useState<Staff[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -550,6 +553,16 @@ export default function PatientAppointments() {
     }
 
     try {
+      // Get the selected service to check if it's auto-confirmed
+      const selectedService = services.find(s => s.id === Number(newAppointment.service))
+      const serviceName = selectedService?.name?.toLowerCase() || ""
+      
+      // Auto-confirm for Cleaning and Consultation services, pending for others
+      const appointmentStatus = 
+        serviceName === "cleaning" || serviceName === "consultation" 
+          ? "confirmed" 
+          : "pending"
+      
       const appointmentData = {
         patient: user.id,
         dentist: newAppointment.dentist ? Number.parseInt(newAppointment.dentist) : null,
@@ -557,7 +570,7 @@ export default function PatientAppointments() {
         time: newAppointment.time,
         service: newAppointment.service ? Number.parseInt(newAppointment.service) : null,
         notes: newAppointment.notes || "",
-        status: "pending", // Patients create pending appointments - staff/owner must approve
+        status: appointmentStatus,
       }
 
       console.log("[APPOINTMENT] Creating appointment with data:", appointmentData)
@@ -567,7 +580,12 @@ export default function PatientAppointments() {
       const createdAppointment = await api.createAppointment(appointmentData, token)
       console.log("[APPOINTMENT] Appointment created successfully:", createdAppointment)
       setAllAppointments([createdAppointment, ...allAppointments])
+      
+      // Close the add modal first
+      console.log("[APPOINTMENT] Closing add modal")
       setShowAddModal(false)
+      
+      // Reset form
       setNewAppointment({
         date: "",
         time: "",
@@ -577,7 +595,24 @@ export default function PatientAppointments() {
       })
       setSelectedDate(undefined)
       setBookedSlots([])
-      alert("Appointment booked successfully! Staff and owner have been notified.")
+      
+      // Show success modal with appointment details after a brief delay
+      const successDetails = {
+        patientName: `${user.first_name} ${user.last_name}`,
+        date: createdAppointment.date,
+        time: createdAppointment.time,
+        service: createdAppointment.service_name || "N/A",
+        dentist: createdAppointment.dentist_name || "Any Available Dentist",
+        notes: createdAppointment.notes || ""
+      }
+      console.log("[APPOINTMENT] Setting success modal details:", successDetails)
+      
+      // Use setTimeout to ensure add modal is fully closed before showing success modal
+      setTimeout(() => {
+        setSuccessAppointmentDetails(successDetails)
+        console.log("[APPOINTMENT] Showing success modal")
+        setShowSuccessModal(true)
+      }, 100)
     } catch (error: any) {
       console.error("[APPOINTMENT] Error creating appointment:", error)
       console.error("[APPOINTMENT] Error details:", {
@@ -1646,6 +1681,18 @@ export default function PatientAppointments() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && successAppointmentDetails && (
+        <AppointmentSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => {
+            setShowSuccessModal(false)
+            setSuccessAppointmentDetails(null)
+          }}
+          appointmentDetails={successAppointmentDetails}
+        />
       )}
     </div>
   )
