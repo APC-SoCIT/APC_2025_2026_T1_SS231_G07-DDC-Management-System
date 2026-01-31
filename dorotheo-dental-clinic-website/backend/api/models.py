@@ -23,6 +23,7 @@ class User(AbstractUser):
     profile_picture = models.ImageField(upload_to='profiles/', null=True, blank=True)
     is_active_patient = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)  # NEW: For archiving patients
+    assigned_clinic = models.ForeignKey('ClinicLocation', on_delete=models.SET_NULL, null=True, blank=True, related_name='staff_members', help_text="Clinic where staff/dentist is currently assigned")
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Override email to make it unique and required
@@ -92,6 +93,7 @@ class Service(models.Model):
     duration = models.IntegerField(default=30, help_text="Duration in minutes")
     color = models.CharField(max_length=7, default='#10b981', help_text="Hex color code (e.g., #10b981)")
     image = models.ImageField(upload_to='services/', null=True, blank=True)
+    clinics = models.ManyToManyField('ClinicLocation', related_name='services', blank=True, help_text="Clinics where this service is offered")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -112,6 +114,7 @@ class Appointment(models.Model):
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments')
     dentist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dentist_appointments')
     service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True)
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True, help_text="Clinic where appointment occurs")
     date = models.DateField()
     time = models.TimeField()
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='confirmed')
@@ -136,6 +139,11 @@ class Appointment(models.Model):
 
     class Meta:
         ordering = ['-date', '-time']
+        indexes = [
+            models.Index(fields=['clinic', 'date']),
+            models.Index(fields=['clinic', 'status']),
+            models.Index(fields=['date', 'time']),
+        ]
 
     def __str__(self):
         return f"{self.patient.get_full_name()} - {self.date} {self.time}"

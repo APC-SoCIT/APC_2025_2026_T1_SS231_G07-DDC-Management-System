@@ -83,8 +83,9 @@ export const api = {
   },
 
   // Services endpoints
-  getServices: async () => {
-    const response = await fetch(`${API_BASE_URL}/services/`)
+  getServices: async (clinicId?: number) => {
+    const params = clinicId ? `?clinic_id=${clinicId}` : '';
+    const response = await fetch(`${API_BASE_URL}/services/${params}`)
     return response.json()
   },
 
@@ -117,8 +118,9 @@ export const api = {
   },
 
   // Appointments endpoints
-  getAppointments: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/appointments/`, {
+  getAppointments: async (token: string, clinicId?: number) => {
+    const params = clinicId ? `?clinic_id=${clinicId}` : '';
+    const response = await fetch(`${API_BASE_URL}/appointments/${params}`, {
       headers: { Authorization: `Token ${token}` },
     })
     return response.json()

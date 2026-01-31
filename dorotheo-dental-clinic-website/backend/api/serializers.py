@@ -11,14 +11,22 @@ from .models import (
 PATIENT_FULL_NAME = 'patient.get_full_name'
 CREATED_BY_FULL_NAME = 'created_by.get_full_name'
 
+# ClinicLocation serializer (defined early for use in other serializers)
+class ClinicLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClinicLocation
+        fields = '__all__'
+
 class UserSerializer(serializers.ModelSerializer):
     last_appointment_date = serializers.SerializerMethodField()
+    assigned_clinic_name = serializers.CharField(source='assigned_clinic.name', read_only=True)
     
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'user_type', 
                   'role', 'phone', 'address', 'birthday', 'age', 'profile_picture', 
-                  'is_active_patient', 'is_archived', 'created_at', 'last_appointment_date']
+                  'is_active_patient', 'is_archived', 'assigned_clinic', 'assigned_clinic_name', 
+                  'created_at', 'last_appointment_date']
         extra_kwargs = {'password': {'write_only': True}}
 
     def get_last_appointment_date(self, obj):
@@ -34,9 +42,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ServiceSerializer(serializers.ModelSerializer):
+    clinics_data = ClinicLocationSerializer(source='clinics', many=True, read_only=True)
+    clinic_ids = serializers.PrimaryKeyRelatedField(
+        source='clinics',
+        many=True,
+        queryset=ClinicLocation.objects.all(),
+        write_only=True,
+        required=False
+    )
+    
     class Meta:
         model = Service
-        fields = '__all__'
+        fields = ['id', 'name', 'category', 'description', 'duration', 'color', 'image', 
+                  'created_at', 'clinics_data', 'clinic_ids']
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -47,6 +65,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     service_color = serializers.CharField(source='service.color', read_only=True)
     reschedule_service_name = serializers.CharField(source='reschedule_service.name', read_only=True)
     reschedule_dentist_name = serializers.CharField(source='reschedule_dentist.get_full_name', read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
+    clinic_name = serializers.CharField(source='clinic.name', read_only=True)
 
     class Meta:
         model = Appointment
@@ -107,12 +127,6 @@ class BillingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Billing
-        fields = '__all__'
-
-
-class ClinicLocationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ClinicLocation
         fields = '__all__'
 
 

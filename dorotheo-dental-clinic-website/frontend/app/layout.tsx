@@ -2,6 +2,7 @@ import type React from "react"
 import { Geist, Playfair_Display } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth"
+import { ClinicProvider } from "@/lib/clinic-context"
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -27,7 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${playfair.variable}`}>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ClinicProvider>
+            {children}
+          </ClinicProvider>
+        </AuthProvider>
       </body>
     </html>
   )
