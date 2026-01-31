@@ -316,8 +316,13 @@ Step 6: Appointment created with clinic association
 2. ✅ Create `ClinicSelector` component (basic version)
 3. ✅ Update appointment booking flow to include clinic selection
 4. ✅ Add clinic display to appointment list
+5. ✅ Integrate ClinicSelector into owner/staff layouts
+6. ✅ Filter dashboards by selected clinic
+7. ✅ Add clinic badge column to appointments tables
 
 #### Testing Checklist
+- [x] Clinic selector visible in owner and staff portals
+- [x] Clinic selection persists and filters data
 - [ ] Can create appointments with clinic association
 - [ ] Can filter appointments by clinic
 - [ ] Existing data migrated successfully

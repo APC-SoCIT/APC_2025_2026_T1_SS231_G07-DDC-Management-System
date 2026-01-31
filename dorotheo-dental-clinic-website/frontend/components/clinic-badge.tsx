@@ -6,7 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface ClinicBadgeProps {
-  clinicName: string;
+  clinic: {
+    id: number;
+    name: string;
+    address: string;
+  };
   variant?: 'default' | 'outline' | 'secondary';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -15,6 +19,8 @@ interface ClinicBadgeProps {
 
 // Color mapping for different clinics
 const getClinicColor = (clinicName: string): string => {
+  if (!clinicName) return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700';
+  
   const lowerName = clinicName.toLowerCase();
   
   if (lowerName.includes('main')) {
@@ -32,7 +38,7 @@ const getClinicColor = (clinicName: string): string => {
 };
 
 export function ClinicBadge({ 
-  clinicName, 
+  clinic, 
   variant = 'outline', 
   size = 'sm',
   className,
@@ -50,7 +56,7 @@ export function ClinicBadge({
     lg: 'h-4 w-4',
   };
 
-  const clinicColor = variant === 'outline' ? getClinicColor(clinicName) : '';
+  const clinicColor = variant === 'outline' ? getClinicColor(clinic.name) : '';
 
   return (
     <Badge 
@@ -63,7 +69,7 @@ export function ClinicBadge({
       )}
     >
       {showIcon && <Building2 className={iconSizes[size]} />}
-      <span className="truncate max-w-[150px]">{clinicName}</span>
+      <span className="truncate max-w-[150px]">{clinic.name}</span>
     </Badge>
   );
 }

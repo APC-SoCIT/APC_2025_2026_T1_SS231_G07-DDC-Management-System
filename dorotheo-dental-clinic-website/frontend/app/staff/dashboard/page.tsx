@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, Users, Clock, AlertTriangle, ChevronLeft, Che
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { useClinic } from "@/lib/clinic-context"
 import Link from "next/link"
 
 interface Appointment {
@@ -19,6 +20,7 @@ interface Appointment {
 
 export default function StaffDashboard() {
   const { token, user } = useAuth()
+  const { selectedClinic } = useClinic()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [totalPatients, setTotalPatients] = useState(0)
@@ -40,8 +42,9 @@ export default function StaffDashboard() {
         const active = patients.filter((p: any) => p.is_active_patient !== false).length
         setActivePatients(active)
         
-        // Fetch appointments
-        const appointments = await api.getAppointments(token)
+        // Fetch appointments - filter by clinic if not "all"
+        const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
+        const appointments = await api.getAppointments(token, clinicId)
         console.log('[Staff Dashboard] Fetched appointments:', appointments)
         console.log('[Staff Dashboard] Sample appointment dates:', appointments.slice(0, 3).map((a: any) => a.date))
         setAllAppointments(appointments)
@@ -53,7 +56,7 @@ export default function StaffDashboard() {
     }
 
     fetchData()
-  }, [token])
+  }, [token, selectedClinic])
 
   // No sample birthday data - will be filled with real data
   const birthdays: Array<{
