@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Calendar, ChevronDown, ChevronUp, Clock, FileText, Calendar as CalendarIcon, Plus, X } from "lucide-react"
+import { ArrowLeft, Calendar, ChevronDown, ChevronUp, Clock, FileText, Calendar as CalendarIcon, Plus, X, Download, Camera, Eye } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -13,6 +13,33 @@ interface Patient {
   first_name: string
   last_name: string
   email: string
+}
+
+interface Document {
+  id: number
+  patient: number
+  document_type: string
+  file: string
+  file_url?: string
+  title: string
+  description: string
+  uploaded_by: number
+  uploaded_by_name?: string
+  uploaded_at: string
+  appointment?: number | null
+  appointment_date?: string | null
+  appointment_time?: string | null
+  service_name?: string | null
+  dentist_name?: string | null
+  document_type_display?: string
+}
+
+interface TeethImage {
+  id: number
+  image_url: string
+  uploaded_at: string
+  notes: string
+  appointment?: number | null
 }
 
 interface Service {
@@ -76,12 +103,46 @@ export default function PatientAppointmentsPage() {
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([])
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
+  const [appointmentDocuments, setAppointmentDocuments] = useState<Record<number, Document[]>>({})
+  const [appointmentImages, setAppointmentImages] = useState<Record<number, TeethImage[]>>({})
+  const [loadingFiles, setLoadingFiles] = useState<Record<number, boolean>>({})
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
+  const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token || !patientId) return
     fetchData()
     fetchServicesAndStaff()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, patientId])
+
+  // Fetch PDF as blob when document is selected
+  useEffect(() => {
+    if (selectedDocument) {
+      fetch(selectedDocument.file_url || selectedDocument.file)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob)
+          setPdfBlobUrl(url)
+        })
+        .catch(err => {
+          console.error('Failed to load document:', err)
+          setPdfBlobUrl(null)
+        })
+    } else {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+        setPdfBlobUrl(null)
+      }
+    }
+
+    return () => {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+      }
+    }
+  }, [selectedDocument])
 
   useEffect(() => {
     if (!token || !newAppointment.dentist) return
@@ -98,7 +159,7 @@ export default function PatientAppointmentsPage() {
         )
         if (response.ok) {
           const data = await response.json()
-          const dates = new Set(data.map((slot: any) => slot.date))
+          const dates = new Set<string>(data.map((slot: any) => slot.date))
           setAvailableDates(dates)
         }
       } catch (error) {
@@ -149,7 +210,7 @@ export default function PatientAppointmentsPage() {
     
     try {
       const [servicesData, staffData] = await Promise.all([
-        api.getServices(token),
+        api.getServices(),
         api.getStaff(token),
       ])
       setServices(servicesData)
@@ -308,10 +369,6 @@ export default function PatientAppointmentsPage() {
     return `Dr. ${dentist.first_name} ${dentist.last_name}`
   }
 
-  const handleRowClick = (id: number) => {
-    setExpandedRow(expandedRow === id ? null : id)
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
@@ -356,6 +413,35 @@ export default function PatientAppointmentsPage() {
     )
       .toString(16)
       .slice(1)}`
+  }
+
+  const toggleAppointmentExpansion = async (appointmentId: number) => {
+    if (expandedRow === appointmentId) {
+      setExpandedRow(null)
+      return
+    }
+
+    setExpandedRow(appointmentId)
+    setLoadingFiles(prev => ({ ...prev, [appointmentId]: true }))
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token || !patient) return
+
+      // Fetch documents for this patient
+      const docsResponse = await api.getDocuments(patient.id, token)
+      const appointmentDocs = docsResponse.filter((doc: Document) => doc.appointment === appointmentId)
+      setAppointmentDocuments(prev => ({ ...prev, [appointmentId]: appointmentDocs }))
+
+      // Fetch teeth images for this patient
+      const imagesResponse = await api.getPatientTeethImages(patient.id, token)
+      const appointmentImgs = imagesResponse.filter((img: TeethImage) => img.appointment === appointmentId)
+      setAppointmentImages(prev => ({ ...prev, [appointmentId]: appointmentImgs }))
+    } catch (error) {
+      console.error("Error loading appointment files:", error)
+    } finally {
+      setLoadingFiles(prev => ({ ...prev, [appointmentId]: false }))
+    }
   }
 
   if (isLoading) {
@@ -450,7 +536,7 @@ export default function PatientAppointmentsPage() {
                 upcomingAppointments.map((apt) => (
                   <Fragment key={apt.id}>
                     <tr
-                      onClick={() => handleRowClick(apt.id)}
+                      onClick={() => toggleAppointmentExpansion(apt.id)}
                       className="hover:bg-[var(--color-background)] transition-all duration-200 cursor-pointer"
                     >
                       <td className="px-6 py-4">
@@ -539,28 +625,89 @@ export default function PatientAppointmentsPage() {
                                   </div>
                                 </div>
 
-                                {/* Additional Information Card */}
+                                {/* Uploaded Files Card */}
                                 <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
                                   <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
                                     <FileText className="w-5 h-5" />
-                                    Notes & Information
+                                    Uploaded Files
                                   </h4>
-                                  <div className="space-y-4 text-sm">
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-2 font-medium">Notes</p>
-                                      <p className="text-sm leading-relaxed">{apt.notes || "No notes added"}</p>
+                                  {loadingFiles[apt.id] ? (
+                                    <div className="flex items-center justify-center py-8">
+                                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
                                     </div>
-                                    <div className="pt-3 border-t border-[var(--color-border)]">
-                                      <p className="text-[var(--color-text-muted)] text-xs mb-1">Created</p>
-                                      <p className="text-sm">{new Date(apt.created_at).toLocaleString()}</p>
-                                    </div>
-                                    {apt.updated_at !== apt.created_at && (
+                                  ) : (
+                                    <div className="space-y-4 text-sm">
+                                      {/* Documents Section */}
                                       <div>
-                                        <p className="text-[var(--color-text-muted)] text-xs mb-1">Last Updated</p>
-                                        <p className="text-sm">{new Date(apt.updated_at).toLocaleString()}</p>
+                                        <p className="text-[var(--color-text-muted)] mb-2 font-medium flex items-center gap-2">
+                                          <FileText className="w-4 h-4" />
+                                          Documents ({appointmentDocuments[apt.id]?.length || 0})
+                                        </p>
+                                        {appointmentDocuments[apt.id] && appointmentDocuments[apt.id].length > 0 ? (
+                                          <div className="space-y-2">
+                                            {appointmentDocuments[apt.id].map((doc) => (
+                                              <div
+                                                key={doc.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedDocument(doc)
+                                                }}
+                                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors border border-gray-200"
+                                              >
+                                                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                                  {(doc.file_url || doc.file).match(/\.pdf$/i) ? (
+                                                    <FileText className="w-5 h-5 text-red-600" />
+                                                  ) : (
+                                                    <FileText className="w-5 h-5 text-blue-600" />
+                                                  )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="font-medium text-sm truncate">{doc.title}</p>
+                                                  <p className="text-xs text-gray-500">{doc.document_type_display || doc.document_type}</p>
+                                                </div>
+                                                <Eye className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-500">No documents uploaded</p>
+                                        )}
                                       </div>
-                                    )}
-                                  </div>
+
+                                      {/* Images Section */}
+                                      <div className="pt-3 border-t border-[var(--color-border)]">
+                                        <p className="text-[var(--color-text-muted)] mb-2 font-medium flex items-center gap-2">
+                                          <Camera className="w-4 h-4" />
+                                          Dental Images ({appointmentImages[apt.id]?.length || 0})
+                                        </p>
+                                        {appointmentImages[apt.id] && appointmentImages[apt.id].length > 0 ? (
+                                          <div className="grid grid-cols-2 gap-2">
+                                            {appointmentImages[apt.id].map((img) => (
+                                              <div
+                                                key={img.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedImage(img)
+                                                }}
+                                                className="relative aspect-video rounded-lg overflow-hidden cursor-pointer group border border-gray-200 hover:border-[var(--color-primary)] transition-colors"
+                                              >
+                                                <img
+                                                  src={img.image_url}
+                                                  alt="Dental image"
+                                                  className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-500">No dental images uploaded</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -606,7 +753,7 @@ export default function PatientAppointmentsPage() {
                 pastAppointments.map((apt) => (
                   <Fragment key={apt.id}>
                     <tr
-                      onClick={() => handleRowClick(apt.id)}
+                      onClick={() => toggleAppointmentExpansion(apt.id)}
                       className="hover:bg-[var(--color-background)] transition-all duration-200 cursor-pointer"
                     >
                       <td className="px-6 py-4">
@@ -695,28 +842,89 @@ export default function PatientAppointmentsPage() {
                                   </div>
                                 </div>
 
-                                {/* Additional Information Card */}
+                                {/* Uploaded Files Card */}
                                 <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
                                   <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
                                     <FileText className="w-5 h-5" />
-                                    Notes & Information
+                                    Uploaded Files
                                   </h4>
-                                  <div className="space-y-4 text-sm">
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-2 font-medium">Notes</p>
-                                      <p className="text-sm leading-relaxed">{apt.notes || "No notes added"}</p>
+                                  {loadingFiles[apt.id] ? (
+                                    <div className="flex items-center justify-center py-8">
+                                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
                                     </div>
-                                    <div className="pt-3 border-t border-[var(--color-border)]">
-                                      <p className="text-[var(--color-text-muted)] text-xs mb-1">Created</p>
-                                      <p className="text-sm">{new Date(apt.created_at).toLocaleString()}</p>
-                                    </div>
-                                    {apt.updated_at !== apt.created_at && (
+                                  ) : (
+                                    <div className="space-y-4 text-sm">
+                                      {/* Documents Section */}
                                       <div>
-                                        <p className="text-[var(--color-text-muted)] text-xs mb-1">Last Updated</p>
-                                        <p className="text-sm">{new Date(apt.updated_at).toLocaleString()}</p>
+                                        <p className="text-[var(--color-text-muted)] mb-2 font-medium flex items-center gap-2">
+                                          <FileText className="w-4 h-4" />
+                                          Documents ({appointmentDocuments[apt.id]?.length || 0})
+                                        </p>
+                                        {appointmentDocuments[apt.id] && appointmentDocuments[apt.id].length > 0 ? (
+                                          <div className="space-y-2">
+                                            {appointmentDocuments[apt.id].map((doc) => (
+                                              <div
+                                                key={doc.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedDocument(doc)
+                                                }}
+                                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors border border-gray-200"
+                                              >
+                                                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                                  {(doc.file_url || doc.file).match(/\.pdf$/i) ? (
+                                                    <FileText className="w-5 h-5 text-red-600" />
+                                                  ) : (
+                                                    <FileText className="w-5 h-5 text-blue-600" />
+                                                  )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="font-medium text-sm truncate">{doc.title}</p>
+                                                  <p className="text-xs text-gray-500">{doc.document_type_display || doc.document_type}</p>
+                                                </div>
+                                                <Eye className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-500">No documents uploaded</p>
+                                        )}
                                       </div>
-                                    )}
-                                  </div>
+
+                                      {/* Images Section */}
+                                      <div className="pt-3 border-t border-[var(--color-border)]">
+                                        <p className="text-[var(--color-text-muted)] mb-2 font-medium flex items-center gap-2">
+                                          <Camera className="w-4 h-4" />
+                                          Dental Images ({appointmentImages[apt.id]?.length || 0})
+                                        </p>
+                                        {appointmentImages[apt.id] && appointmentImages[apt.id].length > 0 ? (
+                                          <div className="grid grid-cols-2 gap-2">
+                                            {appointmentImages[apt.id].map((img) => (
+                                              <div
+                                                key={img.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedImage(img)
+                                                }}
+                                                className="relative aspect-video rounded-lg overflow-hidden cursor-pointer group border border-gray-200 hover:border-[var(--color-primary)] transition-colors"
+                                              >
+                                                <img
+                                                  src={img.image_url}
+                                                  alt="Dental image"
+                                                  className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-gray-500">No dental images uploaded</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -941,6 +1149,110 @@ export default function PatientAppointmentsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {selectedDocument && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setSelectedDocument(null)
+            setPdfBlobUrl(null)
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-[var(--color-primary)]">{selectedDocument.title}</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedDocument.document_type_display || selectedDocument.document_type}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={selectedDocument.file_url || selectedDocument.file}
+                  download={selectedDocument.title}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-5 h-5" />
+                </a>
+                <button
+                  onClick={() => {
+                    setSelectedDocument(null)
+                    setPdfBlobUrl(null)
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {(selectedDocument.file_url || selectedDocument.file).match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                <img
+                  src={selectedDocument.file_url || selectedDocument.file}
+                  alt={selectedDocument.title}
+                  className="w-full h-full object-contain"
+                />
+              ) : pdfBlobUrl ? (
+                <iframe src={pdfBlobUrl} className="w-full h-full border-0" />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-[var(--color-primary)]">Dental Image</h2>
+                {selectedImage.notes && (
+                  <p className="text-sm text-gray-500 mt-1">{selectedImage.notes}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={selectedImage.image_url}
+                  download={`dental-image-${selectedImage.id}.jpg`}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-5 h-5" />
+                </a>
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden p-4">
+              <img
+                src={selectedImage.image_url}
+                alt="Dental image"
+                className="w-full h-full object-contain"
+              />
+            </div>
           </div>
         </div>
       )}

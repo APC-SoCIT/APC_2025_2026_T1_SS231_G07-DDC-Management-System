@@ -28,6 +28,7 @@ export default function Documents() {
   const { user, token } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -48,14 +49,66 @@ export default function Documents() {
     fetchData()
   }, [user?.id, token])
 
+  // Fetch PDF as blob when document is selected
+  useEffect(() => {
+    if (selectedDocument) {
+      // Fetch PDF as blob and create object URL
+      fetch(selectedDocument.file_url || selectedDocument.file)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob)
+          setPdfBlobUrl(url)
+        })
+        .catch(err => {
+          console.error('Failed to load document:', err)
+          setPdfBlobUrl(null)
+        })
+    } else {
+      // Clean up blob URL when modal closes
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+        setPdfBlobUrl(null)
+      }
+    }
+
+    return () => {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+      }
+    }
+  }, [selectedDocument])
+
   const handleDownload = (fileUrl: string, filename: string) => {
-    const link = document.createElement('a')
-    link.href = fileUrl
-    link.download = filename
-    link.target = '_blank'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+    // Try to fetch and download the file
+    fetch(fileUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      })
+      .catch(error => {
+        console.error('Download failed:', error)
+        // Fallback: open in new tab
+        const link = document.createElement('a')
+        link.href = fileUrl
+        link.download = filename
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      })
+  }
+
+  const handleView = (doc: Document) => {
+    console.log('Viewing document:', doc)
+    console.log('File URL:', doc.file_url || doc.file)
+    setSelectedDocument(doc)
   }
 
   const getDocumentTypeLabel = (type: string) => {
@@ -135,7 +188,7 @@ export default function Documents() {
                   </span>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => setSelectedDocument(doc)}
+                      onClick={() => handleView(doc)}
                       className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
                       title="View"
                     >
@@ -151,17 +204,34 @@ export default function Documents() {
                   </div>
                 </div>
 
-                <div className="mb-3 h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                  {(doc.document_type === 'xray' || doc.document_type === 'scan' || doc.document_type === 'medical_certificate' || doc.document_type === 'dental_image') ? (
+                <div 
+                  className="mb-3 h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" 
+                  onClick={() => handleView(doc)}
+                >
+                  {(doc.file_url || doc.file).match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                     <img
                       src={doc.file_url || doc.file}
                       alt={doc.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                        e.currentTarget.parentElement!.innerHTML = '<svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>'
+                        const target = e.currentTarget
+                        target.style.display = 'none'
+                        const parent = target.parentElement
+                        if (parent) {
+                          const icon = document.createElement('div')
+                          icon.className = 'flex items-center justify-center'
+                          icon.innerHTML = '<svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>'
+                          parent.appendChild(icon)
+                        }
                       }}
                     />
+                  ) : (doc.file_url || doc.file).match(/\.pdf$/i) ? (
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-xs font-medium text-gray-600">PDF</span>
+                    </div>
                   ) : (
                     <FileText className="w-12 h-12 text-gray-400" />
                   )}
@@ -204,55 +274,98 @@ export default function Documents() {
 
       {/* Document Preview Modal */}
       {selectedDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setSelectedDocument(null)}>
-          <div className="relative bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">{selectedDocument.title}</h3>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" 
+          onClick={() => setSelectedDocument(null)}
+        >
+          <div 
+            className="relative w-full max-w-6xl h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {selectedDocument.title || "Document"}
+                </h3>
                 {selectedDocument.description && (
                   <p className="text-sm text-gray-600">{selectedDocument.description}</p>
                 )}
               </div>
               <button
                 onClick={() => setSelectedDocument(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-4">
+
+            {/* Document Info */}
+            {formatAppointmentDateTime(selectedDocument.appointment_date, selectedDocument.appointment_time) && (
+              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+                <p className="text-sm font-medium text-gray-700 mb-1">Linked Appointment:</p>
+                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                  <span>
+                    <strong>Date:</strong> {formatAppointmentDateTime(selectedDocument.appointment_date, selectedDocument.appointment_time)}
+                  </span>
+                  {selectedDocument.service_name && (
+                    <span>
+                      <strong>Service:</strong> {selectedDocument.service_name}
+                    </span>
+                  )}
+                  {selectedDocument.dentist_name && (
+                    <span>
+                      <strong>Dentist:</strong> {selectedDocument.dentist_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Document Viewer */}
+            <div className="flex-1 overflow-auto bg-gray-100">
               {(selectedDocument.document_type === 'xray' || selectedDocument.document_type === 'scan' || selectedDocument.document_type === 'medical_certificate' || selectedDocument.document_type === 'dental_image') ? (
-                <img
-                  src={selectedDocument.file_url || selectedDocument.file}
-                  alt={selectedDocument.title}
-                  className="w-full h-auto"
+                <div className="flex items-center justify-center p-4 h-full">
+                  <img
+                    src={selectedDocument.file_url || selectedDocument.file}
+                    alt={selectedDocument.title}
+                    className="max-w-full max-h-full h-auto object-contain"
+                    onError={(e) => {
+                      console.error('Image failed to load:', selectedDocument.file_url || selectedDocument.file)
+                      const target = e.currentTarget
+                      target.style.display = 'none'
+                      const parent = target.parentElement
+                      if (parent) {
+                        parent.innerHTML = `
+                          <div class="text-center py-12">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p class="text-gray-600 mb-4">Unable to load image</p>
+                            <button class="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors" onclick="window.open('${selectedDocument.file_url || selectedDocument.file}', '_blank')">
+                              Open in New Tab
+                            </button>
+                          </div>
+                        `
+                      }
+                    }}
+                  />
+                </div>
+              ) : pdfBlobUrl ? (
+                <iframe
+                  src={pdfBlobUrl}
+                  className="w-full h-full border-0"
+                  title={selectedDocument.title || "Document Preview"}
+                  style={{ minHeight: '600px' }}
                 />
               ) : (
-                <div className="text-center py-12">
-                  <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <p className="text-gray-600 mb-4">Preview not available for this file type</p>
-                  <button
-                    onClick={() => handleDownload(selectedDocument.file_url || selectedDocument.file, `${selectedDocument.title}.${selectedDocument.file.split('.').pop()}`)}
-                    className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-                  >
-                    Download File
-                  </button>
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-600 mb-4">Loading document...</p>
+                  </div>
                 </div>
               )}
-              <div className="mt-4 space-y-2 text-sm text-gray-700">
-                {selectedDocument.document_type_display && (
-                  <p><span className="font-semibold">Type:</span> {selectedDocument.document_type_display}</p>
-                )}
-                {selectedDocument.service_name && (
-                  <p><span className="font-semibold">Service:</span> {selectedDocument.service_name}</p>
-                )}
-                {selectedDocument.dentist_name && (
-                  <p><span className="font-semibold">Dentist:</span> {selectedDocument.dentist_name}</p>
-                )}
-                {formatAppointmentDateTime(selectedDocument.appointment_date, selectedDocument.appointment_time) && (
-                  <p><span className="font-semibold">Appointment:</span> {formatAppointmentDateTime(selectedDocument.appointment_date, selectedDocument.appointment_time)}</p>
-                )}
-              </div>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Calendar as CalendarIcon, Clock, User, Plus, X, Edit, XCircle, ChevronDown, ChevronUp, FileText, Camera, Download } from "lucide-react"
+import { useState, useEffect, Fragment } from "react"
+import { Calendar as CalendarIcon, Clock, User, Plus, X, Edit, XCircle, ChevronDown, ChevronUp, FileText, Camera, Download, Search } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -31,6 +31,7 @@ interface Appointment {
   cancel_reason: string
   created_at: string
   updated_at: string
+  completed_at: string | null
 }
 
 interface Document {
@@ -67,7 +68,8 @@ interface Service {
 
 export default function PatientAppointments() {
   const { token, user } = useAuth()
-  const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming")
+  const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "waiting" | "pending" | "past" | "completed" | "missed" | "cancelled">("all")
+  const [searchQuery, setSearchQuery] = useState("")
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -84,6 +86,9 @@ export default function PatientAppointments() {
   const [appointmentDocuments, setAppointmentDocuments] = useState<Record<number, Document[]>>({})
   const [appointmentImages, setAppointmentImages] = useState<Record<number, TeethImage[]>>({})
   const [loadingFiles, setLoadingFiles] = useState<Record<number, boolean>>({})
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
+  const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [newAppointment, setNewAppointment] = useState({
     date: "",
     time: "",
@@ -316,6 +321,33 @@ export default function PatientAppointments() {
 
     return slots
   }
+
+  // Fetch PDF as blob when document is selected
+  useEffect(() => {
+    if (selectedDocument) {
+      fetch(selectedDocument.file_url)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob)
+          setPdfBlobUrl(url)
+        })
+        .catch(err => {
+          console.error('Failed to load document:', err)
+          setPdfBlobUrl(null)
+        })
+    } else {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+        setPdfBlobUrl(null)
+      }
+    }
+
+    return () => {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+      }
+    }
+  }, [selectedDocument])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -865,7 +897,53 @@ export default function PatientAppointments() {
   console.log("Upcoming appointments:", upcomingAppointments)
   console.log("Past appointments:", pastAppointments)
 
-  const appointments = activeTab === "upcoming" ? upcomingAppointments : pastAppointments
+  // Filter appointments based on status filter and search query
+  const appointments = allAppointments.filter((apt) => {
+    // Filter by search query
+    const matchesSearch = searchQuery === "" || 
+      apt.service_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    // Filter by status
+    let matchesStatus = false
+    if (statusFilter === "all") {
+      matchesStatus = true
+    } else if (statusFilter === "upcoming") {
+      matchesStatus = apt.status === "confirmed"
+    } else if (statusFilter === "past") {
+      matchesStatus = apt.status === "completed" || apt.status === "missed" || apt.status === "cancelled"
+    } else {
+      matchesStatus = apt.status === statusFilter
+    }
+    
+    return matchesSearch && matchesStatus
+  })
+
+  // Helper function to darken a hex color for better text readability
+  const darkenColor = (hex: string, percent: number = 40): string => {
+    // Remove the hash if present
+    const color = hex.replace('#', '')
+    
+    // Parse RGB values
+    const r = parseInt(color.substring(0, 2), 16)
+    const g = parseInt(color.substring(2, 4), 16)
+    const b = parseInt(color.substring(4, 6), 16)
+    
+    // Darken by reducing each component
+    const darkenAmount = 1 - (percent / 100)
+    const newR = Math.round(r * darkenAmount)
+    const newG = Math.round(g * darkenAmount)
+    const newB = Math.round(b * darkenAmount)
+    
+    // Convert back to hex
+    const toHex = (n: number) => {
+      const hex = n.toString(16)
+      return hex.length === 1 ? '0' + hex : hex
+    }
+    
+    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -921,33 +999,78 @@ export default function PatientAppointments() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-[var(--color-border)]">
-        <button
-          onClick={() => setActiveTab("upcoming")}
-          className={`px-6 py-3 font-medium transition-colors ${
-            activeTab === "upcoming"
-              ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]"
-              : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-          }`}
-        >
-          Upcoming
-        </button>
-        <button
-          onClick={() => setActiveTab("past")}
-          className={`px-6 py-3 font-medium transition-colors ${
-            activeTab === "past"
-              ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]"
-              : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-          }`}
-        >
-          Past
-        </button>
+      {/* Search */}
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-muted)]" />
+          <input
+            type="text"
+            placeholder="Search by treatment, dentist, or status..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+        </div>
       </div>
 
-      {/* Appointments List */}
-      <div className="space-y-4">
-        {isLoading ? (
+      {/* Status Filter Tabs */}
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-2">
+        <div className="flex gap-2 overflow-x-auto">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "all"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            All Appointments
+          </button>
+          <button
+            onClick={() => setStatusFilter("upcoming")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "upcoming"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Upcoming
+          </button>
+          <button
+            onClick={() => setStatusFilter("waiting")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "waiting"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Waiting
+          </button>
+          <button
+            onClick={() => setStatusFilter("pending")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "pending"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => setStatusFilter("past")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "past"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Past
+          </button>
+        </div>
+      </div>
+
+      {/* Appointments Table */}
+      <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">{isLoading ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto mb-4"></div>
@@ -955,229 +1078,335 @@ export default function PatientAppointments() {
             </div>
           </div>
         ) : appointments.length === 0 ? (
-          <div className="bg-white rounded-xl border border-[var(--color-border)] p-12 text-center">
+          <div className="p-12 text-center">
             <CalendarIcon className="w-16 h-16 mx-auto mb-4 text-[var(--color-text-muted)] opacity-30" />
             <p className="text-lg font-medium text-[var(--color-text)] mb-2">
-              {activeTab === "upcoming" ? "No Upcoming Appointments" : "No Past Appointments"}
+              {statusFilter === "all" && "No Appointments"}
+              {statusFilter === "upcoming" && "No Confirmed Appointments"}
+              {statusFilter === "waiting" && "No Waiting Appointments"}
+              {statusFilter === "pending" && "No Pending Appointments"}
+              {statusFilter === "past" && "No Past Appointments"}
             </p>
             <p className="text-sm text-[var(--color-text-muted)]">
-              {activeTab === "upcoming" 
-                ? "You don't have any scheduled appointments yet" 
-                : "You haven't had any appointments yet"}
+              {statusFilter === "all" && "You don't have any appointments yet"}
+              {statusFilter === "upcoming" && "You don't have any confirmed appointments scheduled"}
+              {statusFilter === "waiting" && "No appointments are currently in waiting status"}
+              {statusFilter === "pending" && "No appointments are currently pending approval"}
+              {statusFilter === "past" && "No completed, missed, or cancelled appointments found"}
             </p>
           </div>
         ) : (
-          appointments.map((appointment) => (
-            <div key={appointment.id} className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-              {/* Main appointment card - clickable */}
-              <div 
-                className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => toggleAppointmentExpansion(appointment.id)}
-              >
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-xl font-semibold">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Patient</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Treatment</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Date</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Time</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Dentist</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)]">
+                {appointments.map((apt) => (
+                  <Fragment key={apt.id}>
+                    <tr 
+                      onClick={() => toggleAppointmentExpansion(apt.id)}
+                      className="hover:bg-[var(--color-background)] cursor-pointer transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <button className="flex items-center gap-2 text-[var(--color-primary)] hover:underline">
+                          {expandedAppointmentId === apt.id ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                          <div className="text-left">
+                            <p className="font-medium text-[var(--color-text)]">{apt.patient_name}</p>
+                            <p className="text-xs text-[var(--color-text-muted)]">{apt.patient_email}</p>
+                          </div>
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
                         <span 
-                          className="px-3 py-1 rounded-lg"
+                          className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                           style={{ 
-                            backgroundColor: appointment.service_color || '#10b981',
-                            color: '#ffffff'
+                            color: darkenColor(apt.service_color || '#10b981', 40),
+                            backgroundColor: `${apt.service_color || '#10b981'}15`,
+                            border: `1px solid ${apt.service_color || '#10b981'}40`
                           }}
                         >
-                          {appointment.service_name || "General Consultation"}
+                          {apt.service_name || "General Consultation"}
                         </span>
-                      </h3>
-                      {/* Only show status badge for non-confirmed appointments */}
-                      {appointment.status !== "confirmed" && (
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                          {formatStatus(appointment.status)}
+                      </td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
+                          {formatStatus(apt.status)}
                         </span>
-                      )}
-                      <button className="ml-auto text-gray-500">
-                        {expandedAppointmentId === appointment.id ? (
-                          <ChevronUp className="w-5 h-5" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
+                      </td>
+                    </tr>
+                    {/* Expanded Row */}
+                    {expandedAppointmentId === apt.id && (
+                      <tr>
+                        <td colSpan={6} className="bg-gradient-to-br from-gray-50 to-teal-50">
+                          <div className="px-6 py-6 animate-in slide-in-from-top-2 duration-300">
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-[var(--color-primary)]">
+                                  Appointment Details
+                                </h3>
+                              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
-                      <CalendarIcon className="w-4 h-4" />
-                      <span className="text-sm">{appointment.date}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
-                      <Clock className="w-4 h-4" />
-                      <span className="text-sm">{formatTime(appointment.time)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
-                      <User className="w-4 h-4" />
-                      <span className="text-sm">{appointment.dentist_name || "To be assigned"}</span>
-                    </div>
-                  </div>
-
-                  {appointment.status === "reschedule_requested" && appointment.reschedule_date && (
-                    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                      <p className="text-sm font-semibold text-orange-800 mb-2">📅 Requested Reschedule:</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-orange-600 font-medium">New Date:</span>
-                          <p className="text-orange-800">{appointment.reschedule_date}</p>
-                        </div>
-                        <div>
-                          <span className="text-orange-600 font-medium">New Time:</span>
-                          <p className="text-orange-800">{formatTime(appointment.reschedule_time || '')}</p>
-                        </div>
-                      </div>
-                      {appointment.reschedule_notes && (
-                        <div className="mt-3">
-                          <span className="text-orange-600 font-medium text-sm">Notes:</span>
-                          <p className="text-orange-800 text-sm">{appointment.reschedule_notes}</p>
-                        </div>
-                      )}
-                      <p className="text-xs text-orange-700 mt-2">Waiting for staff approval...</p>
-                    </div>
-                  )}
-
-                  {appointment.notes && (
-                    <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-                      <p className="text-sm text-[var(--color-text-muted)]">
-                        <span className="font-medium">Notes:</span> {appointment.notes}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Action buttons for confirmed and missed appointments - prevent click propagation */}
-                {appointment.status === "confirmed" && activeTab === "upcoming" && (
-                  <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleRequestReschedule(appointment)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Request Reschedule
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedAppointment(appointment)
-                        setShowCancelModal(true)
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Request Cancel
-                    </button>
-                  </div>
-                )}
-
-                {/* Reschedule button for missed appointments */}
-                {appointment.status === "missed" && (
-                  <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleRequestReschedule(appointment)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Request Reschedule
-                    </button>
-                  </div>
-                )}
-
-                {/* Info for reschedule requested appointments */}
-                {appointment.status === "reschedule_requested" && (
-                  <div className="text-sm text-orange-600 font-medium">
-                    Reschedule pending approval...
-                  </div>
-                )}
-              </div>
-              </div>
-
-              {/* Expanded section with documents and images */}
-              {expandedAppointmentId === appointment.id && (
-                <div className="px-6 pb-6 border-t border-[var(--color-border)] bg-gray-50">
-                  <div className="pt-4 space-y-4">
-                    <h4 className="font-semibold text-[var(--color-text)] mb-3">Appointment Records</h4>
-                    
-                    {loadingFiles[appointment.id] ? (
-                      <p className="text-sm text-[var(--color-text-muted)]">Loading files...</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Documents */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <FileText className="w-4 h-4 text-[var(--color-primary)]" />
-                            <h5 className="font-medium text-sm">Documents</h5>
-                          </div>
-                          {appointmentDocuments[appointment.id]?.length > 0 ? (
-                            <div className="space-y-2">
-                              {appointmentDocuments[appointment.id].map((doc) => (
-                                <div key={doc.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-[var(--color-border)]">
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium text-[var(--color-text)]">{doc.title}</p>
-                                    <p className="text-xs text-[var(--color-text-muted)]">
-                                      {new Date(doc.uploaded_at).toLocaleDateString()}
-                                    </p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Appointment Details Card */}
+                                <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
+                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
+                                    <CalendarIcon className="w-5 h-5" />
+                                    Appointment Details
+                                  </h4>
+                                  <div className="space-y-3 text-sm">
+                                    <div>
+                                      <p className="text-[var(--color-text-muted)] mb-0.5">Patient</p>
+                                      <p className="font-medium text-lg">{apt.patient_name}</p>
+                                      <p className="text-xs text-[var(--color-text-muted)]">{apt.patient_email}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[var(--color-text-muted)] mb-0.5">Service</p>
+                                      <p className="font-medium">{apt.service_name || "General Consultation"}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <CalendarIcon className="w-4 h-4 text-[var(--color-text-muted)]" />
+                                      <div>
+                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Date</p>
+                                        <p className="font-medium">{apt.date}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="w-4 h-4 text-[var(--color-text-muted)]" />
+                                      <div>
+                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Time</p>
+                                        <p className="font-medium">{formatTime(apt.time)}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <p className="text-[var(--color-text-muted)] mb-0.5">Assigned Dentist</p>
+                                      <p className="font-medium">{apt.dentist_name || "Not Assigned"}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[var(--color-text-muted)] mb-0.5">Status</p>
+                                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
+                                        {formatStatus(apt.status)}
+                                      </span>
+                                    </div>
+                                    {apt.status === "completed" && apt.completed_at && (
+                                      <div className="pt-3 border-t border-[var(--color-border)]">
+                                        <p className="text-[var(--color-text-muted)] mb-0.5">Completed At</p>
+                                        <p className="font-medium text-green-600">{new Date(apt.completed_at).toLocaleString()}</p>
+                                      </div>
+                                    )}
+                                    <div className="pt-3 border-t border-[var(--color-border)]">
+                                      <p className="text-[var(--color-text-muted)] text-xs mb-1">Created</p>
+                                      <p className="text-sm">{new Date(apt.created_at).toLocaleString()}</p>
+                                    </div>
+                                    {apt.updated_at !== apt.created_at && (
+                                      <div>
+                                        <p className="text-[var(--color-text-muted)] text-xs mb-1">Last Updated</p>
+                                        <p className="text-sm">{new Date(apt.updated_at).toLocaleString()}</p>
+                                      </div>
+                                    )}
                                   </div>
+                                </div>
+
+                                {/* Documents & Images Card */}
+                                <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
+                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
+                                    <FileText className="w-5 h-5" />
+                                    Uploaded Files
+                                  </h4>
+                                  {loadingFiles[apt.id] ? (
+                                    <p className="text-sm text-[var(--color-text-muted)]">Loading files...</p>
+                                  ) : (
+                                    <div className="space-y-4">
+                                      {/* Documents Section */}
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <FileText className="w-4 h-4 text-[var(--color-primary)]" />
+                                          <h5 className="font-medium text-sm">Documents</h5>
+                                        </div>
+                                        {appointmentDocuments[apt.id]?.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {appointmentDocuments[apt.id].map((doc) => (
+                                              <div
+                                                key={doc.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedDocument(doc)
+                                                }}
+                                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-[var(--color-border)] hover:bg-gray-100 cursor-pointer transition-colors group"
+                                              >
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="text-sm font-medium text-[var(--color-text)] truncate">{doc.title}</p>
+                                                  <p className="text-xs text-[var(--color-text-muted)]">
+                                                    {new Date(doc.uploaded_at).toLocaleDateString()}
+                                                  </p>
+                                                </div>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDownloadFile(doc.file_url, doc.title)
+                                                  }}
+                                                  className="ml-2 p-2 hover:bg-white rounded-lg transition-colors flex-shrink-0"
+                                                  title="Download document"
+                                                >
+                                                  <Download className="w-4 h-4 text-[var(--color-primary)]" />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-[var(--color-text-muted)] italic">No documents uploaded</p>
+                                        )}
+                                      </div>
+
+                                      {/* Images Section */}
+                                      <div className="pt-4 border-t border-[var(--color-border)]">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Camera className="w-4 h-4 text-[var(--color-primary)]" />
+                                          <h5 className="font-medium text-sm">Images</h5>
+                                        </div>
+                                        {appointmentImages[apt.id]?.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {appointmentImages[apt.id].map((img) => (
+                                              <div
+                                                key={img.id}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setSelectedImage(img)
+                                                }}
+                                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-[var(--color-border)] hover:bg-gray-100 cursor-pointer transition-colors group"
+                                              >
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                  <img 
+                                                    src={img.image_url} 
+                                                    alt="Dental" 
+                                                    className="w-12 h-12 object-cover rounded flex-shrink-0"
+                                                  />
+                                                  <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-[var(--color-text)]">Dental Image</p>
+                                                    <p className="text-xs text-[var(--color-text-muted)]">
+                                                      {new Date(img.uploaded_at).toLocaleDateString()}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleDownloadFile(img.image_url, `dental-image-${img.id}.jpg`)
+                                                  }}
+                                                  className="ml-2 p-2 hover:bg-white rounded-lg transition-colors flex-shrink-0"
+                                                  title="Download image"
+                                                >
+                                                  <Download className="w-4 h-4 text-[var(--color-primary)]" />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-[var(--color-text-muted)] italic">No images uploaded</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              {apt.status === "confirmed" && (
+                                <div className="flex gap-3 pt-4 border-t border-[var(--color-border)]">
                                   <button
-                                    onClick={() => handleDownloadFile(doc.file_url, doc.title)}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleRequestReschedule(apt)
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
                                   >
-                                    <Download className="w-4 h-4 text-[var(--color-primary)]" />
+                                    <Edit className="w-4 h-4" />
+                                    Request Reschedule
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedAppointment(apt)
+                                      setShowCancelModal(true)
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                    Request Cancel
                                   </button>
                                 </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-[var(--color-text-muted)] italic">No documents uploaded</p>
-                          )}
-                        </div>
+                              )}
 
-                        {/* Images */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Camera className="w-4 h-4 text-[var(--color-primary)]" />
-                            <h5 className="font-medium text-sm">Images</h5>
-                          </div>
-                          {appointmentImages[appointment.id]?.length > 0 ? (
-                            <div className="space-y-2">
-                              {appointmentImages[appointment.id].map((img) => (
-                                <div key={img.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-[var(--color-border)]">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <img 
-                                      src={img.image_url} 
-                                      alt="Dental" 
-                                      className="w-12 h-12 object-cover rounded"
-                                    />
+                              {/* Reschedule button for missed appointments */}
+                              {apt.status === "missed" && (
+                                <div className="flex gap-3 pt-4 border-t border-[var(--color-border)]">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleRequestReschedule(apt)
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                    Request Reschedule
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Reschedule/Cancel Request Info */}
+                              {apt.status === "reschedule_requested" && apt.reschedule_date && (
+                                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                                  <p className="text-sm font-semibold text-orange-800 mb-2">📅 Requested Reschedule:</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                                     <div>
-                                      <p className="text-sm font-medium text-[var(--color-text)]">Dental Image</p>
-                                      <p className="text-xs text-[var(--color-text-muted)]">
-                                        {new Date(img.uploaded_at).toLocaleDateString()}
-                                      </p>
+                                      <span className="text-orange-600 font-medium">New Date:</span>
+                                      <p className="text-orange-800">{apt.reschedule_date}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-orange-600 font-medium">New Time:</span>
+                                      <p className="text-orange-800">{formatTime(apt.reschedule_time || '')}</p>
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => handleDownloadFile(img.image_url, `dental-image-${img.id}.jpg`)}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                                  >
-                                    <Download className="w-4 h-4 text-[var(--color-primary)]" />
-                                  </button>
+                                  {apt.reschedule_notes && (
+                                    <div className="mt-3">
+                                      <span className="text-orange-600 font-medium text-sm">Notes:</span>
+                                      <p className="text-orange-800 text-sm">{apt.reschedule_notes}</p>
+                                    </div>
+                                  )}
+                                  <p className="text-xs text-orange-700 mt-2">Waiting for staff approval...</p>
                                 </div>
-                              ))}
+                              )}
+
+                              {apt.status === "cancel_requested" && (
+                                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                  <p className="text-sm font-semibold text-red-800 mb-2">❌ Cancellation Requested</p>
+                                  <p className="text-xs text-red-700">Waiting for staff approval...</p>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <p className="text-sm text-[var(--color-text-muted)] italic">No images uploaded</p>
-                          )}
-                        </div>
-                      </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -1693,6 +1922,110 @@ export default function PatientAppointments() {
           }}
           appointmentDetails={successAppointmentDetails}
         />
+      )}
+
+      {/* Document Preview Modal */}
+      {selectedDocument && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setSelectedDocument(null)
+            setPdfBlobUrl(null)
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-[var(--color-primary)]">{selectedDocument.title}</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedDocument.document_type}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={selectedDocument.file_url}
+                  download={selectedDocument.title}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-5 h-5" />
+                </a>
+                <button
+                  onClick={() => {
+                    setSelectedDocument(null)
+                    setPdfBlobUrl(null)
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {selectedDocument.file_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                <img
+                  src={selectedDocument.file_url}
+                  alt={selectedDocument.title}
+                  className="w-full h-full object-contain"
+                />
+              ) : pdfBlobUrl ? (
+                <iframe src={pdfBlobUrl} className="w-full h-full border-0" />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-[var(--color-primary)]">Dental Image</h2>
+                {selectedImage.notes && (
+                  <p className="text-sm text-gray-500 mt-1">{selectedImage.notes}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={selectedImage.image_url}
+                  download={`dental-image-${selectedImage.id}.jpg`}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-5 h-5" />
+                </a>
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden p-4">
+              <img
+                src={selectedImage.image_url}
+                alt="Dental image"
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
