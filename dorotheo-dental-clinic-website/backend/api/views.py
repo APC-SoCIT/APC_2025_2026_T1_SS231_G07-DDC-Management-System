@@ -491,13 +491,30 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [AllowAny]
 
+    def get_queryset(self):
+        queryset = Service.objects.all()
+        
+        # Filter by clinic_id if provided in query params
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinics__id=clinic_id)
+        
+        return queryset
+
     @action(detail=False, methods=['get'])
     def by_category(self, request):
         category = request.query_params.get('category', 'all')
+        clinic_id = request.query_params.get('clinic_id', None)
+        
         if category == 'all':
             services = Service.objects.all()
         else:
             services = Service.objects.filter(category=category)
+        
+        # Filter by clinic if provided
+        if clinic_id is not None:
+            services = services.filter(clinics__id=clinic_id)
+            
         serializer = self.get_serializer(services, many=True)
         return Response(serializer.data)
 
@@ -508,9 +525,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = Appointment.objects.all()
+        
+        # Filter by user type
         if user.user_type == 'patient':
-            return Appointment.objects.filter(patient=user)
-        return Appointment.objects.all()
+            queryset = queryset.filter(patient=user)
+        
+        # Filter by clinic_id if provided in query params
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        
+        return queryset
     
     def list(self, request, *args, **kwargs):
         """Override list to auto-mark missed appointments"""
