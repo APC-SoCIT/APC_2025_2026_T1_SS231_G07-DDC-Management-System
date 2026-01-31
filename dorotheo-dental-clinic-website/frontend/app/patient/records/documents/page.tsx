@@ -324,7 +324,7 @@ export default function Documents() {
 
             {/* Document Viewer */}
             <div className="flex-1 overflow-auto bg-gray-100">
-              {(selectedDocument.document_type === 'xray' || selectedDocument.document_type === 'scan' || selectedDocument.document_type === 'medical_certificate' || selectedDocument.document_type === 'dental_image') ? (
+              {(selectedDocument.file_url || selectedDocument.file).match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                 <div className="flex items-center justify-center p-4 h-full">
                   <img
                     src={selectedDocument.file_url || selectedDocument.file}
