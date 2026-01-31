@@ -21,10 +21,12 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { useClinic } from "@/lib/clinic-context"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
 import BlockTimeSuccessModal from "@/components/block-time-success-modal"
+import { ClinicBadge } from "@/components/clinic-badge"
 
 interface Appointment {
   id: number
@@ -36,6 +38,13 @@ interface Appointment {
   service: number | null
   service_name: string | null
   service_color: string | null
+  clinic?: number
+  clinic_name?: string
+  clinic_data?: {
+    id: number
+    name: string
+    address: string
+  }
   date: string
   time: string
   status: "confirmed" | "pending" | "waiting" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
@@ -81,6 +90,7 @@ interface Staff {
 
 export default function StaffAppointments() {
   const { token } = useAuth()
+  const { selectedClinic } = useClinic()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "pending" | "completed" | "missed" | "cancelled">("all")
   const [showAddModal, setShowAddModal] = useState(false)
@@ -284,7 +294,8 @@ export default function StaffAppointments() {
       
       try {
         setIsLoading(true)
-        const response = await api.getAppointments(token)
+        const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
+        const response = await api.getAppointments(token, clinicId)
         console.log("Fetched appointments:", response)
         setAppointments(response)
       } catch (error) {
@@ -295,7 +306,7 @@ export default function StaffAppointments() {
     }
 
     fetchAppointments()
-  }, [token])
+  }, [token, selectedClinic])
 
   // Fetch blocked time slots
   useEffect(() => {
@@ -1024,6 +1035,7 @@ export default function StaffAppointments() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Treatment</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Time</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Clinic</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Dentist</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
@@ -1063,6 +1075,13 @@ export default function StaffAppointments() {
                     </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
+                    <td className="px-6 py-4">
+                      {apt.clinic_data ? (
+                        <ClinicBadge clinic={apt.clinic_data} size="sm" />
+                      ) : (
+                        <span className="text-[var(--color-text-muted)] text-sm">N/A</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
