@@ -1126,71 +1126,71 @@ export default function OwnerAppointments() {
       {/* Appointments Table */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[1400px]">
             <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr>
                 <th 
                   onClick={() => handleSort('patient')}
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     Patient
                     {sortColumn === 'patient' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     )}
                   </div>
                 </th>
                 <th 
                   onClick={() => handleSort('treatment')}
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     Treatment
                     {sortColumn === 'treatment' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     )}
                   </div>
                 </th>
                 <th 
                   onClick={() => handleSort('date')}
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     Date
                     {sortColumn === 'date' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">
+                <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)]">
                   Time
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">
+                <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)]">
                   Clinic
                 </th>
                 <th 
                   onClick={() => handleSort('dentist')}
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     Dentist
                     {sortColumn === 'dentist' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     )}
                   </div>
                 </th>
                 <th 
                   onClick={() => handleSort('status')}
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     Status
                     {sortColumn === 'status' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] min-w-[400px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
@@ -1201,22 +1201,22 @@ export default function OwnerAppointments() {
                     onClick={() => handleRowClick(apt.id)}
                     className="hover:bg-[var(--color-background)] transition-all duration-200 cursor-pointer"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
                         {expandedRow === apt.id ? (
-                          <ChevronUp className="w-4 h-4 text-[var(--color-primary)]" />
+                          <ChevronUp className="w-3 h-3 text-[var(--color-primary)]" />
                         ) : (
-                          <ChevronDown className="w-4 h-4 text-[var(--color-text-muted)]" />
+                          <ChevronDown className="w-3 h-3 text-[var(--color-text-muted)]" />
                         )}
                         <div>
-                          <p className="font-medium text-[var(--color-text)]">{apt.patient_name || "Unknown"}</p>
-                          <p className="text-sm text-[var(--color-text-muted)]">{apt.patient_email || "N/A"}</p>
+                          <p className="font-medium text-sm text-[var(--color-text)]">{apt.patient_name || "Unknown"}</p>
+                          <p className="text-xs text-[var(--color-text-muted)]">{apt.patient_email || "N/A"}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <span 
-                        className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
+                        className="inline-block px-2 py-0.5 rounded-lg font-medium text-xs whitespace-nowrap"
                         style={{ 
                           color: darkenColor(apt.service_color || '#10b981', 40),
                           backgroundColor: `${apt.service_color || '#10b981'}15`,
@@ -1226,23 +1226,23 @@ export default function OwnerAppointments() {
                         {apt.service_name || "General Consultation"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{apt.date}</td>
+                    <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
+                    <td className="px-3 py-3">
                       {apt.clinic_data ? (
                         <ClinicBadge clinic={apt.clinic_data} size="sm" />
                       ) : (
-                        <span className="text-[var(--color-text-muted)] text-sm">N/A</span>
+                        <span className="text-[var(--color-text-muted)] text-xs">N/A</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
+                    <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
+                    <td className="px-3 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
                         {formatStatus(apt.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                         {/* Mark as Waiting Button - Only for appointments that aren't already waiting, pending, or done */}
                         {apt.status !== "waiting" && apt.status !== "pending" && apt.status !== "completed" && apt.status !== "missed" && apt.status !== "cancelled" && (
                           <button
@@ -1250,11 +1250,11 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleStatusChange(apt.id, "waiting")
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-medium text-xs"
                             title="Mark as Waiting"
                           >
-                            <Clock className="w-4 h-4" />
-                            <span>Waiting</span>
+                            <Clock className="w-3 h-3" />
+                            <span>Wait</span>
                           </button>
                         )}
                         {/* Mark as Pending Button - Only for appointments that aren't already pending or done */}
@@ -1264,11 +1264,11 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleStatusChange(apt.id, "pending")
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded transition-colors font-medium text-xs"
                             title="Mark as Pending"
                           >
-                            <Hourglass className="w-4 h-4" />
-                            <span>Pending</span>
+                            <Hourglass className="w-3 h-3" />
+                            <span>Pend</span>
                           </button>
                         )}
                         {/* Complete Button - For pending appointments */}
@@ -1278,13 +1278,13 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleApprove(apt.id)
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded transition-colors font-medium text-xs"
                             title="Complete Appointment"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Complete</span>
+                            <span>Done</span>
                           </button>
                         )}
                         {/* Complete Button - Only for confirmed appointments */}
@@ -1294,13 +1294,13 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleMarkComplete(apt)
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded transition-colors font-medium text-xs"
                             title="Mark as Complete"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Complete</span>
+                            <span>Done</span>
                           </button>
                         )}
                         {/* Mark as Missed Button - Only for confirmed appointments */}
@@ -1310,13 +1310,13 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleMarkMissed(apt)
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded transition-colors font-medium text-xs"
                             title="Mark as Missed"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>Missed</span>
+                            <span>Miss</span>
                           </button>
                         )}
                         {/* Cancel Button - Only for pending and confirmed appointments */}
@@ -1326,10 +1326,10 @@ export default function OwnerAppointments() {
                               e.stopPropagation()
                               handleCancelAppointment(apt)
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded transition-colors font-medium text-xs"
                             title="Cancel Appointment"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3 h-3" />
                             <span>Cancel</span>
                           </button>
                         )}
@@ -1337,20 +1337,20 @@ export default function OwnerAppointments() {
                         {(apt.status === "pending" || apt.status === "confirmed") && (
                           <button
                             onClick={(e) => handleEdit(apt, e)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors font-medium text-sm"
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-medium text-xs"
                             title="Reschedule"
                           >
-                            <Edit2 className="w-4 h-4" />
-                            <span>Reschedule</span>
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
                           </button>
                         )}
                         <button
                           onClick={(e) => handleDelete(apt.id, e)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors font-medium text-sm"
+                          className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded transition-colors font-medium text-xs"
                           title="Delete"
                         >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Delete</span>
+                          <Trash2 className="w-3 h-3" />
+                          <span>Del</span>
                         </button>
                       </div>
                     </td>

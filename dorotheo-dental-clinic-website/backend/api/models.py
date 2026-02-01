@@ -162,6 +162,7 @@ class ToothChart(models.Model):
 class DentalRecord(models.Model):
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dental_records')
     appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.SET_NULL, null=True, blank=True, related_name='dental_records', help_text="Clinic where this record was created")
     treatment = models.TextField()
     diagnosis = models.TextField(blank=True)
     notes = models.TextField(blank=True)
@@ -186,6 +187,7 @@ class Document(models.Model):
         ('other', 'Other'),
     )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.SET_NULL, null=True, blank=True, related_name='documents', help_text="Clinic where this document was uploaded")
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
     file = models.FileField(upload_to='documents/')
     title = models.CharField(max_length=200)
@@ -228,6 +230,7 @@ class Billing(models.Model):
     )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='billings')
     appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.SET_NULL, null=True, blank=True, related_name='billings', help_text="Clinic where this billing was created")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
     soa_file = models.FileField(upload_to='billing/', null=True, blank=True)

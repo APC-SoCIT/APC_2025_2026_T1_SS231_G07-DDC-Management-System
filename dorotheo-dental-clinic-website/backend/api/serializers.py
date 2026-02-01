@@ -81,6 +81,8 @@ class ToothChartSerializer(serializers.ModelSerializer):
 
 class DentalRecordSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source=CREATED_BY_FULL_NAME, read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
+    clinic_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = DentalRecord
@@ -89,6 +91,7 @@ class DentalRecordSerializer(serializers.ModelSerializer):
 
 class DocumentSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
     appointment_date = serializers.DateField(source='appointment.date', read_only=True)
     appointment_time = serializers.TimeField(source='appointment.time', read_only=True)
     service_name = serializers.CharField(source='appointment.service.name', read_only=True)
@@ -99,7 +102,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            'id', 'patient', 'document_type', 'document_type_display', 'file', 'file_url',
+            'id', 'patient', 'clinic', 'clinic_data', 'document_type', 'document_type_display', 'file', 'file_url',
             'title', 'description', 'appointment', 'appointment_date', 'appointment_time',
             'service_name', 'dentist_name', 'uploaded_by', 'uploaded_by_name', 'uploaded_at'
         ]
@@ -124,6 +127,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 class BillingSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source=PATIENT_FULL_NAME, read_only=True)
     created_by_name = serializers.CharField(source=CREATED_BY_FULL_NAME, read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
+    clinic_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Billing

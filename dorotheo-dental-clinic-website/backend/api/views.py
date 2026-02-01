@@ -1022,6 +1022,11 @@ class DentalRecordViewSet(viewsets.ModelViewSet):
             if patient_id is not None:
                 queryset = queryset.filter(patient_id=patient_id)
         
+        # Optional clinic filter (does not restrict cross-clinic visibility)
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        
         return queryset
 
 
@@ -1041,6 +1046,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
             patient_id = self.request.query_params.get('patient', None)
             if patient_id is not None:
                 queryset = queryset.filter(patient_id=patient_id)
+        
+        # Optional clinic filter (does not restrict cross-clinic visibility)
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinic_id=clinic_id)
         
         return queryset
 
@@ -1072,6 +1082,11 @@ class BillingViewSet(viewsets.ModelViewSet):
         status_filter = self.request.query_params.get('status', None)
         if status_filter and status_filter in ['pending', 'paid', 'cancelled']:
             queryset = queryset.filter(status=status_filter)
+        
+        # Optional clinic filter (does not restrict cross-clinic visibility)
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinic_id=clinic_id)
         
         return queryset
 

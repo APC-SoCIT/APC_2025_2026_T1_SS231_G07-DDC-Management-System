@@ -4,10 +4,37 @@ import { useState, useEffect } from "react"
 import { Download, CreditCard, CheckCircle, Clock } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { ClinicBadge } from "@/components/ClinicBadge"
+
+interface ClinicLocation {
+  id: number
+  name: string
+  address: string
+  city: string
+  state: string
+  zipcode: string
+  phone: string
+  email: string
+}
+
+interface Billing {
+  id: number
+  patient: number
+  patient_name?: string
+  amount: number
+  status: string
+  description: string
+  date?: string
+  created_at: string
+  created_by?: number
+  created_by_name?: string
+  clinic?: number | null
+  clinic_data?: ClinicLocation | null
+}
 
 export default function PatientBilling() {
   const { token } = useAuth()
-  const [billings, setBillings] = useState<any[]>([])
+  const [billings, setBillings] = useState<Billing[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -92,7 +119,8 @@ export default function PatientBilling() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-[var(--color-text)] mb-1">{billing.description || "Treatment"}</h3>
-                      <p className="text-sm text-[var(--color-text-muted)]">{billing.date || new Date(billing.created_at).toLocaleDateString()}</p>
+                      <p className="text-sm text-[var(--color-text-muted)] mb-2">{billing.date || new Date(billing.created_at).toLocaleDateString()}</p>
+                      {billing.clinic_data && <ClinicBadge clinic={billing.clinic_data} size="sm" />}
                     </div>
                   </div>
 

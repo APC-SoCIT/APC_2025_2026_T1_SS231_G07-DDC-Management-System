@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Calendar, FileText, Clock, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
+import { ClinicBadge } from "@/components/clinic-badge"
 import Link from "next/link"
 
 interface Appointment {
@@ -13,6 +14,12 @@ interface Appointment {
   dentist_name: string
   service_name: string | null
   status: string
+  clinic_data: {
+    id: number
+    name: string
+    address: string
+    phone: string
+  } | null
 }
 
 export default function PatientDashboard() {
@@ -183,6 +190,11 @@ export default function PatientDashboard() {
                       {appointment.service_name || "General Consultation"}
                     </h3>
                     <p className="text-sm text-[var(--color-text-muted)]">{appointment.dentist_name}</p>
+                    {appointment.clinic_data && (
+                      <div className="mt-1">
+                        <ClinicBadge clinic={appointment.clinic_data} size="sm" />
+                      </div>
+                    )}
                     <span
                       className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                         appointment.status === "confirmed"

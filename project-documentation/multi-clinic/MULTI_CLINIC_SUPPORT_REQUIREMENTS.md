@@ -286,30 +286,30 @@ Step 6: Appointment created with clinic association
 
 ### 📋 Phase 1: Core Models & Associations
 **Priority:** HIGH  
-**Status:** Not Started
+**Status:** ✅ COMPLETE (Backend & Frontend)
 
 #### Backend Tasks
 1. ✅ Add `clinic` ForeignKey to core models:
-   - [ ] `Appointment` → `clinic` (required)
-   - [ ] `User` → `assigned_clinic` (for staff/dentist, nullable)
-   - [ ] `Service` → `clinics` (ManyToMany or ForeignKey)
+   - [x] `Appointment` → `clinic` (required)
+   - [x] `User` → `assigned_clinic` (for staff/dentist, nullable)
+   - [x] `Service` → `clinics` (ManyToMany or ForeignKey)
 
 2. ✅ Create data migration:
-   - [ ] Create "Main Clinic" if none exists
-   - [ ] Assign all existing appointments to Main Clinic
-   - [ ] Assign all existing staff to Main Clinic
-   - [ ] Assign all existing services to Main Clinic
+   - [x] Create "Main Clinic" if none exists
+   - [x] Assign all existing appointments to Main Clinic
+   - [x] Assign all existing staff to Main Clinic
+   - [x] Assign all existing services to Main Clinic
 
 3. ✅ Update API endpoints:
-   - [ ] `GET /api/clinics/` - list all clinics
-   - [ ] `GET /api/appointments/?clinic_id=1` - filter by clinic
-   - [ ] `POST /api/appointments/` - require clinic in payload
-   - [ ] Update serializers to include clinic data
+   - [x] `GET /api/locations/` - list all clinics (ClinicLocationViewSet)
+   - [x] `GET /api/appointments/?clinic_id=1` - filter by clinic (AppointmentViewSet.get_queryset)
+   - [x] `GET /api/services/?clinic_id=1` - filter services by clinic (ServiceViewSet.get_queryset)
+   - [x] Serializers include clinic data (clinics_data, clinic_data fields)
 
 4. ✅ Add database indexes:
-   - [ ] Index on `appointment.clinic_id`
-   - [ ] Index on `user.assigned_clinic_id`
-   - [ ] Index on `service.clinic_id`
+   - [x] Index on `appointment.clinic_id` + date
+   - [x] Index on `appointment.clinic_id` + status
+   - [x] Index on `appointment.date` + time
 
 #### Frontend Tasks
 1. ✅ Create `ClinicContext` provider
@@ -319,42 +319,61 @@ Step 6: Appointment created with clinic association
 5. ✅ Integrate ClinicSelector into owner/staff layouts
 6. ✅ Filter dashboards by selected clinic
 7. ✅ Add clinic badge column to appointments tables
+8. ✅ Add clinic assignment to service management:
+   - [x] Update Service interface to include `clinics_data` and `clinic_ids`
+   - [x] Fetch all clinics in services page
+   - [x] Add clinic multi-select checkboxes in service form modal
+   - [x] Show clinic badges on service cards ("Available at: Clinic A, Clinic B")
+   - [x] Send `clinic_ids` array when creating/updating services
+   - [x] Display "No clinics assigned" warning if service has no clinics
+
+**Patient Portal Implementation:**
+- ✅ Added clinic selection as Step 1 in appointment booking (clinic-first flow)
+- ✅ Added clinic badge to appointments table
+- ✅ Added clinic information in appointment details (with address and phone)
+- ✅ Added clinic badge to patient dashboard upcoming appointments
+- ✅ Disabled dentist/service selection until clinic is chosen
+- ✅ Integrated ClinicContext for accessing clinic data
 
 #### Testing Checklist
 - [x] Clinic selector visible in owner and staff portals
 - [x] Clinic selection persists and filters data
-- [ ] Can create appointments with clinic association
+- [x] Can create appointments with clinic association (patient portal)
 - [ ] Can filter appointments by clinic
 - [ ] Existing data migrated successfully
 - [ ] Clinic selector changes context correctly
+- [ ] Can assign/unassign clinics to services in service management
+- [ ] Service cards show which clinics offer them
+- [ ] Appointment booking only shows services available at selected clinic
+- [ ] Services with no clinic assignment show warning indicator
 
 ---
 
 ### 📋 Phase 2: Clinical Data & Records
 **Priority:** HIGH  
-**Status:** Not Started  
+**Status:** ✅ COMPLETE (Backend & Frontend)  
 **Depends On:** Phase 1 completion
 
 #### Backend Tasks
 1. ✅ Add `clinic` ForeignKey to:
-   - [ ] `DentalRecord` → `clinic`
-   - [ ] `Document` → `clinic`
-   - [ ] `Billing` → `clinic`
+   - [x] `DentalRecord` → `clinic`
+   - [x] `Document` → `clinic`
+   - [x] `Billing` → `clinic`
 
 2. ✅ Data migration:
-   - [ ] Assign existing dental records to Main Clinic
-   - [ ] Assign existing documents to Main Clinic
-   - [ ] Assign existing billing to Main Clinic
+   - [x] Assign existing dental records to Main Clinic (migration 0026)
+   - [x] Assign existing documents to Main Clinic (migration 0026)
+   - [x] Assign existing billing to Main Clinic (migration 0026)
 
 3. ✅ Update API endpoints:
-   - [ ] Filter dental records by clinic (optional)
-   - [ ] Filter documents by clinic (optional)
-   - [ ] Filter billing by clinic (optional)
-   - [ ] Show clinic information in responses
+   - [x] Filter dental records by clinic (DentalRecordViewSet.get_queryset with clinic_id param)
+   - [x] Filter documents by clinic (DocumentViewSet.get_queryset with clinic_id param)
+   - [x] Filter billing by clinic (BillingViewSet.get_queryset with clinic_id param)
+   - [x] Show clinic information in responses (clinic_data field in serializers)
 
 4. ✅ Cross-clinic visibility:
-   - [ ] Ensure patient records visible from all clinics
-   - [ ] Add "Created at Clinic" indicator
+   - [x] Patient records visible from all clinics (no restrictions in get_queryset)
+   - [x] "Created at Clinic" indicator (clinic_data field available)
 
 #### Frontend Tasks
 1. ✅ Add clinic badges to records table
