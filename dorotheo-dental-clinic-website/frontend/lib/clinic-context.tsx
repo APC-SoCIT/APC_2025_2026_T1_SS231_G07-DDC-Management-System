@@ -30,15 +30,22 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const loadClinics = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clinics/`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const url = `${apiUrl}/api/locations/`;
+      console.log('[ClinicContext] Fetching clinics from:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
       });
 
+      console.log('[ClinicContext] Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[ClinicContext] Loaded clinics:', data);
         setAllClinics(data);
         
         // Load selected clinic from localStorage
@@ -57,9 +64,11 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           // No saved selection, default to first clinic
           setSelectedClinicState(data[0]);
         }
+      } else {
+        console.error('[ClinicContext] Failed to load clinics, status:', response.status);
       }
     } catch (error) {
-      console.error('Error loading clinics:', error);
+      console.error('[ClinicContext] Error loading clinics:', error);
     } finally {
       setIsLoading(false);
     }

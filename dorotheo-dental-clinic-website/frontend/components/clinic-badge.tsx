@@ -17,19 +17,32 @@ interface ClinicBadgeProps {
   showIcon?: boolean;
 }
 
+// Extract short name from clinic name (e.g., "Dorotheo Dental Clinic - Bacoor (Main)" -> "Bacoor")
+const getShortClinicName = (clinicName: string): string => {
+  if (!clinicName) return 'Unknown';
+  
+  // Remove "Dorotheo Dental Clinic - " prefix
+  let shortName = clinicName.replace(/Dorotheo Dental Clinic\s*-\s*/i, '');
+  
+  // Remove "(Main)" suffix but keep the location name
+  shortName = shortName.replace(/\s*\(Main\)\s*$/i, '');
+  
+  return shortName.trim() || clinicName;
+};
+
 // Color mapping for different clinics
 const getClinicColor = (clinicName: string): string => {
   if (!clinicName) return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700';
   
   const lowerName = clinicName.toLowerCase();
   
-  if (lowerName.includes('main')) {
+  if (lowerName.includes('bacoor') || lowerName.includes('main')) {
     return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700';
-  } else if (lowerName.includes('branch a')) {
+  } else if (lowerName.includes('alabang')) {
     return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-700';
-  } else if (lowerName.includes('branch b')) {
+  } else if (lowerName.includes('poblacion') || lowerName.includes('makati')) {
     return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-700';
-  } else if (lowerName.includes('branch c')) {
+  } else if (lowerName.includes('branch')) {
     return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-700';
   }
   
@@ -57,6 +70,7 @@ export function ClinicBadge({
   };
 
   const clinicColor = variant === 'outline' ? getClinicColor(clinic.name) : '';
+  const displayName = getShortClinicName(clinic.name);
 
   return (
     <Badge 
@@ -67,9 +81,10 @@ export function ClinicBadge({
         'inline-flex items-center gap-1 font-medium border',
         className
       )}
+      title={clinic.name} // Show full name on hover
     >
       {showIcon && <Building2 className={iconSizes[size]} />}
-      <span className="truncate max-w-[150px]">{clinic.name}</span>
+      <span>{displayName}</span>
     </Badge>
   );
 }
