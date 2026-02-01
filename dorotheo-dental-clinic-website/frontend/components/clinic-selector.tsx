@@ -17,6 +17,19 @@ interface ClinicSelectorProps {
   className?: string;
 }
 
+// Extract short name from clinic name
+const getShortClinicName = (clinicName: string): string => {
+  if (!clinicName) return 'Unknown';
+  
+  // Remove "Dorotheo Dental Clinic - " prefix
+  let shortName = clinicName.replace(/Dorotheo Dental Clinic\s*-\s*/i, '');
+  
+  // Remove "(Main)" suffix but keep the location name
+  shortName = shortName.replace(/\s*\(Main\)\s*$/i, '');
+  
+  return shortName.trim() || clinicName;
+};
+
 export function ClinicSelector({ showAllOption = false, className }: ClinicSelectorProps) {
   const { selectedClinic, allClinics, setSelectedClinic, isLoading } = useClinic();
 
@@ -31,7 +44,7 @@ export function ClinicSelector({ showAllOption = false, className }: ClinicSelec
 
   const displayText = selectedClinic === "all" 
     ? "All Clinics" 
-    : selectedClinic?.name || "Select Clinic";
+    : selectedClinic?.name ? getShortClinicName(selectedClinic.name) : "Select Clinic";
 
   return (
     <DropdownMenu>
@@ -65,9 +78,9 @@ export function ClinicSelector({ showAllOption = false, className }: ClinicSelec
             className="cursor-pointer"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="truncate">{clinic.name}</span>
+              <span title={clinic.name}>{getShortClinicName(clinic.name)}</span>
               {selectedClinic !== "all" && selectedClinic?.id === clinic.id && (
-                <Check className="h-4 w-4 text-primary" />
+                <Check className="h-4 w-4 text-primary ml-2 flex-shrink-0" />
               )}
             </div>
           </DropdownMenuItem>
