@@ -1,24 +1,29 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronLeft, ChevronRight, Clock, Save } from "lucide-react"
+import { ChevronLeft, ChevronRight, Clock, Save, MapPin, Calendar } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import AvailabilitySuccessModal from "@/components/availability-success-modal"
 
 interface DentistAvailabilityProps {
   dentistId: number | undefined
+  selectedClinicId?: number | null // null means "All Clinics"
 }
 
 interface SelectedDate {
   date: string
   startTime: string
   endTime: string
+  clinicId?: number | null
+  clinicName?: string
+  applyToAllClinics?: boolean
 }
 
-export default function DentistCalendarAvailability({ dentistId }: DentistAvailabilityProps) {
+export default function DentistCalendarAvailability({ dentistId, selectedClinicId }: DentistAvailabilityProps) {
   const { token } = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDates, setSelectedDates] = useState<Record<string, SelectedDate>>({})
+  const [allAvailability, setAllAvailability] = useState<SelectedDate[]>([]) // Store all availability for table view
   const [showTimeModal, setShowTimeModal] = useState(false)
   const [activeDate, setActiveDate] = useState<string | null>(null)
   const [tempStartTime, setTempStartTime] = useState("09:00")
@@ -69,10 +74,10 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
 
   useEffect(() => {
     if (dentistId) {
-      console.log('[CALENDAR] Loading availability for dentist ID:', dentistId)
+      console.log('[CALENDAR] Loading availability for dentist ID:', dentistId, 'clinic:', selectedClinicId)
       loadAvailability()
     }
-  }, [dentistId, currentDate])
+  }, [dentistId, currentDate, selectedClinicId])
 
   const loadAvailability = async () => {
     if (!dentistId) return
@@ -90,41 +95,77 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
     const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
 
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`,
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      )
+      // Build URL with optional clinic filter
+      let url = `http://127.0.0.1:8000/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`
+      if (selectedClinicId) {
+        url += `&clinic_id=${selectedClinicId}`
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      })
 
       if (response.ok) {
         const data = await response.json()
         console.log('[CALENDAR] Loaded availability:', data)
         const availabilityMap: Record<string, SelectedDate> = {}
+        const allAvail: SelectedDate[] = []
         
-        // Get today's date for comparison
+        // Get today's date string for comparison (YYYY-MM-DD format)
         const today = new Date()
-        today.setHours(0, 0, 0, 0)
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
         
         data.forEach((item: any) => {
-          const itemDate = new Date(item.date)
-          // Only include dates that are today or in the future
-          if (itemDate >= today) {
-            availabilityMap[item.date] = {
-              date: item.date,
-              startTime: item.start_time.substring(0, 5), // Convert "09:00:00" to "09:00"
-              endTime: item.end_time.substring(0, 5),
+          // Compare date strings directly to avoid timezone issues
+          // item.date is already in YYYY-MM-DD format
+          if (item.date >= todayStr) {
+            // Filter based on selectedClinicId
+            // If selectedClinicId is null (All Clinics), show:
+            //   - Items with apply_to_all_clinics = true
+            //   - All items (to show everything)
+            // If selectedClinicId is set, show:
+            //   - Items that match that clinic
+            //   - Items with apply_to_all_clinics = true
+            
+            const shouldInclude = selectedClinicId === null || selectedClinicId === undefined
+              ? true // Show all when "All Clinics" is selected
+              : (item.apply_to_all_clinics || item.clinic === selectedClinicId)
+            
+            if (shouldInclude) {
+              // Determine clinic name with better fallback logic
+              let clinicName = 'Unknown'
+              if (item.apply_to_all_clinics) {
+                clinicName = 'All Clinics'
+              } else if (item.clinic_data?.name) {
+                clinicName = item.clinic_data.name
+              } else if (item.clinic) {
+                // Clinic ID exists but no expanded data - shouldn't happen but handle gracefully
+                clinicName = `Clinic ID ${item.clinic}`
+              }
+              
+              const availItem: SelectedDate = {
+                date: item.date,
+                startTime: item.start_time.substring(0, 5), // Convert "09:00:00" to "09:00"
+                endTime: item.end_time.substring(0, 5),
+                clinicId: item.clinic,
+                clinicName: clinicName,
+                applyToAllClinics: item.apply_to_all_clinics,
+              }
+              availabilityMap[item.date] = availItem
+              allAvail.push(availItem)
             }
           }
         })
         
         setSelectedDates(availabilityMap)
+        setAllAvailability(allAvail.sort((a, b) => a.date.localeCompare(b.date)))
         console.log('[CALENDAR] Selected dates updated (past dates filtered):', availabilityMap)
       } else if (response.status === 401) {
         // Silently ignore 401 errors (authentication issues)
         setSelectedDates({})
+        setAllAvailability([])
       } else {
         // Only log non-auth errors
         console.log('[CALENDAR] Failed to load availability:', response.status)
@@ -132,6 +173,7 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
     } catch (error) {
       // Silently handle errors to avoid annoying popups
       setSelectedDates({})
+      setAllAvailability([])
     } finally {
       setIsLoading(false)
     }
@@ -426,8 +468,35 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
         <h3 className="text-xl font-bold text-gray-800 mb-1">
           Select Your Available Dates
         </h3>
-        <p className="text-xs text-gray-500">Click on dates to set your working hours</p>
+        <p className="text-xs text-gray-500">Click on dates to set your working hours. Use the "+ Set Availability" button above for bulk scheduling.</p>
       </div>
+
+      {/* Current Status Banner */}
+      {allAvailability.length > 0 ? (
+        <div className="mb-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-green-800">Availability Set</p>
+            <p className="text-xs text-green-600">You have {allAvailability.length} available {allAvailability.length === 1 ? 'date' : 'dates'} in {monthName}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-3 p-3 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg border border-amber-200 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">No Availability Set</p>
+            <p className="text-xs text-amber-600">Click on dates below or use the "+ Set Availability" button to set your schedule</p>
+          </div>
+        </div>
+      )}
 
       {isLoading && (
         <div className="text-center text-gray-500 text-sm py-4 bg-blue-50 rounded-lg">
@@ -495,47 +564,107 @@ export default function DentistCalendarAvailability({ dentistId }: DentistAvaila
         })}
       </div>
 
-      {/* Selected Dates Summary */}
-      {Object.keys(selectedDates).length > 0 && (
-        <div className="mt-4 p-3 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <h4 className="text-sm font-bold text-green-800">
-              {Object.keys(selectedDates).length} {Object.keys(selectedDates).length === 1 ? 'Date' : 'Dates'} Selected
-            </h4>
-          </div>
-          <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
-            {Object.values(selectedDates).sort((a, b) => a.date.localeCompare(b.date)).map(item => (
-              <div key={item.date} className="text-xs bg-white border border-green-300 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow">
-                <div className="font-bold text-green-900">
-                  {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
-                <div className="text-green-700 flex items-center gap-1 mt-1">
-                  <Clock className="w-3 h-3" />
-                  <span className="text-[11px]">{item.startTime} - {item.endTime}</span>
-                </div>
+      {/* Calendar Legend */}
+      <div className="mt-3 flex items-center justify-center gap-4 text-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm"></div>
+          <span className="text-gray-600">Available</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-white border border-gray-200"></div>
+          <span className="text-gray-600">Not Set</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-gray-50"></div>
+          <span className="text-gray-600">Past Date</span>
+        </div>
+      </div>
+
+      {/* Selected Dates Summary - Table View */}
+      {allAvailability.length > 0 && (
+        <div className="mt-4 bg-white rounded-xl border border-green-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <h4 className="text-sm font-bold text-green-800">
+                  Your Available Dates ({allAvailability.length})
+                </h4>
               </div>
-            ))}
+              <span className="text-xs text-green-600">Patients can book during these times</span>
+            </div>
+          </div>
+          
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Date
+                    </div>
+                  </th>
+                  <th className="text-left px-4 py-2 font-semibold text-gray-700">Day</th>
+                  <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      Time
+                    </div>
+                  </th>
+                  <th className="text-left px-4 py-2 font-semibold text-gray-700">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Clinic
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {allAvailability.map((item, index) => {
+                  const dateObj = new Date(item.date + 'T00:00:00')
+                  const formatTime = (time: string) => {
+                    const [h, m] = time.split(':')
+                    const hour = parseInt(h)
+                    const ampm = hour >= 12 ? 'PM' : 'AM'
+                    const displayHour = hour % 12 || 12
+                    return `${displayHour}:${m} ${ampm}`
+                  }
+                  return (
+                    <tr key={`${item.date}-${index}`} className="hover:bg-green-50/50 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <span className="font-medium text-gray-900">
+                          {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600">
+                        {dateObj.toLocaleDateString('en-US', { weekday: 'long' })}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                          {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {item.applyToAllClinics ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium">
+                            All Clinics
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                            {item.clinicName || 'Unknown'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
-
-      {/* Save Button - Prominent at bottom */}
-      <div className="mt-4 pt-3 border-t-2 border-gray-200">
-        <button
-          onClick={handleSaveAvailability}
-          disabled={isSaving || isLoading}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3 text-base font-bold bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <Save className="w-5 h-5" />
-          {isSaving ? "Saving Availability..." : "Save Availability"}
-        </button>
-        {Object.keys(selectedDates).length > 0 && (
-          <p className="text-xs text-center text-gray-500 mt-2">
-            Click to save your availability for {monthName}
-          </p>
-        )}
-      </div>
 
       {/* Time Selection Modal */}
       {showTimeModal && (

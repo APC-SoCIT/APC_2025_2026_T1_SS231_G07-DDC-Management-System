@@ -5,9 +5,11 @@ import { Camera } from "lucide-react"
 import DentistCalendarAvailability from "@/components/dentist-calendar-availability"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
+import { useClinic } from "@/lib/clinic-context"
 
 export default function StaffProfile() {
   const { user, token, setUser } = useAuth()
+  const { selectedClinic } = useClinic()
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
     firstName: "",
@@ -177,7 +179,10 @@ export default function StaffProfile() {
       {(user?.role === 'dentist' || user?.user_type === 'owner') && (
         <div className="mt-8">
           <h2 className="text-2xl font-semibold text-[var(--color-text)] mb-4">My Schedule</h2>
-          <DentistCalendarAvailability dentistId={user?.id} />
+          <DentistCalendarAvailability 
+            dentistId={user?.id} 
+            selectedClinicId={selectedClinic?.id || null}
+          />
         </div>
       )}
     </div>

@@ -7,9 +7,11 @@ import QuickAvailabilityModal from "@/components/quick-availability-modal"
 import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
+import { useClinic } from "@/lib/clinic-context"
 
 export default function OwnerProfile() {
   const { user, token, setUser } = useAuth()
+  const { allClinics, selectedClinic } = useClinic()
   const [isEditing, setIsEditing] = useState(false)
   const [showQuickAvailability, setShowQuickAvailability] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
@@ -18,6 +20,10 @@ export default function OwnerProfile() {
     dateCount?: number;
     daysOfWeek?: string[];
     monthYear?: string;
+    startTime?: string;
+    endTime?: string;
+    clinicName?: string;
+    dates?: string[];
   }>({ mode: 'specific' })
   const [profile, setProfile] = useState({
     firstName: "",
@@ -191,7 +197,10 @@ export default function OwnerProfile() {
             Set Availability
           </button>
         </div>
-        <DentistCalendarAvailability dentistId={user?.id} />
+        <DentistCalendarAvailability 
+          dentistId={user?.id} 
+          selectedClinicId={selectedClinic?.id || null}
+        />
       </div>
 
       {/* Quick Availability Modal */}
@@ -200,6 +209,20 @@ export default function OwnerProfile() {
         onClose={() => setShowQuickAvailability(false)}
         onSave={async (data) => {
           if (!token || !user) return;
+
+          // Get clinic name for display
+          const clinicName = data.applyToAllClinics 
+            ? 'All Clinics' 
+            : allClinics.find(c => c.id === data.clinicId)?.name || 'Selected Clinic';
+
+          // Helper to format time for display
+          const formatTimeDisplay = (time: string) => {
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+          };
 
           try {
             if (data.mode === 'specific') {
@@ -216,20 +239,42 @@ export default function OwnerProfile() {
                     date,
                     start_time: data.startTime,
                     end_time: data.endTime,
+                    apply_to_all_clinics: data.applyToAllClinics,
+                    clinic_id: data.applyToAllClinics ? null : data.clinicId,
                   }),
                 })
               );
-              await Promise.all(promises);
+              const responses = await Promise.all(promises);
+              
+              // Check if any requests failed
+              const failedResponses = responses.filter(r => !r.ok);
+              if (failedResponses.length > 0) {
+                const errorDetails = await Promise.all(
+                  failedResponses.map(async r => {
+                    try {
+                      return await r.json();
+                    } catch {
+                      return { error: r.statusText };
+                    }
+                  })
+                );
+                console.error('Failed to save some availability slots:', errorDetails);
+                throw new Error(`Failed to save ${failedResponses.length} availability slot(s)`);
+              }
               
               // Get month and year from first date
               const firstDate = new Date(data.dates![0]);
               const monthYear = firstDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
               
-              // Show success modal
+              // Show success modal with more details
               setSuccessData({
                 mode: 'specific',
                 dateCount: data.dates!.length,
-                monthYear
+                monthYear,
+                startTime: formatTimeDisplay(data.startTime),
+                endTime: formatTimeDisplay(data.endTime),
+                clinicName,
+                dates: data.dates!.slice(0, 5) // Show first 5 dates
               });
               setShowQuickAvailability(false);
               setShowSuccessModal(true);
@@ -261,26 +306,37 @@ export default function OwnerProfile() {
                     date,
                     start_time: data.startTime,
                     end_time: data.endTime,
+                    apply_to_all_clinics: data.applyToAllClinics,
+                    clinic_id: data.applyToAllClinics ? null : data.clinicId,
                   }),
                 })
               );
-              await Promise.all(promises);
+              const responses = await Promise.all(promises);
+              
+              // Check if any requests failed
+              const failedResponses = responses.filter(r => !r.ok);
+              if (failedResponses.length > 0) {
+                console.error(`Failed to save ${failedResponses.length} availability slots`);
+                throw new Error(`Failed to save ${failedResponses.length} availability slot(s)`);
+              }
               
               const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
               const selectedDayNames = data.daysOfWeek!.map(d => dayNames[d]);
               
-              // Show success modal
+              // Show success modal with more details
               setSuccessData({
                 mode: 'recurring',
                 dateCount: dates.length,
-                daysOfWeek: selectedDayNames
+                daysOfWeek: selectedDayNames,
+                startTime: formatTimeDisplay(data.startTime),
+                endTime: formatTimeDisplay(data.endTime),
+                clinicName
               });
               setShowQuickAvailability(false);
               setShowSuccessModal(true);
             }
-            
-            // Refresh the calendar
-            window.location.reload();
+            // NOTE: Do NOT reload here - let the success modal display first
+            // The reload happens when user closes the success modal
           } catch (error) {
             console.error('Error saving availability:', error);
             alert('Failed to save availability. Please try again.');
@@ -299,6 +355,10 @@ export default function OwnerProfile() {
         dateCount={successData.dateCount}
         daysOfWeek={successData.daysOfWeek}
         monthYear={successData.monthYear}
+        startTime={successData.startTime}
+        endTime={successData.endTime}
+        clinicName={successData.clinicName}
+        dates={successData.dates}
       />
     </div>
   )

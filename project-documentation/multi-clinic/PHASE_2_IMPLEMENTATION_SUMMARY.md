@@ -312,3 +312,13 @@ if clinic_id is not None:
 - ✅ 100% backward compatibility maintained
 - ✅ All migrations applied successfully
 - ✅ Cross-clinic visibility preserved for patients
+
+---
+
+## Phase 3: Availability & Scheduling (February 2026)
+
+See [AVAILABILITY_MANAGEMENT_CHANGES.md](../fixes-and-issues/AVAILABILITY_MANAGEMENT_CHANGES.md) for detailed documentation of:
+- Multi-clinic support for dentist availability
+- Clinic selector in Quick Availability Modal
+- Enhanced success modal with clinic and time details
+- Improved calendar display with status banners and legends

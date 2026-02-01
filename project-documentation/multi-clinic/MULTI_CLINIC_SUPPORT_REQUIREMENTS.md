@@ -391,36 +391,39 @@ Step 6: Appointment created with clinic association
 
 ### 📋 Phase 3: Availability & Scheduling
 **Priority:** MEDIUM  
-**Status:** Not Started  
+**Status:** ✅ IN PROGRESS (February 2026)  
 **Depends On:** Phase 1 completion
 
 #### Backend Tasks
 1. ✅ Add `clinic` relationship to:
-   - [ ] `StaffAvailability` → ManyToMany `clinics` OR single `clinic` + `apply_to_all` flag
-   - [ ] `DentistAvailability` → `clinic`
-   - [ ] `BlockedTimeSlot` → `clinic`
+   - [x] `StaffAvailability` → ManyToMany `clinics` + `apply_to_all_clinics` flag
+   - [x] `DentistAvailability` → `clinic` ForeignKey + `apply_to_all_clinics` flag
+   - [x] `BlockedTimeSlot` → `clinic` ForeignKey + `apply_to_all_clinics` flag
 
 2. ✅ Implement flexible availability:
-   - [ ] Option 1: Set availability for one specific clinic
-   - [ ] Option 2: Set different availability per clinic
-   - [ ] Option 3: Set same availability for all clinics
+   - [x] Option 1: Set availability for one specific clinic
+   - [x] Option 2: Set different availability per clinic
+   - [x] Option 3: Set same availability for all clinics (apply_to_all_clinics flag)
    - [ ] Option 4: Set same availability for selected clinics
 
 3. ✅ Update availability endpoints:
-   - [ ] `GET /api/availability/?clinic_id=1` - filter by clinic
-   - [ ] `POST /api/availability/` - support multiple clinics
-   - [ ] Show dentist availability per clinic
+   - [x] `GET /api/dentist-availability/?clinic_id=1` - filter by clinic
+   - [x] `POST /api/dentist-availability/` - support clinic and apply_to_all_clinics
+   - [x] `GET /api/blocked-time-slots/?clinic_id=1` - filter by clinic
+   - [x] Show dentist availability per clinic
 
 4. ✅ Scheduling logic:
-   - [ ] Check availability for specific clinic
+   - [x] Check availability for specific clinic
+   - [x] Block time slots per clinic
    - [ ] Prevent double-booking (pending business rules)
-   - [ ] Block time slots per clinic
 
 #### Frontend Tasks
-1. ✅ Update availability calendar with clinic selector
-2. ✅ Show dentist availability per clinic
-3. ✅ Add clinic selector to block time modal
-4. ✅ Add multi-clinic availability setting UI
+1. ✅ Update Quick Availability Modal with clinic selector
+2. ✅ Add clinic selector to block time modal
+3. ✅ Enhanced success modal with clinic and time details
+4. ✅ Updated calendar display with status banners and legends
+5. ✅ Removed redundant "Save Availability" button from calendar
+6. ✅ Fixed success modal closing immediately issue
 
 #### Design Decision Needed
 **How to store availability for multiple clinics?**

@@ -77,6 +77,7 @@ interface Service {
   description: string
   duration: number
   color: string
+  clinics_data?: { id: number; name: string }[]
 }
 
 interface Staff {
@@ -89,7 +90,7 @@ interface Staff {
 
 export default function OwnerAppointments() {
   const { token } = useAuth()
-  const { selectedClinic } = useClinic()
+  const { selectedClinic, allClinics } = useClinic()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "pending" | "completed" | "missed" | "cancelled">("all")
   const [showAddModal, setShowAddModal] = useState(false)
@@ -104,6 +105,7 @@ export default function OwnerAppointments() {
   const [isLoading, setIsLoading] = useState(true)
   const [newAppointment, setNewAppointment] = useState({
     patient: "",
+    clinic: "",
     date: "",
     time: "",
     dentist: "",
@@ -452,6 +454,7 @@ export default function OwnerAppointments() {
     try {
       const appointmentData = {
         patient: selectedPatientId,
+        clinic: newAppointment.clinic ? Number.parseInt(newAppointment.clinic) : null,
         date: newAppointment.date,
         time: newAppointment.time,
         dentist: newAppointment.dentist ? Number.parseInt(newAppointment.dentist) : null,
@@ -467,13 +470,15 @@ export default function OwnerAppointments() {
       const patient = patients.find(p => p.id === selectedPatientId)
       const service = services.find(s => s.id === Number.parseInt(newAppointment.service))
       const dentist = staff.find(s => s.id === Number.parseInt(newAppointment.dentist))
+      const clinic = allClinics.find(c => c.id === Number.parseInt(newAppointment.clinic))
       
       setSuccessAppointmentDetails({
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown Patient',
         date: newAppointment.date,
         time: newAppointment.time,
         service: service?.name,
-        dentist: dentist ? `Dr. ${dentist.first_name} ${dentist.last_name}` : undefined
+        dentist: dentist ? `Dr. ${dentist.first_name} ${dentist.last_name}` : undefined,
+        clinic: clinic?.name
       })
       
       setShowAddModal(false)
@@ -483,6 +488,7 @@ export default function OwnerAppointments() {
       setSelectedPatientId(null)
       setNewAppointment({
         patient: "",
+        clinic: "",
         date: "",
         time: "",
         dentist: "",
@@ -1683,7 +1689,7 @@ export default function OwnerAppointments() {
               <button
                 onClick={() => {
                   setShowAddModal(false)
-                  setNewAppointment({ patient: "", date: "", time: "", dentist: "", service: "", notes: "" })
+                  setNewAppointment({ patient: "", clinic: "", date: "", time: "", dentist: "", service: "", notes: "" })
                   setSelectedPatientId(null)
                   setSelectedDate(undefined)
                   setAvailableDates(new Set())
@@ -1699,6 +1705,48 @@ export default function OwnerAppointments() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
                   <strong>Note:</strong> The appointment will be confirmed immediately.
+                </p>
+              </div>
+
+              {/* Step 1: Clinic Selection - MUST BE FIRST */}
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-sm">
+                    1
+                  </div>
+                  <h3 className="text-lg font-semibold text-teal-900">Select Clinic Location</h3>
+                </div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                  Choose Clinic <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={newAppointment.clinic}
+                  onChange={(e) => {
+                    setNewAppointment({ 
+                      ...newAppointment, 
+                      clinic: e.target.value,
+                      dentist: "",
+                      service: "",
+                      date: "",
+                      time: ""
+                    })
+                    setSelectedDate(undefined)
+                  }}
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white"
+                  required
+                >
+                  <option value="">Select clinic location first...</option>
+                  {(selectedClinic === "all" 
+                    ? allClinics 
+                    : allClinics.filter(c => c.id === (typeof selectedClinic === 'object' ? selectedClinic?.id : null))
+                  ).map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name} - {clinic.address}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-teal-700 mt-2">
+                  📍 Choose the clinic location where you want the appointment
                 </p>
               </div>
 
@@ -1813,16 +1861,22 @@ export default function OwnerAppointments() {
                         setNewAppointment({ ...newAppointment, dentist: e.target.value, date: "", time: "" })
                         setSelectedDate(undefined)
                       }}
-                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                       required
+                      disabled={!newAppointment.clinic}
                     >
-                      <option value="">Select a dentist first...</option>
+                      <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select clinic first"}</option>
                       {staff.map((s) => (
                         <option key={s.id} value={s.id}>
                           {formatDentistName(s)}
                         </option>
                       ))}
                     </select>
+                    {!newAppointment.clinic && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        ⚠️ Select a clinic first to see available dentists
+                      </p>
+                    )}
                     {newAppointment.dentist && (
                       <p className="text-xs text-green-600 mt-1">
                         ✓ Available dates are highlighted in the calendar below
@@ -1837,16 +1891,28 @@ export default function OwnerAppointments() {
                     <select
                       value={newAppointment.service}
                       onChange={(e) => setNewAppointment({ ...newAppointment, service: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                       required
+                      disabled={!newAppointment.clinic}
                     >
-                      <option value="">Select a treatment...</option>
-                      {services.map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {service.name}
-                        </option>
-                      ))}
+                      <option value="">{newAppointment.clinic ? "Select a treatment..." : "Select clinic first"}</option>
+                      {services
+                        .filter((service) => {
+                          // Filter services by selected clinic if clinic_ids are available
+                          if (!newAppointment.clinic || !service.clinics_data) return true
+                          return service.clinics_data.some((c: any) => c.id === parseInt(newAppointment.clinic))
+                        })
+                        .map((service) => (
+                          <option key={service.id} value={service.id}>
+                            {service.name}
+                          </option>
+                        ))}
                     </select>
+                    {!newAppointment.clinic && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        ⚠️ Select a clinic first to see available services
+                      </p>
+                    )}
                   </div>
 
                   <div>

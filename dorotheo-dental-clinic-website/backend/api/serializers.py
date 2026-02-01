@@ -184,22 +184,43 @@ class TeethImageSerializer(serializers.ModelSerializer):
 class StaffAvailabilitySerializer(serializers.ModelSerializer):
     staff_name = serializers.CharField(source='staff.get_full_name', read_only=True)
     day_name = serializers.CharField(source='get_day_of_week_display', read_only=True)
+    clinics_data = ClinicLocationSerializer(source='clinics', many=True, read_only=True)
+    clinic_ids = serializers.PrimaryKeyRelatedField(
+        source='clinics',
+        many=True,
+        queryset=ClinicLocation.objects.all(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = StaffAvailability
         fields = ['id', 'staff', 'staff_name', 'day_of_week', 'day_name', 
-                  'is_available', 'start_time', 'end_time', 'created_at', 'updated_at']
+                  'is_available', 'start_time', 'end_time', 'clinics', 'clinics_data', 
+                  'clinic_ids', 'apply_to_all_clinics', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
 
 class DentistAvailabilitySerializer(serializers.ModelSerializer):
     dentist_name = serializers.CharField(source='dentist.get_full_name', read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
+    clinic_id = serializers.PrimaryKeyRelatedField(
+        source='clinic',
+        queryset=ClinicLocation.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = DentistAvailability
         fields = ['id', 'dentist', 'dentist_name', 'date', 'start_time', 'end_time',
-                  'is_available', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+                  'is_available', 'clinic', 'clinic_data', 'clinic_id', 'apply_to_all_clinics',
+                  'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'clinic']
+        # Disable auto-generated unique_together validator since we have both clinic and clinic_id fields
+        # We handle uniqueness manually in the create method
+        validators = []
 
     def validate(self, data):
         """Ensure end_time is after start_time"""
@@ -208,13 +229,61 @@ class DentistAvailabilitySerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("End time must be after start time")
         return data
 
+    def create(self, validated_data):
+        """Update existing availability or create new one to avoid unique constraint errors"""
+        dentist = validated_data.get('dentist')
+        date = validated_data.get('date')
+        clinic = validated_data.get('clinic')
+        apply_to_all = validated_data.get('apply_to_all_clinics', False)
+        
+        # Try to find existing availability for this dentist + date + clinic combo
+        try:
+            existing = self.Meta.model.objects.get(
+                dentist=dentist,
+                date=date,
+                clinic=clinic
+            )
+            # Update existing record
+            for key, value in validated_data.items():
+                setattr(existing, key, value)
+            existing.save()
+            return existing
+        except self.Meta.model.DoesNotExist:
+            # If we're setting a specific clinic, check if there's an old record with clinic=null
+            # that we should update instead of creating a duplicate
+            if clinic is not None and not apply_to_all:
+                old_null_clinic = self.Meta.model.objects.filter(
+                    dentist=dentist,
+                    date=date,
+                    clinic__isnull=True
+                ).first()
+                
+                if old_null_clinic:
+                    # Update the old record to use the new clinic
+                    for key, value in validated_data.items():
+                        setattr(old_null_clinic, key, value)
+                    old_null_clinic.save()
+                    return old_null_clinic
+            
+            # Create new record
+            return super().create(validated_data)
+
 
 class BlockedTimeSlotSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
+    clinic_id = serializers.PrimaryKeyRelatedField(
+        source='clinic',
+        queryset=ClinicLocation.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = BlockedTimeSlot
         fields = ['id', 'date', 'start_time', 'end_time', 'reason', 
+                  'clinic', 'clinic_data', 'clinic_id', 'apply_to_all_clinics',
                   'created_by', 'created_by_name', 'created_at', 'updated_at']
         read_only_fields = ['created_by', 'created_at', 'updated_at']
 

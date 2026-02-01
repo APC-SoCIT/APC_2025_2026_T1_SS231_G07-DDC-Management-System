@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Calendar, Clock, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { useClinic, type ClinicLocation } from "@/lib/clinic-context";
 
 interface QuickAvailabilityModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface QuickAvailabilityModalProps {
     daysOfWeek?: number[];
     startTime: string;
     endTime: string;
+    applyToAllClinics: boolean;
+    clinicId?: number;
   }) => void;
   existingAvailability?: any[];
 }
@@ -22,11 +25,23 @@ export default function QuickAvailabilityModal({
   onSave,
   existingAvailability = []
 }: QuickAvailabilityModalProps) {
+  const { allClinics } = useClinic();
   const [mode, setMode] = useState<'specific' | 'recurring'>('specific');
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState<number[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [setAsRecurring, setSetAsRecurring] = useState(false);
+  
+  // Clinic selection states
+  const [applyToAllClinics, setApplyToAllClinics] = useState(true);
+  const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null);
+  
+  // Initialize selectedClinicId when component mounts or clinics change
+  useEffect(() => {
+    if (!applyToAllClinics && !selectedClinicId && allClinics.length > 0) {
+      setSelectedClinicId(allClinics[0].id);
+    }
+  }, [applyToAllClinics, allClinics]);
   
   // Drag selection states
   const [isDragging, setIsDragging] = useState(false);
@@ -154,6 +169,18 @@ export default function QuickAvailabilityModal({
     const startTime = convertTo24Hour(startHour, startMinute, startPeriod);
     const endTime = convertTo24Hour(endHour, endMinute, endPeriod);
 
+    // Validate clinic selection
+    if (!applyToAllClinics && !selectedClinicId) {
+      alert('Please select a clinic or choose to apply to all clinics');
+      return;
+    }
+
+    // Additional validation: ensure we have a valid clinic ID when not applying to all
+    if (!applyToAllClinics && (selectedClinicId === null || selectedClinicId === undefined)) {
+      alert('Please select a specific clinic from the dropdown');
+      return;
+    }
+
     if (mode === 'specific') {
       if (selectedDates.length === 0) {
         alert('Please select at least one date');
@@ -163,7 +190,9 @@ export default function QuickAvailabilityModal({
         mode: 'specific',
         dates: selectedDates,
         startTime,
-        endTime
+        endTime,
+        applyToAllClinics,
+        clinicId: applyToAllClinics ? undefined : selectedClinicId!
       });
     } else {
       if (selectedDaysOfWeek.length === 0) {
@@ -174,7 +203,9 @@ export default function QuickAvailabilityModal({
         mode: 'recurring',
         daysOfWeek: selectedDaysOfWeek,
         startTime,
-        endTime
+        endTime,
+        applyToAllClinics,
+        clinicId: applyToAllClinics ? undefined : selectedClinicId!
       });
     }
   };
@@ -207,6 +238,59 @@ export default function QuickAvailabilityModal({
         </div>
 
         <div className="p-6">
+          {/* Clinic Selection */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl border border-teal-200">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="w-5 h-5 text-teal-600" />
+              <h3 className="font-semibold text-teal-900">Clinic Location</h3>
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 p-3 bg-white rounded-lg border border-teal-200 cursor-pointer hover:bg-teal-50 transition-colors">
+                <input
+                  type="radio"
+                  name="clinicScope"
+                  checked={applyToAllClinics}
+                  onChange={() => {
+                    setApplyToAllClinics(true);
+                    setSelectedClinicId(null);
+                  }}
+                  className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Apply to All Clinics</span>
+                  <p className="text-xs text-gray-500">Your availability will be the same across all clinic locations</p>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 p-3 bg-white rounded-lg border border-teal-200 cursor-pointer hover:bg-teal-50 transition-colors">
+                <input
+                  type="radio"
+                  name="clinicScope"
+                  checked={!applyToAllClinics}
+                  onChange={() => setApplyToAllClinics(false)}
+                  className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                />
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900">Specific Clinic Only</span>
+                  <p className="text-xs text-gray-500">Set availability for a specific clinic location</p>
+                </div>
+              </label>
+              {!applyToAllClinics && (
+                <select
+                  value={selectedClinicId || ""}
+                  onChange={(e) => setSelectedClinicId(Number(e.target.value))}
+                  className="w-full mt-2 px-4 py-2.5 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                >
+                  <option value="">Select a clinic...</option>
+                  {allClinics.map((clinic: ClinicLocation) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name} - {clinic.address}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+
           {/* Mode Toggle */}
           <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
             <button
