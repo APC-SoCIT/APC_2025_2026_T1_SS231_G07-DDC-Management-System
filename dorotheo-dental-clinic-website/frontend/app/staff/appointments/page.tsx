@@ -107,6 +107,7 @@ export default function StaffAppointments() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [newAppointment, setNewAppointment] = useState({
     patient: "",
@@ -300,10 +301,20 @@ export default function StaffAppointments() {
       
       try {
         setIsLoading(true)
-        const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
-        const response = await api.getAppointments(token, clinicId)
-        console.log("Fetched appointments:", response)
-        setAppointments(response)
+        // Fetch all appointments once (without clinic filter)
+        const allResponse = await api.getAppointments(token, undefined)
+        setAllAppointments(allResponse)
+        
+        // Filter appointments locally based on selected clinic
+        if (selectedClinic === "all") {
+          setAppointments(allResponse)
+        } else {
+          const clinicId = selectedClinic?.id
+          const filtered = allResponse.filter(apt => 
+            apt.clinic === clinicId || apt.clinic_data?.id === clinicId
+          )
+          setAppointments(filtered)
+        }
       } catch (error) {
         console.error("Error fetching appointments:", error)
       } finally {
@@ -480,6 +491,7 @@ export default function StaffAppointments() {
       
       // Clear all form data including selected patient
       setSelectedPatientId(null)
+      setPatientSearchQuery("")
       setNewAppointment({
         patient: "",
         date: "",
@@ -491,6 +503,7 @@ export default function StaffAppointments() {
       })
       setSelectedDate(undefined)
       setBookedSlots([])
+      setAvailableDates(new Set())
     } catch (error: any) {
       console.error("Error creating appointment:", error)
       // Check if it's a double booking error from backend
@@ -698,8 +711,12 @@ export default function StaffAppointments() {
       onConfirm: async () => {
         try {
           await api.updateAppointment(appointment.id, { status: "completed" }, token)
+          const completedAt = new Date().toISOString()
           setAppointments(appointments.map(apt => 
-            apt.id === appointment.id ? { ...apt, status: "completed" as const } : apt
+            apt.id === appointment.id ? { ...apt, status: "completed" as const, completed_at: completedAt } : apt
+          ))
+          setAllAppointments(allAppointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, status: "completed" as const, completed_at: completedAt } : apt
           ))
         } catch (error) {
           console.error("Error marking appointment as complete:", error)
@@ -836,7 +853,12 @@ export default function StaffAppointments() {
       // Filter by status
       const matchesStatus = statusFilter === "all" || apt.status === statusFilter
       
-      return matchesSearch && matchesStatus
+      // Filter by clinic
+      const matchesClinic = selectedClinic === "all" || 
+        (apt.clinic === selectedClinic?.id) ||
+        (apt.clinic_data?.id === selectedClinic?.id)
+      
+      return matchesSearch && matchesStatus && matchesClinic
     })
     .sort((a, b) => {
       // Sort by updated_at in descending order (most recent first)
@@ -1585,9 +1607,9 @@ export default function StaffAppointments() {
                       )
                     })
                     .sort((a, b) => {
-                      // Get most recent completed appointment for each patient
+                      // Get most recent completed appointment for each patient (across all clinics)
                       const getLastCompletedDate = (patientId: number) => {
-                        const completedApts = appointments
+                        const completedApts = allAppointments
                           .filter(apt => apt.patient === patientId && apt.status === 'completed' && apt.completed_at)
                           .sort((apt1, apt2) => {
                             const date1 = new Date(apt1.completed_at!).getTime()
@@ -1818,6 +1840,7 @@ export default function StaffAppointments() {
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
           appointmentDetails={successAppointmentDetails}
+          isConfirmed={true}
         />
       )}
 
