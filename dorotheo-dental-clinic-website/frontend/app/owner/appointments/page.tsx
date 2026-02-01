@@ -102,6 +102,7 @@ export default function OwnerAppointments() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [newAppointment, setNewAppointment] = useState({
     patient: "",
@@ -295,10 +296,20 @@ export default function OwnerAppointments() {
       
       try {
         setIsLoading(true)
-        const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
-        const response = await api.getAppointments(token, clinicId)
-        console.log("Fetched appointments:", response)
-        setAppointments(response)
+        // Fetch all appointments once (without clinic filter)
+        const allResponse = await api.getAppointments(token, undefined)
+        setAllAppointments(allResponse)
+        
+        // Filter appointments locally based on selected clinic
+        if (selectedClinic === "all") {
+          setAppointments(allResponse)
+        } else {
+          const clinicId = selectedClinic?.id
+          const filtered = allResponse.filter(apt => 
+            apt.clinic === clinicId || apt.clinic_data?.id === clinicId
+          )
+          setAppointments(filtered)
+        }
       } catch (error) {
         console.error("Error fetching appointments:", error)
       } finally {
@@ -486,6 +497,7 @@ export default function OwnerAppointments() {
       
       // Clear all form data including selected patient
       setSelectedPatientId(null)
+      setPatientSearchQuery("")
       setNewAppointment({
         patient: "",
         clinic: "",
@@ -497,6 +509,7 @@ export default function OwnerAppointments() {
       })
       setSelectedDate(undefined)
       setBookedSlots([])
+      setAvailableDates(new Set())
     } catch (error: any) {
       console.error("Error creating appointment:", error)
       // Check if it's a double booking error from backend
@@ -769,8 +782,12 @@ export default function OwnerAppointments() {
       onConfirm: async () => {
         try {
           await api.updateAppointment(appointmentId, { status: "completed" }, token)
+          const completedAt = new Date().toISOString()
           setAppointments(appointments.map(apt => 
-            apt.id === appointmentId ? { ...apt, status: "completed" as const } : apt
+            apt.id === appointmentId ? { ...apt, status: "completed" as const, completed_at: completedAt } : apt
+          ))
+          setAllAppointments(allAppointments.map(apt => 
+            apt.id === appointmentId ? { ...apt, status: "completed" as const, completed_at: completedAt } : apt
           ))
         } catch (error) {
           console.error("Error completing appointment:", error)
@@ -946,7 +963,12 @@ export default function OwnerAppointments() {
       // Filter by status
       const matchesStatus = statusFilter === "all" || apt.status === statusFilter
       
-      return matchesSearch && matchesStatus
+      // Filter by clinic
+      const matchesClinic = selectedClinic === "all" || 
+        (apt.clinic === selectedClinic?.id) ||
+        (apt.clinic_data?.id === selectedClinic?.id)
+      
+      return matchesSearch && matchesStatus && matchesClinic
     })
   )
 
@@ -1736,10 +1758,7 @@ export default function OwnerAppointments() {
                   required
                 >
                   <option value="">Select clinic location first...</option>
-                  {(selectedClinic === "all" 
-                    ? allClinics 
-                    : allClinics.filter(c => c.id === (typeof selectedClinic === 'object' ? selectedClinic?.id : null))
-                  ).map((clinic) => (
+                  {allClinics.map((clinic) => (
                     <option key={clinic.id} value={clinic.id}>
                       {clinic.name} - {clinic.address}
                     </option>
@@ -1784,9 +1803,9 @@ export default function OwnerAppointments() {
                               )
                             })
                             .sort((a, b) => {
-                              // Get most recent completed appointment for each patient
+                              // Get most recent completed appointment for each patient (across all clinics)
                               const getLastCompletedDate = (patientId: number) => {
-                                const completedApts = appointments
+                                const completedApts = allAppointments
                                   .filter(apt => apt.patient === patientId && apt.status === 'completed' && apt.completed_at)
                                   .sort((apt1, apt2) => {
                                     const date1 = new Date(apt1.completed_at!).getTime()
@@ -1800,9 +1819,11 @@ export default function OwnerAppointments() {
                               const bLastCompleted = getLastCompletedDate(b.id)
 
                               // Patients with recent completed appointments come first
+                              // Sort by most recent completion date (descending)
                               if (aLastCompleted && bLastCompleted) {
                                 return bLastCompleted.getTime() - aLastCompleted.getTime()
                               }
+                              // Patients with completed appointments come before those without
                               if (aLastCompleted && !bLastCompleted) return -1
                               if (!aLastCompleted && bLastCompleted) return 1
 
@@ -2083,6 +2104,7 @@ export default function OwnerAppointments() {
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
           appointmentDetails={successAppointmentDetails}
+          isConfirmed={true}
         />
       )}
 
