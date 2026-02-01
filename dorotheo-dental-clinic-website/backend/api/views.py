@@ -1586,6 +1586,7 @@ class BlockedTimeSlotViewSet(viewsets.ModelViewSet):
 class DentistNotificationViewSet(viewsets.ModelViewSet):
     queryset = DentistNotification.objects.all()
     serializer_class = DentistNotificationSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Dentists only see their own notifications"""
@@ -1631,6 +1632,7 @@ class DentistNotificationViewSet(viewsets.ModelViewSet):
 class AppointmentNotificationViewSet(viewsets.ModelViewSet):
     queryset = AppointmentNotification.objects.all()
     serializer_class = AppointmentNotificationSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Return notifications for the current user (staff, owner, or patient)"""

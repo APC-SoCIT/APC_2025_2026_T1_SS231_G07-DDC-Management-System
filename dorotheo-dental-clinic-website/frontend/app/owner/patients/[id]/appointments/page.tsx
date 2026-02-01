@@ -2,11 +2,14 @@
 
 import { useState, useEffect, Fragment, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Calendar, ChevronDown, ChevronUp, Clock, FileText, Calendar as CalendarIcon, Plus, X, Download, Camera, Eye } from "lucide-react"
+import { ArrowLeft, Calendar, ChevronDown, ChevronUp, Clock, FileText, Calendar as CalendarIcon, Plus, X, Download, Camera, Eye, MapPin, Upload } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { useClinic } from "@/lib/clinic-context"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
+import { ClinicBadge } from "@/components/clinic-badge"
+import UnifiedDocumentUpload from "@/components/unified-document-upload"
 
 interface Patient {
   id: number
@@ -76,6 +79,15 @@ interface Appointment {
   created_at: string
   updated_at: string
   completed_at: string | null
+  clinic: number | null
+  clinic_name: string | null
+  clinic_data?: {
+    id: number
+    name: string
+    address: string
+    phone: string
+    color: string
+  }
 }
 
 export default function PatientAppointmentsPage() {
@@ -83,6 +95,7 @@ export default function PatientAppointmentsPage() {
   const params = useParams()
   const patientId = params.id as string
   const { token } = useAuth()
+  const { selectedClinic } = useClinic()
 
   const [patient, setPatient] = useState<Patient | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -109,6 +122,8 @@ export default function PatientAppointmentsPage() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [uploadAppointmentId, setUploadAppointmentId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!token || !patientId) return
@@ -415,13 +430,7 @@ export default function PatientAppointmentsPage() {
       .slice(1)}`
   }
 
-  const toggleAppointmentExpansion = async (appointmentId: number) => {
-    if (expandedRow === appointmentId) {
-      setExpandedRow(null)
-      return
-    }
-
-    setExpandedRow(appointmentId)
+  const fetchDocumentsAndImages = async (appointmentId: number) => {
     setLoadingFiles(prev => ({ ...prev, [appointmentId]: true }))
 
     try {
@@ -442,6 +451,16 @@ export default function PatientAppointmentsPage() {
     } finally {
       setLoadingFiles(prev => ({ ...prev, [appointmentId]: false }))
     }
+  }
+
+  const toggleAppointmentExpansion = async (appointmentId: number) => {
+    if (expandedRow === appointmentId) {
+      setExpandedRow(null)
+      return
+    }
+
+    setExpandedRow(appointmentId)
+    await fetchDocumentsAndImages(appointmentId)
   }
 
   if (isLoading) {
@@ -467,11 +486,24 @@ export default function PatientAppointmentsPage() {
   }
 
   const upcomingAppointments = appointments.filter(
-    (apt) => new Date(`${apt.date}T${apt.time || '00:00'}`) >= new Date() && apt.status !== "completed" && apt.status !== "cancelled" && apt.status !== "missed"
+    (apt) => {
+      const isFuture = new Date(`${apt.date}T${apt.time || '00:00'}`) >= new Date()
+      const isActive = apt.status !== "completed" && apt.status !== "cancelled" && apt.status !== "missed"
+      const matchesClinic = selectedClinic === "all" || 
+        (apt.clinic === selectedClinic?.id) ||
+        (apt.clinic_data?.id === selectedClinic?.id)
+      return isFuture && isActive && matchesClinic
+    }
   )
 
   const pastAppointments = appointments.filter(
-    (apt) => new Date(`${apt.date}T${apt.time || '00:00'}`) < new Date() || apt.status === "completed" || apt.status === "cancelled" || apt.status === "missed"
+    (apt) => {
+      const isPast = new Date(`${apt.date}T${apt.time || '00:00'}`) < new Date() || apt.status === "completed" || apt.status === "cancelled" || apt.status === "missed"
+      const matchesClinic = selectedClinic === "all" || 
+        (apt.clinic === selectedClinic?.id) ||
+        (apt.clinic_data?.id === selectedClinic?.id)
+      return isPast && matchesClinic
+    }
   )
 
   return (
@@ -521,6 +553,7 @@ export default function PatientAppointmentsPage() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Treatment</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Time</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Clinic</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Dentist</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
               </tr>
@@ -528,7 +561,7 @@ export default function PatientAppointmentsPage() {
             <tbody className="divide-y divide-[var(--color-border)]">
               {upcomingAppointments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     No upcoming appointments
                   </td>
                 </tr>
@@ -560,6 +593,13 @@ export default function PatientAppointmentsPage() {
                       </td>
                       <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
                       <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
+                      <td className="px-6 py-4">
+                        {apt.clinic_data ? (
+                          <ClinicBadge clinic={apt.clinic_data} size="sm" />
+                        ) : (
+                          <span className="text-[var(--color-text-muted)] text-xs">N/A</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
@@ -571,7 +611,7 @@ export default function PatientAppointmentsPage() {
                     {/* Expanded Row */}
                     {expandedRow === apt.id && (
                       <tr>
-                        <td colSpan={5} className="bg-gradient-to-br from-gray-50 to-teal-50">
+                        <td colSpan={6} className="bg-gradient-to-br from-gray-50 to-teal-50">
                           <div className="px-6 py-6 animate-in slide-in-from-top-2 duration-300">
                             <div className="space-y-6">
                               <div className="flex items-center justify-between">
@@ -606,6 +646,13 @@ export default function PatientAppointmentsPage() {
                                         <p className="font-medium">{formatTime(apt.time)}</p>
                                       </div>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="w-4 h-4 text-[var(--color-text-muted)]" />
+                                      <div>
+                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Clinic</p>
+                                        <p className="font-medium">{apt.clinic_name || "Not Assigned"}</p>
+                                      </div>
+                                    </div>
                                     <div>
                                       <p className="text-[var(--color-text-muted)] mb-0.5">Assigned Dentist</p>
                                       <p className="font-medium">{apt.dentist_name || "Not Assigned"}</p>
@@ -627,10 +674,23 @@ export default function PatientAppointmentsPage() {
 
                                 {/* Uploaded Files Card */}
                                 <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
-                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
-                                    <FileText className="w-5 h-5" />
-                                    Uploaded Files
-                                  </h4>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-semibold text-[var(--color-primary)] flex items-center gap-2">
+                                      <FileText className="w-5 h-5" />
+                                      Uploaded Files
+                                    </h4>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setUploadAppointmentId(apt.id)
+                                        setShowUploadModal(true)
+                                      }}
+                                      className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors text-sm"
+                                    >
+                                      <Upload className="w-4 h-4" />
+                                      Upload
+                                    </button>
+                                  </div>
                                   {loadingFiles[apt.id] ? (
                                     <div className="flex items-center justify-center py-8">
                                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
@@ -680,8 +740,8 @@ export default function PatientAppointmentsPage() {
                                           <Camera className="w-4 h-4" />
                                           Dental Images ({appointmentImages[apt.id]?.length || 0})
                                         </p>
-                                        {appointmentImages[apt.id] && appointmentImages[apt.id].length > 0 ? (
-                                          <div className="grid grid-cols-2 gap-2">
+                                        {appointmentImages[apt.id]?.length > 0 ? (
+                                          <div className="space-y-2">
                                             {appointmentImages[apt.id].map((img) => (
                                               <div
                                                 key={img.id}
@@ -689,16 +749,22 @@ export default function PatientAppointmentsPage() {
                                                   e.stopPropagation()
                                                   setSelectedImage(img)
                                                 }}
-                                                className="relative aspect-video rounded-lg overflow-hidden cursor-pointer group border border-gray-200 hover:border-[var(--color-primary)] transition-colors"
+                                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors group"
                                               >
-                                                <img
-                                                  src={img.image_url}
-                                                  alt="Dental image"
-                                                  className="w-full h-full object-cover"
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <div className="flex items-center gap-3">
+                                                  <img 
+                                                    src={img.image_url} 
+                                                    alt="Dental image" 
+                                                    className="w-12 h-12 object-cover rounded flex-shrink-0"
+                                                  />
+                                                  <div>
+                                                    <p className="text-sm font-medium">Dental Image</p>
+                                                    <p className="text-xs text-gray-500">
+                                                      {new Date(img.uploaded_at).toLocaleDateString()}
+                                                    </p>
+                                                  </div>
                                                 </div>
+                                                <Eye className="w-5 h-5 text-gray-400 group-hover:text-[var(--color-primary)] transition-colors" />
                                               </div>
                                             ))}
                                           </div>
@@ -738,6 +804,7 @@ export default function PatientAppointmentsPage() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Treatment</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Time</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Clinic</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Dentist</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
               </tr>
@@ -745,7 +812,7 @@ export default function PatientAppointmentsPage() {
             <tbody className="divide-y divide-[var(--color-border)]">
               {pastAppointments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     No past appointments
                   </td>
                 </tr>
@@ -777,6 +844,13 @@ export default function PatientAppointmentsPage() {
                       </td>
                       <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.date}</td>
                       <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>
+                      <td className="px-6 py-4">
+                        {apt.clinic_data ? (
+                          <ClinicBadge clinic={apt.clinic_data} size="sm" />
+                        ) : (
+                          <span className="text-[var(--color-text-muted)] text-xs">N/A</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
@@ -788,7 +862,7 @@ export default function PatientAppointmentsPage() {
                     {/* Expanded Row */}
                     {expandedRow === apt.id && (
                       <tr>
-                        <td colSpan={5} className="bg-gradient-to-br from-gray-50 to-teal-50">
+                        <td colSpan={6} className="bg-gradient-to-br from-gray-50 to-teal-50">
                           <div className="px-6 py-6 animate-in slide-in-from-top-2 duration-300">
                             <div className="space-y-6">
                               <div className="flex items-center justify-between">
@@ -823,6 +897,13 @@ export default function PatientAppointmentsPage() {
                                         <p className="font-medium">{formatTime(apt.time)}</p>
                                       </div>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="w-4 h-4 text-[var(--color-text-muted)]" />
+                                      <div>
+                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Clinic</p>
+                                        <p className="font-medium">{apt.clinic_name || "Not Assigned"}</p>
+                                      </div>
+                                    </div>
                                     <div>
                                       <p className="text-[var(--color-text-muted)] mb-0.5">Assigned Dentist</p>
                                       <p className="font-medium">{apt.dentist_name || "Not Assigned"}</p>
@@ -844,10 +925,23 @@ export default function PatientAppointmentsPage() {
 
                                 {/* Uploaded Files Card */}
                                 <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
-                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
-                                    <FileText className="w-5 h-5" />
-                                    Uploaded Files
-                                  </h4>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-semibold text-[var(--color-primary)] flex items-center gap-2">
+                                      <FileText className="w-5 h-5" />
+                                      Uploaded Files
+                                    </h4>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setUploadAppointmentId(apt.id)
+                                        setShowUploadModal(true)
+                                      }}
+                                      className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors text-sm"
+                                    >
+                                      <Upload className="w-4 h-4" />
+                                      Upload
+                                    </button>
+                                  </div>
                                   {loadingFiles[apt.id] ? (
                                     <div className="flex items-center justify-center py-8">
                                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
@@ -897,8 +991,8 @@ export default function PatientAppointmentsPage() {
                                           <Camera className="w-4 h-4" />
                                           Dental Images ({appointmentImages[apt.id]?.length || 0})
                                         </p>
-                                        {appointmentImages[apt.id] && appointmentImages[apt.id].length > 0 ? (
-                                          <div className="grid grid-cols-2 gap-2">
+                                        {appointmentImages[apt.id]?.length > 0 ? (
+                                          <div className="space-y-2">
                                             {appointmentImages[apt.id].map((img) => (
                                               <div
                                                 key={img.id}
@@ -906,16 +1000,22 @@ export default function PatientAppointmentsPage() {
                                                   e.stopPropagation()
                                                   setSelectedImage(img)
                                                 }}
-                                                className="relative aspect-video rounded-lg overflow-hidden cursor-pointer group border border-gray-200 hover:border-[var(--color-primary)] transition-colors"
+                                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors group"
                                               >
-                                                <img
-                                                  src={img.image_url}
-                                                  alt="Dental image"
-                                                  className="w-full h-full object-cover"
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <div className="flex items-center gap-3">
+                                                  <img 
+                                                    src={img.image_url} 
+                                                    alt="Dental image" 
+                                                    className="w-12 h-12 object-cover rounded flex-shrink-0"
+                                                  />
+                                                  <div>
+                                                    <p className="text-sm font-medium">Dental Image</p>
+                                                    <p className="text-xs text-gray-500">
+                                                      {new Date(img.uploaded_at).toLocaleDateString()}
+                                                    </p>
+                                                  </div>
                                                 </div>
+                                                <Eye className="w-5 h-5 text-gray-400 group-hover:text-[var(--color-primary)] transition-colors" />
                                               </div>
                                             ))}
                                           </div>
@@ -1255,6 +1355,34 @@ export default function PatientAppointmentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && uploadAppointmentId && (
+        <UnifiedDocumentUpload
+          patientId={parseInt(patientId)}
+          patientName={patient ? `${patient.first_name} ${patient.last_name}` : ''}
+          selectedAppointment={uploadAppointmentId}
+          onClose={() => {
+            setShowUploadModal(false)
+            setUploadAppointmentId(null)
+          }}
+          onUploadSuccess={() => {
+            setShowUploadModal(false)
+            setUploadAppointmentId(null)
+            if (uploadAppointmentId) {
+              fetchDocumentsAndImages(uploadAppointmentId)
+            }
+          }}
+          onSuccess={() => {
+            setShowUploadModal(false)
+            setUploadAppointmentId(null)
+            // Refresh files for this specific appointment
+            if (uploadAppointmentId) {
+              fetchDocumentsAndImages(uploadAppointmentId)
+            }
+          }}
+        />
       )}
     </div>
   )

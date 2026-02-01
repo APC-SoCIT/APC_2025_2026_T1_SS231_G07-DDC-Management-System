@@ -9,10 +9,14 @@ import {
   FileText,
   Download,
   X,
+  Clock,
+  MapPin,
+  User,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import UnifiedDocumentUpload from "@/components/unified-document-upload"
+import { ClinicBadge } from "@/components/clinic-badge"
 
 // Get the API base URL for constructing full image URLs
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
@@ -23,9 +27,21 @@ interface Appointment {
   date: string
   time: string
   service: any
+  service_name?: string
+  service_color?: string
   dentist: any
+  dentist_name?: string
   status: string
   notes: string
+  clinic?: number
+  clinic_name?: string
+  clinic_data?: {
+    id: number
+    name: string
+    address: string
+    phone: string
+    color: string
+  }
 }
 
 interface DentalRecord {
@@ -239,6 +255,20 @@ export default function PatientDetailPage() {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  const darkenColor = (color: string, percent: number) => {
+    const num = parseInt(color.replace("#", ""), 16)
+    const amt = Math.round(2.55 * percent)
+    const R = (num >> 16) - amt
+    const G = (num >> 8 & 0x00FF) - amt
+    const B = (num & 0x0000FF) - amt
+    return "#" + (
+      0x1000000 +
+      (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+      (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+      (B < 255 ? (B < 1 ? 0 : B) : 255)
+    ).toString(16).slice(1)
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -356,29 +386,84 @@ export default function PatientDetailPage() {
             return upcoming.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No upcoming appointments</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {upcoming
                   .slice(0, 3)
                 .map((apt) => (
-                  <div key={apt.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-gray-900">{(apt as any).service_name || apt.service?.name || "General Checkup"}</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {new Date(apt.date).toLocaleDateString()} at {formatTime(apt.time)}
-                        </p>
-                        {((apt as any).dentist_name || apt.dentist) && (
-                          <p className="text-sm text-gray-600">
-                            {(apt as any).dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
-                          </p>
+                  <div 
+                    key={apt.id} 
+                    className="border border-gray-200 hover:border-blue-300 rounded-xl p-5 transition-all duration-200 hover:shadow-md bg-white"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        {/* Service Name Badge */}
+                        <div className="mb-3">
+                          <span 
+                            className="inline-block px-4 py-1.5 rounded-lg font-semibold text-sm"
+                            style={{ 
+                              color: darkenColor(apt.service_color || '#10b981', 40),
+                              backgroundColor: `${apt.service_color || '#10b981'}15`,
+                              border: `1.5px solid ${apt.service_color || '#10b981'}40`
+                            }}
+                          >
+                            {apt.service_name || apt.service?.name || "General Checkup"}
+                          </span>
+                        </div>
+
+                        {/* Appointment Details Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {/* Date and Time */}
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium">
+                              {new Date(apt.date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Clock className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium">{formatTime(apt.time)}</span>
+                          </div>
+
+                          {/* Dentist */}
+                          {(apt.dentist_name || apt.dentist) && (
+                            <div className="flex items-center gap-2 text-gray-700">
+                              <User className="w-4 h-4 text-gray-400" />
+                              <span className="text-sm font-medium">
+                                {apt.dentist_name || `Dr. ${apt.dentist.first_name} ${apt.dentist.last_name}`}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Clinic */}
+                          {apt.clinic_data && (
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-gray-400" />
+                              <ClinicBadge clinic={apt.clinic_data} size="sm" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Notes if available */}
+                        {apt.notes && (
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <p className="text-xs text-gray-500 mb-1">Notes:</p>
+                            <p className="text-sm text-gray-700">{apt.notes}</p>
+                          </div>
                         )}
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        apt.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                        apt.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-blue-100 text-blue-800'
+
+                      {/* Status Badge */}
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ml-4 ${
+                        apt.status === 'confirmed' ? 'bg-green-100 text-green-700 border border-green-200' :
+                        apt.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+                        'bg-blue-100 text-blue-700 border border-blue-200'
                       }`}>
-                        {apt.status}
+                        {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
                       </span>
                     </div>
                   </div>

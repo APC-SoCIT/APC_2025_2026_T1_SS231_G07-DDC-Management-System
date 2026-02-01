@@ -14,9 +14,11 @@ interface Appointment {
 
 interface UnifiedDocumentUploadProps {
   patientId: number
-  patientName: string
+  patientName?: string
+  selectedAppointment?: number
   onClose: () => void
   onUploadSuccess: () => void
+  onSuccess?: () => void
 }
 
 type DocumentType = 'xray' | 'scan' | 'report' | 'medical_certificate' | 'note' | 'picture'
@@ -24,12 +26,14 @@ type DocumentType = 'xray' | 'scan' | 'report' | 'medical_certificate' | 'note' 
 export default function UnifiedDocumentUpload({
   patientId,
   patientName,
+  selectedAppointment: preSelectedAppointment,
   onClose,
   onUploadSuccess,
+  onSuccess,
 }: UnifiedDocumentUploadProps) {
-  const [step, setStep] = useState<'appointment' | 'type' | 'upload'>('appointment')
+  const [step, setStep] = useState<'appointment' | 'type' | 'upload'>(preSelectedAppointment ? 'type' : 'appointment')
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [selectedAppointment, setSelectedAppointment] = useState<number | null>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<number | null>(preSelectedAppointment || null)
   const [selectedType, setSelectedType] = useState<DocumentType | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
@@ -163,7 +167,11 @@ export default function UnifiedDocumentUpload({
       setSelectedAppointment(null)
       setSelectedType(null)
       setStep('appointment')
-      onUploadSuccess()
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        onUploadSuccess()
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed'
       setError(errorMessage)
