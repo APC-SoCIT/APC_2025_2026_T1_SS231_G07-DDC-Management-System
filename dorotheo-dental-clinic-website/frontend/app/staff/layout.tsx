@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Users, Calendar, Package, CreditCard, LogOut, Menu, X, ChevronDown, User } from "lucide-react"
@@ -16,6 +16,11 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
   const { logout, user } = useAuth()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+
+  // Close profile dropdown when navigating to a different page
+  useEffect(() => {
+    setIsProfileOpen(false)
+  }, [pathname])
 
   const navigation = [
     { name: "Overview", href: "/staff/dashboard", icon: LayoutDashboard },

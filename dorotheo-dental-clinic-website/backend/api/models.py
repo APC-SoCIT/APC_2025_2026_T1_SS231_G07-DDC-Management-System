@@ -335,6 +335,8 @@ class StaffAvailability(models.Model):
     is_available = models.BooleanField(default=True)
     start_time = models.TimeField(default='09:00:00')
     end_time = models.TimeField(default='17:00:00')
+    clinics = models.ManyToManyField('ClinicLocation', related_name='staff_availabilities', blank=True, help_text="Clinics where this availability applies")
+    apply_to_all_clinics = models.BooleanField(default=True, help_text="If True, this availability applies to all clinics")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -361,21 +363,26 @@ class DentistAvailability(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     is_available = models.BooleanField(default=True)
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.CASCADE, null=True, blank=True, related_name='dentist_availabilities', help_text="Clinic where this availability applies. Null means all clinics.")
+    apply_to_all_clinics = models.BooleanField(default=True, help_text="If True, this availability applies to all clinics")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ['dentist', 'date']
+        # Changed unique constraint to allow per-clinic availability
+        unique_together = ['dentist', 'date', 'clinic']
         ordering = ['date', 'start_time']
         verbose_name = 'Dentist Date Availability'
         verbose_name_plural = 'Dentist Date Availabilities'
         indexes = [
             models.Index(fields=['dentist', 'date']),
             models.Index(fields=['date']),
+            models.Index(fields=['clinic', 'date']),
         ]
 
     def __str__(self):
-        return f"{self.dentist.get_full_name()} - {self.date} ({self.start_time} - {self.end_time})"
+        clinic_str = f" at {self.clinic.name}" if self.clinic else " (all clinics)"
+        return f"{self.dentist.get_full_name()} - {self.date} ({self.start_time} - {self.end_time}){clinic_str}"
 
     def clean(self):
         from django.core.exceptions import ValidationError
@@ -396,6 +403,8 @@ class BlockedTimeSlot(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     reason = models.CharField(max_length=200, blank=True, help_text="Optional reason for blocking")
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.CASCADE, null=True, blank=True, related_name='blocked_time_slots', help_text="Clinic where this block applies. Null means all clinics.")
+    apply_to_all_clinics = models.BooleanField(default=True, help_text="If True, this block applies to all clinics")
     created_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -412,10 +421,12 @@ class BlockedTimeSlot(models.Model):
         indexes = [
             models.Index(fields=['date']),
             models.Index(fields=['date', 'start_time', 'end_time']),
+            models.Index(fields=['clinic', 'date']),
         ]
 
     def __str__(self):
-        return f"Blocked: {self.date} ({self.start_time} - {self.end_time})"
+        clinic_str = f" at {self.clinic.name}" if self.clinic else " (all clinics)"
+        return f"Blocked: {self.date} ({self.start_time} - {self.end_time}){clinic_str}"
 
     def clean(self):
         from django.core.exceptions import ValidationError

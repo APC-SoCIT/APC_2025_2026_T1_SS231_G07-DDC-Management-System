@@ -1244,11 +1244,20 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
     serializer_class = StaffAvailabilitySerializer
 
     def get_queryset(self):
-        """Filter by staff member if specified"""
+        """Filter by staff member and/or clinic if specified"""
         queryset = StaffAvailability.objects.all()
         staff_id = self.request.query_params.get('staff_id', None)
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        
         if staff_id:
             queryset = queryset.filter(staff_id=staff_id)
+        
+        if clinic_id:
+            # Filter by clinic or those that apply to all clinics
+            queryset = queryset.filter(
+                Q(clinics__id=clinic_id) | Q(apply_to_all_clinics=True)
+            ).distinct()
+        
         return queryset
 
     @action(detail=False, methods=['post'])
@@ -1256,6 +1265,8 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
         """Bulk update or create availability for a staff member"""
         staff_id = request.data.get('staff_id')
         availability_data = request.data.get('availability', [])
+        clinic_ids = request.data.get('clinic_ids', [])
+        apply_to_all_clinics = request.data.get('apply_to_all_clinics', True)
         
         if not staff_id:
             return Response(
@@ -1268,15 +1279,22 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
             
             # Update or create availability for each day
             for day_data in availability_data:
-                StaffAvailability.objects.update_or_create(
+                availability, _ = StaffAvailability.objects.update_or_create(
                     staff=staff,
                     day_of_week=day_data['day_of_week'],
                     defaults={
                         'is_available': day_data.get('is_available', True),
                         'start_time': day_data.get('start_time', '09:00:00'),
                         'end_time': day_data.get('end_time', '17:00:00'),
+                        'apply_to_all_clinics': day_data.get('apply_to_all_clinics', apply_to_all_clinics),
                     }
                 )
+                
+                # Handle clinic assignments if not applying to all
+                if not availability.apply_to_all_clinics:
+                    day_clinic_ids = day_data.get('clinic_ids', clinic_ids)
+                    if day_clinic_ids:
+                        availability.clinics.set(day_clinic_ids)
             
             # Return updated availability
             availability = StaffAvailability.objects.filter(staff=staff)
@@ -1293,6 +1311,7 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
     def by_date(self, request):
         """Get available staff for a specific date"""
         date_str = request.query_params.get('date')
+        clinic_id = request.query_params.get('clinic_id')
         
         if not date_str:
             return Response(
@@ -1308,12 +1327,18 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
             day_of_week = (day_of_week + 1) % 7
             
             # Get staff available on this day
-            available = StaffAvailability.objects.filter(
+            queryset = StaffAvailability.objects.filter(
                 day_of_week=day_of_week,
                 is_available=True
             ).select_related('staff')
             
-            serializer = self.get_serializer(available, many=True)
+            # Filter by clinic if specified
+            if clinic_id:
+                queryset = queryset.filter(
+                    Q(clinics__id=clinic_id) | Q(apply_to_all_clinics=True)
+                ).distinct()
+            
+            serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data)
         
         except ValueError:
@@ -1326,19 +1351,27 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
 class DentistAvailabilityViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing dentist date-specific availability (calendar-based).
+    Supports clinic-specific availability filtering.
     """
     queryset = DentistAvailability.objects.all()
     serializer_class = DentistAvailabilitySerializer
 
     def get_queryset(self):
-        """Filter by dentist and date range if specified"""
+        """Filter by dentist, clinic, and date range if specified"""
         queryset = DentistAvailability.objects.all()
         dentist_id = self.request.query_params.get('dentist_id', None)
+        clinic_id = self.request.query_params.get('clinic_id', None)
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
         
         if dentist_id:
             queryset = queryset.filter(dentist_id=dentist_id)
+        
+        if clinic_id:
+            # Filter by specific clinic or those that apply to all clinics
+            queryset = queryset.filter(
+                Q(clinic_id=clinic_id) | Q(apply_to_all_clinics=True)
+            )
         
         if start_date:
             queryset = queryset.filter(date__gte=start_date)
@@ -1354,12 +1387,15 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         Bulk create or update availability for multiple dates.
         Expected data: {
             "dentist_id": 1,
+            "clinic_id": 1,  // Optional - if not provided, applies to all clinics
+            "apply_to_all_clinics": true,  // Optional - default true
             "dates": [
                 {
                     "date": "2026-01-10",
                     "start_time": "09:00:00",
                     "end_time": "17:00:00",
-                    "is_available": true
+                    "is_available": true,
+                    "clinic_id": 1  // Optional per-date clinic override
                 },
                 ...
             ]
@@ -1367,6 +1403,8 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         """
         dentist_id = request.data.get('dentist_id')
         dates_data = request.data.get('dates', [])
+        default_clinic_id = request.data.get('clinic_id')
+        default_apply_to_all = request.data.get('apply_to_all_clinics', True)
         
         if not dentist_id:
             return Response(
@@ -1394,13 +1432,27 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
             
             # Update or create availability for each date
             for date_data in dates_data:
+                # Determine clinic settings for this date
+                date_clinic_id = date_data.get('clinic_id', default_clinic_id)
+                apply_to_all = date_data.get('apply_to_all_clinics', default_apply_to_all)
+                
+                # Get clinic object if specified
+                clinic = None
+                if date_clinic_id and not apply_to_all:
+                    try:
+                        clinic = ClinicLocation.objects.get(id=date_clinic_id)
+                    except ClinicLocation.DoesNotExist:
+                        pass
+                
                 availability, created = DentistAvailability.objects.update_or_create(
                     dentist=dentist,
                     date=date_data['date'],
+                    clinic=clinic,
                     defaults={
                         'start_time': date_data.get('start_time', '09:00:00'),
                         'end_time': date_data.get('end_time', '17:00:00'),
                         'is_available': date_data.get('is_available', True),
+                        'apply_to_all_clinics': apply_to_all,
                     }
                 )
                 created_availability.append(availability)
@@ -1425,10 +1477,12 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         Delete availability for specific dates.
         Expected data: {
             "dentist_id": 1,
+            "clinic_id": 1,  // Optional - if provided, only deletes for that clinic
             "dates": ["2026-01-10", "2026-01-11", ...]
         }
         """
         dentist_id = request.data.get('dentist_id')
+        clinic_id = request.data.get('clinic_id')
         dates = request.data.get('dates', [])
         
         if not dentist_id or not dates:
@@ -1437,10 +1491,15 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        deleted_count = DentistAvailability.objects.filter(
+        queryset = DentistAvailability.objects.filter(
             dentist_id=dentist_id,
             date__in=dates
-        ).delete()[0]
+        )
+        
+        if clinic_id:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        
+        deleted_count = queryset.delete()[0]
         
         return Response({
             'message': f'Deleted {deleted_count} availability records'
@@ -1451,17 +1510,19 @@ class BlockedTimeSlotViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing blocked time slots to prevent patient bookings.
     Staff and owners can block specific time ranges on specific dates.
+    Supports clinic-specific blocks.
     """
     queryset = BlockedTimeSlot.objects.all()
     serializer_class = BlockedTimeSlotSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Filter by date range if specified"""
+        """Filter by date range and/or clinic if specified"""
         queryset = BlockedTimeSlot.objects.all()
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
         date = self.request.query_params.get('date', None)
+        clinic_id = self.request.query_params.get('clinic_id', None)
         
         if date:
             queryset = queryset.filter(date=date)
@@ -1472,11 +1533,27 @@ class BlockedTimeSlotViewSet(viewsets.ModelViewSet):
         elif end_date:
             queryset = queryset.filter(date__lte=end_date)
         
+        if clinic_id:
+            # Filter by specific clinic or those that apply to all clinics
+            queryset = queryset.filter(
+                Q(clinic_id=clinic_id) | Q(apply_to_all_clinics=True)
+            )
+        
         return queryset.order_by('date', 'start_time')
 
     def perform_create(self, serializer):
-        """Set the created_by field to the current user"""
-        serializer.save(created_by=self.request.user)
+        """Set the created_by field to the current user and handle clinic assignment"""
+        clinic_id = self.request.data.get('clinic_id') or self.request.data.get('clinic')
+        apply_to_all = self.request.data.get('apply_to_all_clinics', True)
+        
+        if clinic_id and not apply_to_all:
+            try:
+                clinic = ClinicLocation.objects.get(id=clinic_id)
+                serializer.save(created_by=self.request.user, clinic=clinic, apply_to_all_clinics=False)
+            except ClinicLocation.DoesNotExist:
+                serializer.save(created_by=self.request.user)
+        else:
+            serializer.save(created_by=self.request.user, apply_to_all_clinics=True)
 
     def create(self, request, *args, **kwargs):
         """Override create to ensure only staff/owner can block slots"""

@@ -21,7 +21,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { useClinic } from "@/lib/clinic-context"
+import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
@@ -78,6 +78,11 @@ interface Service {
   description: string
   duration: number
   color: string
+  clinics_data?: Array<{
+    id: number
+    name: string
+    address: string
+  }>
 }
 
 interface Staff {
@@ -90,7 +95,7 @@ interface Staff {
 
 export default function StaffAppointments() {
   const { token } = useAuth()
-  const { selectedClinic } = useClinic()
+  const { selectedClinic, allClinics } = useClinic()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "pending" | "completed" | "missed" | "cancelled">("all")
   const [showAddModal, setShowAddModal] = useState(false)
@@ -110,6 +115,7 @@ export default function StaffAppointments() {
     dentist: "",
     service: "",
     notes: "",
+    clinic: "",
   })
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [dentistAvailability, setDentistAvailability] = useState<any[]>([])
@@ -448,6 +454,7 @@ export default function StaffAppointments() {
         service: newAppointment.service ? Number.parseInt(newAppointment.service) : null,
         notes: newAppointment.notes,
         status: "confirmed", // Staff create confirmed appointments
+        clinic: newAppointment.clinic ? Number.parseInt(newAppointment.clinic) : null,
       }
 
       const createdAppointment = await api.createAppointment(appointmentData, token)
@@ -457,13 +464,15 @@ export default function StaffAppointments() {
       const patient = patients.find(p => p.id === Number.parseInt(newAppointment.patient))
       const service = services.find(s => s.id === Number.parseInt(newAppointment.service))
       const dentist = staff.find(s => s.id === Number.parseInt(newAppointment.dentist))
+      const clinic = allClinics.find(c => c.id === Number.parseInt(newAppointment.clinic))
       
       setSuccessAppointmentDetails({
         patientName: patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown Patient',
         date: newAppointment.date,
         time: newAppointment.time,
         service: service?.name,
-        dentist: dentist ? `Dr. ${dentist.first_name} ${dentist.last_name}` : undefined
+        dentist: dentist ? `Dr. ${dentist.first_name} ${dentist.last_name}` : undefined,
+        clinic: clinic?.name
       })
       
       setShowAddModal(false)
@@ -478,6 +487,7 @@ export default function StaffAppointments() {
         dentist: "",
         service: "",
         notes: "",
+        clinic: "",
       })
       setSelectedDate(undefined)
       setBookedSlots([])
@@ -1489,7 +1499,7 @@ export default function StaffAppointments() {
               <button
                 onClick={() => {
                   setShowAddModal(false)
-                  setNewAppointment({ patient: "", date: "", time: "", dentist: "", service: "", notes: "" })
+                  setNewAppointment({ patient: "", date: "", time: "", dentist: "", service: "", notes: "", clinic: "" })
                   setSelectedPatientId(null)
                   setSelectedDate(undefined)
                   setAvailableDates(new Set())
@@ -1506,6 +1516,43 @@ export default function StaffAppointments() {
                 <p className="text-sm text-blue-800">
                   <strong>Note:</strong> The appointment will be confirmed immediately.
                 </p>
+              </div>
+
+              {/* Step 1: Clinic Selection */}
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                  <h3 className="font-semibold text-teal-900">Select Clinic Location</h3>
+                </div>
+                <select
+                  value={newAppointment.clinic}
+                  onChange={(e) => {
+                    setNewAppointment({
+                      ...newAppointment,
+                      clinic: e.target.value,
+                      dentist: "",
+                      service: "",
+                      date: "",
+                      time: ""
+                    })
+                    setSelectedDate(undefined)
+                    setAvailableDates(new Set())
+                  }}
+                  className="w-full px-4 py-2.5 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  required
+                >
+                  <option value="">Select a clinic location...</option>
+                  {allClinics.map((clinic: ClinicLocation) => (
+                    <option key={clinic.id} value={clinic.id.toString()}>
+                      {clinic.name} - {clinic.address}
+                    </option>
+                  ))}
+                </select>
+                {!newAppointment.clinic && (
+                  <p className="text-xs text-teal-700 mt-2">
+                    ⓘ Please select a clinic to see available dentists and services
+                  </p>
+                )}
               </div>
 
               {/* Patient Search/Select */}
@@ -1584,10 +1631,11 @@ export default function StaffAppointments() {
                     setNewAppointment({ ...newAppointment, dentist: e.target.value, date: "", time: "" })
                     setSelectedDate(undefined)
                   }}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
+                  disabled={!newAppointment.clinic}
                 >
-                  <option value="">Select a dentist first...</option>
+                  <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select a clinic first..."}</option>
                   {staff.map((s) => (
                     <option key={s.id} value={s.id}>
                       {formatDentistName(s)}
@@ -1702,11 +1750,20 @@ export default function StaffAppointments() {
                 <select
                   value={newAppointment.service}
                   onChange={(e) => setNewAppointment({ ...newAppointment, service: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
+                  disabled={!newAppointment.clinic}
                 >
-                  <option value="">Select a treatment...</option>
-                  {services.map((service) => (
+                  <option value="">{newAppointment.clinic ? "Select a treatment..." : "Select a clinic first..."}</option>
+                  {services
+                    .filter((service) => {
+                      // If no clinic selected or service has no clinic restriction, show all
+                      if (!newAppointment.clinic) return true
+                      if (!service.clinics_data || service.clinics_data.length === 0) return true
+                      // Filter services that are available at the selected clinic
+                      return service.clinics_data.some(c => c.id === Number(newAppointment.clinic))
+                    })
+                    .map((service) => (
                     <option key={service.id} value={service.id}>
                       {service.name}
                     </option>
@@ -1732,7 +1789,7 @@ export default function StaffAppointments() {
                   type="button"
                   onClick={() => {
                     setShowAddModal(false)
-                    setNewAppointment({ patient: "", date: "", time: "", dentist: "", service: "", notes: "" })
+                    setNewAppointment({ patient: "", date: "", time: "", dentist: "", service: "", notes: "", clinic: "" })
                     setSelectedPatientId(null)
                     setSelectedDate(undefined)
                     setAvailableDates(new Set())
@@ -1744,7 +1801,7 @@ export default function StaffAppointments() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedPatientId || !newAppointment.date || !newAppointment.time || !newAppointment.dentist}
+                  disabled={!newAppointment.clinic || !selectedPatientId || !newAppointment.date || !newAppointment.time || !newAppointment.dentist}
                   className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Book Appointment

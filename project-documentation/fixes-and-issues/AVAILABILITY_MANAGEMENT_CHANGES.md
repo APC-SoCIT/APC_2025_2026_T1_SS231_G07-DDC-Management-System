@@ -1,13 +1,14 @@
 # Availability Management System Overhaul
 
 **Date:** January 31, 2026  
+**Last Updated:** February 1, 2026  
 **Type:** Feature Enhancement & UX Improvements
 
 ---
 
 ## 📋 Overview
 
-This update introduces a comprehensive overhaul of the dentist availability management system, featuring improved UX, compact calendar design, quick access modals, drag-to-select functionality, and animated success feedback.
+This update introduces a comprehensive overhaul of the dentist availability management system, featuring improved UX, compact calendar design, quick access modals, drag-to-select functionality, animated success feedback, and multi-clinic support.
 
 ---
 
@@ -395,6 +396,71 @@ This update introduces a comprehensive overhaul of the dentist availability mana
 
 ---
 
+## 🆕 February 1, 2026 Updates
+
+### Multi-Clinic Support for Availability
+
+#### Quick Availability Modal Enhancements
+- **Clinic Location Selector:** Added clinic selection at the top of the modal
+  - Option 1: "Apply to All Clinics" - availability applies across all locations
+  - Option 2: "Specific Clinic Only" - availability for a single clinic
+  - Dropdown selector appears when "Specific Clinic Only" is selected
+  - Teal/emerald gradient styling with MapPin icon
+  - Validation to ensure clinic is selected before saving
+
+- **Updated onSave Data Structure:**
+  ```typescript
+  {
+    mode: 'specific' | 'recurring',
+    dates?: string[],
+    daysOfWeek?: number[],
+    startTime: string,
+    endTime: string,
+    applyToAllClinics: boolean,
+    clinicId?: number
+  }
+  ```
+
+#### Success Modal Improvements
+- **Fixed Immediate Closing Issue:** Removed `window.location.reload()` that was called immediately after showing the modal, which caused the modal to flash and disappear
+- **Enhanced Information Display:**
+  - Now shows selected dates (first 5 with "+X more" indicator)
+  - Displays working hours (start time - end time)
+  - Shows clinic name (or "All Clinics")
+  - Shows total date count for recurring mode
+- **New Props Added:**
+  ```typescript
+  startTime?: string;
+  endTime?: string;
+  clinicName?: string;
+  dates?: string[];
+  ```
+
+#### Calendar Display Improvements
+- **Removed Redundant "Save Availability" Button:** The main calendar no longer has a separate save button at the bottom (use the modal's save button instead)
+- **Status Banner:** Added visual status banner showing:
+  - Green "Availability Set" banner when dates are selected
+  - Amber "No Availability Set" warning when no dates are selected
+  - Shows date count and guidance text
+- **Calendar Legend:** Added color-coded legend:
+  - Green gradient = Available
+  - White with border = Not Set
+  - Gray = Past Date
+- **Enhanced Summary Section:**
+  - Shows "Your Available Dates (X)" with patient booking info
+  - 3-column grid layout on medium+ screens
+  - Displays weekday abbreviation in date labels
+  - Shows time range for each date
+
+#### Owner Profile Page Updates
+- Added `useClinic` hook integration
+- Updated success data interface to include more fields
+- Time formatting helper for 12-hour display
+- Clinic name resolution from allClinics array
+- Proper page reload only on modal close (not immediately after save)
+
+---
+
 ## 📝 Notes
 
 - All changes maintain backward compatibility with existing API
@@ -414,6 +480,9 @@ This update introduces a comprehensive overhaul of the dentist availability mana
 - ✅ Recurring schedule management
 - ✅ Appointment booking for patients
 - ✅ Profile update success feedback
+- ✅ Multi-clinic support for availability (Feb 2026)
+- ✅ Success modal stays open until user dismisses (Feb 2026)
+- ✅ Enhanced calendar status display (Feb 2026)
 
 ---
 

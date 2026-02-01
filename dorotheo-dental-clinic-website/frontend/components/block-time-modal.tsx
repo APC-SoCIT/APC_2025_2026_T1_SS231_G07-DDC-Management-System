@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, Fragment } from "react"
-import { X, Calendar as CalendarIcon, Clock, Ban } from "lucide-react"
+import { X, Calendar as CalendarIcon, Clock, Ban, Building2 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
+import { useClinic, ClinicLocation } from "@/lib/clinic-context"
 
 interface BlockTimeModalProps {
   isOpen: boolean
@@ -12,6 +13,8 @@ interface BlockTimeModalProps {
     start_time: string
     end_time: string
     reason: string
+    clinic_id?: number | null
+    apply_to_all_clinics: boolean
   }) => void
 }
 
@@ -20,11 +23,14 @@ export default function BlockTimeModal({
   onClose,
   onBlock,
 }: BlockTimeModalProps) {
+  const { allClinics } = useClinic()
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [reason, setReason] = useState("")
   const [error, setError] = useState("")
+  const [selectedClinicId, setSelectedClinicId] = useState<string>("")
+  const [applyToAllClinics, setApplyToAllClinics] = useState(true)
 
   useEffect(() => {
     if (!isOpen) {
@@ -34,6 +40,8 @@ export default function BlockTimeModal({
       setEndTime("")
       setReason("")
       setError("")
+      setSelectedClinicId("")
+      setApplyToAllClinics(true)
     }
   }, [isOpen])
 
@@ -77,6 +85,11 @@ export default function BlockTimeModal({
       setError("End time must be after start time")
       return
     }
+    
+    if (!applyToAllClinics && !selectedClinicId) {
+      setError("Please select a clinic or choose to apply to all clinics")
+      return
+    }
 
     const formattedDate = selectedDate.toISOString().split('T')[0]
 
@@ -85,6 +98,8 @@ export default function BlockTimeModal({
       start_time: startTime,
       end_time: endTime,
       reason: reason.trim(),
+      clinic_id: applyToAllClinics ? null : parseInt(selectedClinicId),
+      apply_to_all_clinics: applyToAllClinics,
     })
 
     onClose()
@@ -121,6 +136,54 @@ export default function BlockTimeModal({
               {error}
             </div>
           )}
+
+          {/* Clinic Selection */}
+          <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-5">
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Clinic Location
+            </label>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="clinicScope"
+                  checked={applyToAllClinics}
+                  onChange={() => {
+                    setApplyToAllClinics(true)
+                    setSelectedClinicId("")
+                  }}
+                  className="w-4 h-4 text-teal-600"
+                />
+                <span className="text-gray-700">Apply to all clinics</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="clinicScope"
+                  checked={!applyToAllClinics}
+                  onChange={() => setApplyToAllClinics(false)}
+                  className="w-4 h-4 text-teal-600"
+                />
+                <span className="text-gray-700">Apply to specific clinic</span>
+              </label>
+              {!applyToAllClinics && (
+                <select
+                  value={selectedClinicId}
+                  onChange={(e) => setSelectedClinicId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white"
+                  required={!applyToAllClinics}
+                >
+                  <option value="">Select clinic...</option>
+                  {allClinics.map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
 
           {/* Date Selection */}
           <div>
