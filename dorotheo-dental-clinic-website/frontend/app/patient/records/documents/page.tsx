@@ -4,6 +4,18 @@ import { useState, useEffect } from "react"
 import { FileText, Calendar, Eye, Download, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { ClinicBadge } from "@/components/ClinicBadge"
+
+interface ClinicLocation {
+  id: number
+  name: string
+  address: string
+  city: string
+  state: string
+  zipcode: string
+  phone: string
+  email: string
+}
 
 interface Document {
   id: number
@@ -22,6 +34,8 @@ interface Document {
   service_name?: string | null
   dentist_name?: string | null
   document_type_display?: string
+  clinic?: number | null
+  clinic_data?: ClinicLocation | null
 }
 
 export default function Documents() {
@@ -183,9 +197,12 @@ export default function Documents() {
                 className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDocumentTypeColor(doc.document_type)}`}>
-                    {getDocumentTypeLabel(doc.document_type)}
-                  </span>
+                  <div className="flex flex-col gap-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDocumentTypeColor(doc.document_type)} w-fit`}>
+                      {getDocumentTypeLabel(doc.document_type)}
+                    </span>
+                    {doc.clinic_data && <ClinicBadge clinic={doc.clinic_data} size="sm" />}
+                  </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleView(doc)}

@@ -4,6 +4,18 @@ import { useState, useEffect } from "react"
 import { FileText, Calendar, User } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { ClinicBadge } from "@/components/ClinicBadge"
+
+interface ClinicLocation {
+  id: number
+  name: string
+  address: string
+  city: string
+  state: string
+  zipcode: string
+  phone: string
+  email: string
+}
 
 interface DentalRecord {
   id: number
@@ -16,6 +28,8 @@ interface DentalRecord {
   created_by_name?: string
   created_at: string
   status?: string
+  clinic?: number | null
+  clinic_data?: ClinicLocation | null
 }
 
 interface Appointment {
@@ -86,7 +100,10 @@ export default function TreatmentHistory() {
             {dentalRecords.map((record) => (
               <div key={`record-${record.id}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-3">
-                  <h4 className="font-semibold text-gray-900">{record.treatment || "Dental Treatment"}</h4>
+                  <div className="flex flex-col gap-2">
+                    <h4 className="font-semibold text-gray-900">{record.treatment || "Dental Treatment"}</h4>
+                    {record.clinic_data && <ClinicBadge clinic={record.clinic_data} size="sm" />}
+                  </div>
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     Completed
                   </span>
@@ -114,6 +131,7 @@ export default function TreatmentHistory() {
                       <p className="font-medium text-gray-900">{record.diagnosis}</p>
                     </div>
                   )}
+                </div>
                 </div>
                 {record.notes && (
                   <div className="mt-3 pt-3 border-t border-gray-200">

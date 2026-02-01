@@ -3,9 +3,11 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Plus, Pencil, Trash2, X } from "lucide-react"
+import { Plus, Pencil, Trash2, X, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
+import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
+import { ClinicBadge } from "@/components/clinic-badge"
 
 interface Service {
   id: number
@@ -16,10 +18,13 @@ interface Service {
   color: string
   image: string
   created_at: string
+  clinics_data?: ClinicLocation[]
+  clinic_ids?: number[]
 }
 
 export default function ServicesPage() {
   const { token } = useAuth()
+  const { allClinics } = useClinic()
   const [services, setServices] = useState<Service[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -46,6 +51,7 @@ export default function ServicesPage() {
     duration: 30,
     color: "#10b981",
     image: null as File | null,
+    selectedClinics: [] as number[],
   })
   const [imagePreview, setImagePreview] = useState("")
 
@@ -102,6 +108,10 @@ export default function ServicesPage() {
       if (formData.image) {
         data.append("image", formData.image)
       }
+      // Append clinic_ids array
+      formData.selectedClinics.forEach(clinicId => {
+        data.append("clinic_ids", clinicId.toString())
+      })
 
       if (editingService) {
         // Update existing service
@@ -114,7 +124,7 @@ export default function ServicesPage() {
       }
 
       // Reset form
-      setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null })
+      setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null, selectedClinics: [] })
       setImagePreview("")
       setEditingService(null)
       setIsModalOpen(false)
@@ -134,6 +144,7 @@ export default function ServicesPage() {
       duration: service.duration || 30,
       color: serviceColor,
       image: null,
+      selectedClinics: service.clinics_data?.map(c => c.id) || [],
     })
     setTempColor(serviceColor)
     setImagePreview(service.image)
@@ -156,7 +167,7 @@ export default function ServicesPage() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingService(null)
-    setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null })
+    setFormData({ name: "", description: "", category: "all", duration: 30, color: "#10b981", image: null, selectedClinics: [] })
     setImagePreview("")
     setShowColorPicker(false)
     setTempColor("#10b981")
@@ -250,6 +261,22 @@ export default function ServicesPage() {
                       {formatDuration(service.duration)}
                     </span>
                   </div>
+                  {/* Show clinic badges */}
+                  {service.clinics_data && service.clinics_data.length > 0 ? (
+                    <div className="mt-3">
+                      <p className="text-xs text-[var(--color-text-muted)] mb-1">Available at:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {service.clinics_data.map((clinic) => (
+                          <ClinicBadge key={clinic.id} clinic={clinic} size="sm" showIcon={false} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-1 rounded text-xs">
+                      <AlertCircle className="w-3 h-3" />
+                      <span>No clinics assigned</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="text-[var(--color-text-muted)] text-sm mb-4">{service.description}</p>
@@ -398,6 +425,50 @@ export default function ServicesPage() {
                   className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   placeholder="Describe the service..."
                 />
+              </div>
+
+              {/* Clinic Assignment */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
+                  Available at Clinics {formData.selectedClinics.length === 0 && (
+                    <span className="text-amber-600 text-xs ml-2">(⚠️ Select at least one clinic)</span>
+                  )}
+                </label>
+                <div className="space-y-2 p-4 border border-[var(--color-border)] rounded-lg">
+                  {allClinics.length === 0 ? (
+                    <p className="text-sm text-[var(--color-text-muted)]">No clinics available</p>
+                  ) : (
+                    allClinics.map((clinic) => (
+                      <label key={clinic.id} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={formData.selectedClinics.includes(clinic.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({
+                                ...formData,
+                                selectedClinics: [...formData.selectedClinics, clinic.id],
+                              })
+                            } else {
+                              setFormData({
+                                ...formData,
+                                selectedClinics: formData.selectedClinics.filter((id) => id !== clinic.id),
+                              })
+                            }
+                          }}
+                          className="w-4 h-4 text-[var(--color-primary)] border-[var(--color-border)] rounded focus:ring-2 focus:ring-[var(--color-primary)]"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{clinic.name}</span>
+                            <ClinicBadge clinic={clinic} size="sm" showIcon={false} />
+                          </div>
+                          <p className="text-xs text-[var(--color-text-muted)]">{clinic.address}</p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
 
               <div>
