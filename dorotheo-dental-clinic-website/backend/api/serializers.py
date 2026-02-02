@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.utils import timezone
+from datetime import timedelta
 from .models import (
     User, Service, Appointment, ToothChart, DentalRecord, 
     Document, InventoryItem, Billing, ClinicLocation, 
@@ -36,6 +38,26 @@ class UserSerializer(serializers.ModelSerializer):
             # Return the datetime as is - DRF will serialize it properly as ISO format
             return last_datetime
         return None
+    
+    def validate_birthday(self, value):
+        """Validate that birthday is more than 6 months old and younger than 100 years"""
+        if value:
+            today = timezone.now().date()
+            age_in_days = (today - value).days
+            
+            # Check if younger than 6 months (approximately 183 days)
+            if age_in_days < 183:
+                raise serializers.ValidationError("Patient must be at least 6 months old to register")
+            
+            # Check if 100 years old or older (exactly 36525 days or more)
+            if age_in_days >= 36525:
+                raise serializers.ValidationError("Patient must be younger than 100 years old")
+            
+            # Check if birthday is in the future
+            if value > today:
+                raise serializers.ValidationError("Birthday cannot be in the future")
+        
+        return value
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)

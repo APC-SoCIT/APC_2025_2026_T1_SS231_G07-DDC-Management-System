@@ -219,19 +219,25 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       return
     }
 
-    // Validate birthday (must be in the past and user must be at least 1 year old)
+    // Validate birthday (must be more than 6 months old and younger than 100 years)
     if (formData.birthday) {
       const birthDate = new Date(formData.birthday)
       const today = new Date()
-      const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
+      const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate())
+      const hundredYearsAgo = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate())
       
       if (birthDate > today) {
         setError("Birthday cannot be in the future")
         setIsLoading(false)
         return
       }
-      if (birthDate > oneYearAgo) {
-        setError("You must be at least 1 year old to register")
+      if (birthDate > sixMonthsAgo) {
+        setError("Patient must be at least 6 months old to register")
+        setIsLoading(false)
+        return
+      }
+      if (birthDate <= hundredYearsAgo) {
+        setError("Patient must be younger than 100 years old")
         setIsLoading(false)
         return
       }
