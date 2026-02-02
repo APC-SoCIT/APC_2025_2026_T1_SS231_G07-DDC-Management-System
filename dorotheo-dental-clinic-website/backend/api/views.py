@@ -13,8 +13,17 @@ from django.conf import settings
 from datetime import date, timedelta
 import secrets
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
+
+# Import email service
+from .email_service import (
+    send_appointment_confirmation,
+    send_appointment_cancelled,
+    notify_staff_new_appointment
+)
+
 from .models import (
     User, Service, Appointment, ToothChart, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
@@ -601,8 +610,29 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        # Continue with normal creation
-        return super().create(request, *args, **kwargs)
+        # Call parent create which will call perform_create
+        try:
+            response = super().create(request, *args, **kwargs)
+            return response
+        except Exception as e:
+            # If something fails during serialization but appointment was created,
+            # try to return the created appointment data
+            logger.error(f"Error during appointment creation response: {str(e)}")
+            
+            # Check if appointment was created despite error
+            if appointment_date and appointment_time:
+                recent_appointment = Appointment.objects.filter(
+                    date=appointment_date,
+                    time__startswith=time_normalized
+                ).order_by('-created_at').first()
+                
+                if recent_appointment:
+                    # Appointment was created, return success response
+                    serializer = self.get_serializer(recent_appointment)
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            # Re-raise if appointment wasn't created
+            raise
     
     def perform_create(self, serializer):
         """Update patient status and create notifications after creating appointment"""
@@ -616,6 +646,42 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         # Notify patient that appointment is confirmed
         if appointment.status == 'confirmed':
             create_patient_notification(appointment, 'appointment_confirmed')
+        
+        # ✉️ Send emails in BACKGROUND THREAD (completely non-blocking)
+        def send_emails_async():
+            try:
+                # Send email confirmation to patient
+                try:
+                    send_appointment_confirmation(appointment)
+                    logger.info(f"✅ Email confirmation sent to {appointment.patient.email}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to send patient confirmation email: {str(e)}")
+                
+                # Notify staff/owner via email about new appointment
+                try:
+                    staff_emails = list(User.objects.filter(
+                        Q(user_type='staff') | Q(user_type='owner')
+                    ).exclude(email='').exclude(email__isnull=True).values_list('email', flat=True))
+                    
+                    if staff_emails:
+                        # Filter out invalid emails
+                        valid_emails = [email for email in staff_emails if '@' in email and '.' in email]
+                        
+                        if valid_emails:
+                            notify_staff_new_appointment(appointment, valid_emails)
+                            logger.info(f"✅ Staff notification emails sent to {len(valid_emails)} recipients")
+                        else:
+                            logger.warning(f"⚠️ No valid staff emails found")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to send staff notification emails: {str(e)}")
+            except Exception as e:
+                # Final catch-all to ensure NO email error breaks anything
+                logger.warning(f"⚠️ Email notification error (continuing anyway): {str(e)}")
+        
+        # Start email sending in background thread
+        email_thread = threading.Thread(target=send_emails_async, daemon=True)
+        email_thread.start()
+        logger.info("📧 Email notifications queued in background thread")
     
     def update(self, request, *args, **kwargs):
         """Update appointment with double booking validation"""

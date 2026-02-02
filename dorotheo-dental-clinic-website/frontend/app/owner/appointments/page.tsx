@@ -104,6 +104,7 @@ export default function OwnerAppointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isBookingAppointment, setIsBookingAppointment] = useState(false)
   const [newAppointment, setNewAppointment] = useState({
     patient: "",
     clinic: "",
@@ -436,6 +437,12 @@ export default function OwnerAppointments() {
       return
     }
 
+    if (isBookingAppointment) {
+      return // Prevent double submission
+    }
+
+    setIsBookingAppointment(true)
+
     // Get the selected service duration
     const selectedService = services.find(s => s.id === Number(newAppointment.service))
     const duration = selectedService?.duration || 30
@@ -518,6 +525,8 @@ export default function OwnerAppointments() {
       } else {
         alert("Failed to create appointment. Please try again.")
       }
+    } finally {
+      setIsBookingAppointment(false)
     }
   }
 
@@ -2065,10 +2074,20 @@ export default function OwnerAppointments() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedPatientId || !newAppointment.date || !newAppointment.time || !newAppointment.dentist}
-                  className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!selectedPatientId || !newAppointment.date || !newAppointment.time || !newAppointment.dentist || isBookingAppointment}
+                  className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Book Appointment
+                  {isBookingAppointment ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Booking...
+                    </>
+                  ) : (
+                    'Book Appointment'
+                  )}
                 </button>
               </div>
             </form>

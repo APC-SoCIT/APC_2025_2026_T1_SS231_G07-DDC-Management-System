@@ -18,18 +18,26 @@ interface LoginResponse {
 export const api = {
   // Auth endpoints
   login: async (username: string, password: string): Promise<LoginResponse> => {
-    console.log("[v0] Attempting login to:", `${API_BASE_URL}/login/`)
     const response = await fetch(`${API_BASE_URL}/login/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     })
-    console.log("[v0] Login response status:", response.status)
+    
     if (!response.ok) {
-      const error = await response.text()
-      console.error("[v0] Login error:", error)
-      throw new Error("Login failed")
+      // Parse error response
+      const errorData = await response.json().catch(() => ({ error: "Login failed" }))
+      
+      // For 401 Unauthorized (invalid credentials), throw user-friendly error without console.error
+      if (response.status === 401) {
+        throw new Error(errorData.error || "Invalid username or password")
+      }
+      
+      // For other errors (500, 503, etc.), log to console for debugging
+      console.error("[API Error] Login failed:", response.status, errorData)
+      throw new Error(errorData.error || "Login failed")
     }
+    
     return response.json()
   },
 

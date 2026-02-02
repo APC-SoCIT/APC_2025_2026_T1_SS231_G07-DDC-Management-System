@@ -146,3 +146,33 @@ else:
     # Development settings
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_SECURE = False
+
+# ============================================
+# EMAIL CONFIGURATION
+# ============================================
+
+# Email Backend Selection
+# For development: Use console or Mailtrap
+# For production: Use SMTP (Gmail, SendGrid, AWS SES, etc.)
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'  # Prints emails to console
+)
+
+# SMTP Configuration (for production)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+# Default sender email
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    'Dorotheo Dental Clinic <noreply@dorothedentallossc.com.ph>'
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Email timeout (seconds)
+EMAIL_TIMEOUT = 10
