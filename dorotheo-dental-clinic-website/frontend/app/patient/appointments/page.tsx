@@ -89,6 +89,7 @@ export default function PatientAppointments() {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
+  const [appointmentError, setAppointmentError] = useState("")
   const [cancelReason, setCancelReason] = useState("")
   const [staff, setStaff] = useState<Staff[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -565,9 +566,10 @@ export default function PatientAppointments() {
 
   const handleAddAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
+    setAppointmentError("") // Clear previous errors
     
     if (!token || !user) {
-      alert("Please log in to create an appointment")
+      setAppointmentError("Please log in to create an appointment")
       return
     }
 
@@ -579,7 +581,7 @@ export default function PatientAppointments() {
     const hasConflict = isTimeSlotBooked(newAppointment.date, newAppointment.time, duration)
 
     if (hasConflict) {
-      alert("This time slot conflicts with an existing appointment. Please select a different time.")
+      setAppointmentError("This time slot conflicts with an existing appointment. Please select a different time.")
       return
     }
 
@@ -593,7 +595,7 @@ export default function PatientAppointments() {
     )
 
     if (hasDuplicate) {
-      alert("You already have this appointment booked for this time. Please select a different time or service.")
+      setAppointmentError("You already have this appointment booked for this time. Please select a different time or service.")
       return
     }
 
@@ -661,22 +663,31 @@ export default function PatientAppointments() {
         setShowSuccessModal(true)
       }, 100)
     } catch (error: any) {
-      console.error("[APPOINTMENT] Error creating appointment:", error)
-      console.error("[APPOINTMENT] Error details:", {
-        message: error.message,
-        response: error.response,
-        stack: error.stack
-      })
+      // Extract the error message from the backend response
+      let errorMessage = "Failed to create appointment. Please try again."
       
-      // Check if it's a double booking error from backend
-      if (error?.response?.data?.error === 'Time slot conflict') {
-        alert(error.response.data.message || "This time slot is already booked. Please select a different time.")
-      } else {
-        const errorMsg = error?.response?.data ? 
-          (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data, null, 2)) :
-          error?.message || "Failed to create appointment. Please try again."
-        alert(`Failed to create appointment:\n${errorMsg}`)
+      if (error?.response?.data) {
+        const errorData = error.response.data
+        
+        // Check for specific validation errors
+        if (errorData.error === 'Weekly limit exceeded') {
+          errorMessage = errorData.message || "You already have an appointment this week. Patients can only book one appointment per week."
+        } else if (errorData.error === 'Duplicate booking') {
+          errorMessage = errorData.message || "You already have an appointment for this service at this time."
+        } else if (errorData.error === 'Dentist conflict') {
+          errorMessage = errorData.message || "This dentist already has an appointment at another location at this time."
+        } else if (errorData.error === 'Time slot conflict') {
+          errorMessage = errorData.message || "This time slot is already booked. Please select a different time."
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData
+        }
+      } else if (error?.message) {
+        errorMessage = error.message
       }
+      
+      setAppointmentError(errorMessage)
     }
   }
 
@@ -1463,6 +1474,7 @@ export default function PatientAppointments() {
                   setNewAppointment({ clinic: "", date: "", time: "", dentist: "", service: "", notes: "" })
                   setSelectedDate(undefined)
                   setAvailableDates(new Set())
+                  setAppointmentError("") // Clear error when closing modal
                 }}
                 className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
               >
@@ -1476,6 +1488,13 @@ export default function PatientAppointments() {
                   <strong>Note:</strong> Your appointment will be booked immediately and staff/owner will be notified.
                 </p>
               </div>
+
+              {/* Error Message Display */}
+              {appointmentError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">{appointmentError}</p>
+                </div>
+              )}
 
               {/* Step 1: Clinic Selection - MUST BE FIRST */}
               <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-5">
