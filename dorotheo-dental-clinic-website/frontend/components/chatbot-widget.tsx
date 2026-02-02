@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { MessageCircle, X, Send, Loader2, Trash2, Calendar, XCircle } from "lucide-react"
+import { MessageCircle, X, Send, Loader2, Trash2, Calendar, XCircle, Mic, MicOff } from "lucide-react"
 import { chatbotQuery } from "@/lib/api"
 import ReactMarkdown from 'react-markdown'
 
@@ -14,17 +14,16 @@ interface Message {
 }
 
 const initialQuickActions = [
-  { icon: Calendar, text: "Book an appointment", message: "I want to book an appointment" },
-  { icon: Calendar, text: "Check availability", message: "Show available slots today" },
-  { icon: XCircle, text: "Cancel appointment", message: "I want to cancel my appointment" },
-  { icon: Calendar, text: "Reschedule", message: "I need to reschedule my appointment" },
+  { icon: Calendar, text: "📅 Book Appointment", message: "I want to book an appointment" },
+  { icon: Calendar, text: "🔄 Reschedule Appointment", message: "I need to reschedule my appointment" },
+  { icon: XCircle, text: "❌ Cancel Appointment", message: "I want to cancel my appointment" },
 ]
 
 const quickReplies = [
-  "What services do you offer?",
-  "Show available slots today",
+  "What dental services do you offer?",
+  "Who are the available dentists?",
   "What are your clinic hours?",
-  "Tell me about dental procedures",
+  "Show me available time slots",
 ]
 
 export default function ChatbotWidget() {
@@ -34,7 +33,10 @@ export default function ChatbotWidget() {
   const [isTyping, setIsTyping] = useState(false)
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [voiceLanguage, setVoiceLanguage] = useState<'en-US' | 'fil-PH'>('en-US')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<any>(null)
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function ChatbotWidget() {
   const initializeChat = () => {
     const welcomeMessage: Message = {
       id: "1",
-      text: "Hi there! 👋\nWelcome to Dorotheo Dental Clinic!\n\nI'm your AI dental assistant. I can help you with:\n\n• **Book, reschedule, or cancel appointments**\n• Information about our services\n• Available appointment slots\n• Clinic hours and location\n• General dental health questions\n\nHow can I help you today?",
+      text: "Welcome to Dorotheo Dental Clinic! 🌿✨\n\nI'm **Sage**, your premium virtual concierge. I'm here to provide you with professional, calming, and efficient assistance.\n\nI can help you with:\n\n• **📅 Book, reschedule, or cancel appointments**\n• Information about our dental services and procedures\n• Available appointment slots and dentist schedules\n• Clinic hours, locations, and contact information\n• General dental health questions\n\nHow may I assist you today?",
       sender: "bot",
       timestamp: new Date(),
     }
@@ -96,6 +98,54 @@ export default function ChatbotWidget() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Initialize speech recognition (only once)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition()
+        recognitionRef.current.continuous = false
+        recognitionRef.current.interimResults = false
+        recognitionRef.current.lang = 'en-US'
+
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript
+          setInputMessage(transcript)
+          setIsListening(false)
+        }
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error)
+          setIsListening(false)
+        }
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false)
+        }
+      }
+    }
+  }, [])
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      alert('Voice recognition is not supported in your browser. Please use Chrome or Edge.')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    } else {
+      recognitionRef.current.lang = voiceLanguage // Update language before starting
+      recognitionRef.current.start()
+      setIsListening(true)
+    }
+  }
+
+  const toggleLanguage = () => {
+    setVoiceLanguage(prev => prev === 'en-US' ? 'fil-PH' : 'en-US')
+  }
 
   const handleSendMessage = async (message?: string) => {
     const messageText = message || inputMessage.trim()
@@ -141,9 +191,9 @@ export default function ChatbotWidget() {
       
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: error.message.includes("Ollama") 
-          ? "⚠️ I'm having trouble connecting to the AI service. Please try again or contact our clinic directly.\n\nYou can reach us at (123) 456-7890."
-          : "Sorry, I encountered an error. Please try again or contact our clinic directly at (123) 456-7890.",
+        text: error.message.includes("Gemini") || error.message.includes("API")
+          ? "⚠️ I'm having trouble connecting to my AI service. Please try again in a moment or contact our clinic directly.\n\nYou can reach us at (123) 456-7890."
+          : "I apologize, but I encountered an issue. Please try again or contact our clinic directly at (123) 456-7890 for immediate assistance.",
         sender: "bot",
         timestamp: new Date(),
       }
@@ -164,12 +214,12 @@ export default function ChatbotWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-[var(--color-primary)] to-teal-600 text-white rounded-full p-4 shadow-2xl hover:scale-110 transition-transform duration-300 group"
+          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-yellow-600 text-white rounded-full p-4 shadow-2xl hover:scale-110 transition-transform duration-300 group"
           aria-label="Open chat"
         >
           <MessageCircle className="w-6 h-6" />
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-            AI
+          <span className="absolute -top-1 -right-1 bg-gradient-to-r from-green-500 to-yellow-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold border-2 border-white">
+            S
           </span>
         </button>
       )}
@@ -178,14 +228,14 @@ export default function ChatbotWidget() {
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-[480px] h-[700px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-[var(--color-primary)] to-teal-600 text-white p-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-emerald-600 to-yellow-600 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border-2 border-white/30">
                 <MessageCircle className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-semibold">AI Dental Assistant</h3>
-                <p className="text-xs text-white/80">Always here to help</p>
+                <h3 className="font-semibold">Sage - AI Concierge</h3>
+                <p className="text-xs text-white/80">Professional • Calming • Efficient</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -241,7 +291,7 @@ export default function ChatbotWidget() {
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                       message.sender === "user"
-                        ? "bg-gradient-to-r from-[var(--color-primary)] to-teal-600 text-white"
+                        ? "bg-gradient-to-r from-emerald-600 to-yellow-600 text-white"
                         : "bg-white text-gray-800 border border-gray-200"
                     }`}
                   >
@@ -274,7 +324,7 @@ export default function ChatbotWidget() {
                           key={index}
                           onClick={() => handleQuickReply(reply)}
                           disabled={isTyping}
-                          className="text-xs bg-gradient-to-r from-[var(--color-primary)] to-teal-600 text-white px-3 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
+                          className="text-xs bg-gradient-to-r from-emerald-600 to-yellow-600 text-white px-3 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
                         >
                           {reply}
                         </button>
@@ -296,58 +346,76 @@ export default function ChatbotWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Action Buttons (shown when no conversation or at start) */}
-          {messages.length <= 1 && (
-            <div className="p-4 bg-white border-t border-gray-200">
-              <p className="text-xs text-gray-500 mb-3 font-medium">Quick Actions:</p>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {initialQuickActions.map((action, index) => {
-                  const Icon = action.icon
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleQuickReply(action.message)}
-                      disabled={isTyping}
-                      className="flex items-center gap-2 text-xs bg-gradient-to-r from-[var(--color-primary)] to-teal-600 text-white px-3 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{action.text}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-xs text-gray-500 mb-2 font-medium">Or ask me:</p>
-              <div className="flex flex-wrap gap-2">
-                {quickReplies.map((reply, index) => (
+          {/* Quick Action Buttons (always visible) */}
+          <div className="p-3 bg-white border-t border-gray-200">
+            <p className="text-xs text-gray-700 mb-2 font-semibold">Quick Actions:</p>
+            <div className="grid grid-cols-1 gap-1.5 mb-3">
+              {initialQuickActions.map((action, index) => {
+                const Icon = action.icon
+                return (
                   <button
                     key={index}
-                    onClick={() => handleQuickReply(reply)}
+                    onClick={() => handleQuickReply(action.message)}
                     disabled={isTyping}
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    className="flex items-center justify-center gap-2 text-xs bg-gradient-to-r from-emerald-600 to-yellow-600 text-white px-3 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
                   >
-                    {reply}
+                    <span>{action.text}</span>
                   </button>
-                ))}
-              </div>
+                )
+              })}
             </div>
-          )}
+            <p className="text-xs text-gray-500 mb-1.5 font-medium">Or ask me:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {quickReplies.map((reply, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleQuickReply(reply)}
+                  disabled={isTyping}
+                  className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  {reply}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Input */}
           <div className="p-4 bg-white border-t border-gray-200">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={toggleLanguage}
+                className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-yellow-600 text-white rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
+                disabled={isTyping || isListening}
+                title={`Switch to ${voiceLanguage === 'en-US' ? 'Filipino' : 'English'}`}
+              >
+                {voiceLanguage === 'en-US' ? '🇺🇸 EN' : '🇵🇭 FIL'}
+              </button>
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && !isTyping && handleSendMessage()}
-                placeholder="Ask me anything about dental care..."
-                disabled={isTyping}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm disabled:opacity-50"
+                onKeyPress={(e) => e.key === "Enter" && !isTyping && !isListening && handleSendMessage()}
+                placeholder={isListening ? `Listening (${voiceLanguage === 'en-US' ? 'English' : 'Filipino'})...` : "Ask Sage about dental care..."}
+                disabled={isTyping || isListening}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm disabled:opacity-50"
               />
               <button
+                onClick={toggleVoiceInput}
+                className={`rounded-full p-2.5 transition-all ${
+                  isListening 
+                    ? 'bg-red-500 text-white animate-pulse' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                disabled={isTyping}
+                aria-label={isListening ? "Stop recording" : "Start voice input"}
+                title={isListening ? "Stop recording" : `Voice input (${voiceLanguage === 'en-US' ? 'English' : 'Filipino'})`}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+              <button
                 onClick={() => handleSendMessage()}
-                className="bg-gradient-to-r from-[var(--color-primary)] to-teal-600 text-white rounded-full p-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
-                disabled={!inputMessage.trim() || isTyping}
+                className="bg-gradient-to-r from-emerald-600 to-yellow-600 text-white rounded-full p-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
+                disabled={!inputMessage.trim() || isTyping || isListening}
                 aria-label="Send message"
               >
                 <Send className="w-5 h-5" />

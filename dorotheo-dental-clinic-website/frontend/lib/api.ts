@@ -953,10 +953,15 @@ export const api = {
   },
 
   // Chatbot endpoint
-  chatbotQuery: async (message: string, conversationHistory: Array<{ role: string; content: string }>) => {
+  chatbotQuery: async (message: string, conversationHistory: Array<{ role: string; content: string }>, token?: string) => {
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    if (token) {
+      headers['Authorization'] = `Token ${token}`
+    }
+    
     const response = await fetch(`${API_BASE_URL}/chatbot/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ message, conversation_history: conversationHistory }),
     })
     if (!response.ok) throw new Error('Failed to query chatbot')
