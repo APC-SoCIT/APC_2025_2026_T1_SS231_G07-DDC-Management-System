@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { FileText, Calendar, User } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { ClinicBadge } from "@/components/ClinicBadge"
+import { ClinicBadge } from "@/components/clinic-badge"
 
 interface ClinicLocation {
   id: number
@@ -131,7 +131,6 @@ export default function TreatmentHistory() {
                       <p className="font-medium text-gray-900">{record.diagnosis}</p>
                     </div>
                   )}
-                </div>
                 </div>
                 {record.notes && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
