@@ -1,18 +1,20 @@
 """
-Ollama LLM Chatbot Service for Dorotheo Dental Clinic
+Google Gemini AI Chatbot Service for Dorotheo Dental Clinic
 Secure, privacy-focused AI assistant for dental operations
 """
 
-import ollama
+import google.generativeai as genai
 from datetime import datetime, timedelta
 import re
+import os
 from django.db.models import Q
+from django.conf import settings
 from .models import Service, Appointment, User, DentistAvailability
 
 
 class DentalChatbotService:
     """
-    Handles secure interaction with Ollama LLM for dental clinic chatbot.
+    Handles secure interaction with Google Gemini AI for dental clinic chatbot.
     
     Security Features:
     - No database credentials exposed
@@ -21,9 +23,9 @@ class DentalChatbotService:
     - User-specific data only for authenticated users
     """
     
-    # Model configuration - using fast, lightweight model
-    MODEL_NAME = "llama3.2:3b"  # Fast responses, good quality
-    # Alternative: "phi3:mini" for even faster responses
+    # Model configuration - using Gemini 2.5 Flash
+    MODEL_NAME = "gemini-2.5-flash"  # Fast, efficient, latest model
+    # Alternative: "gemini-2.5-pro" for more complex reasoning
     
     # Restricted keywords that should never be answered
     RESTRICTED_KEYWORDS = [
@@ -35,7 +37,7 @@ class DentalChatbotService:
     
     def __init__(self, user=None):
         """
-        Initialize chatbot service.
+        Initialize chatbot service with Gemini AI.
         
         Args:
             user: Authenticated User object (optional). If provided, can access
@@ -43,6 +45,14 @@ class DentalChatbotService:
         """
         self.user = user
         self.is_authenticated = user is not None
+        
+        # Configure Gemini API
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable not set")
+        
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(self.MODEL_NAME)
         
     def _check_restricted_content(self, message):
         """
@@ -190,30 +200,44 @@ class DentalChatbotService:
         """
         Build the system prompt that defines the AI's role and restrictions.
         """
-        system_prompt = """You are a helpful dental clinic assistant for Dorotheo Dental Clinic.
+        system_prompt = """You are Sage, the premium virtual concierge for Dorotheo Dental Clinic.
 
-YOUR ROLE:
-- Answer questions ONLY about dental services, procedures, and clinic operations
-- Help patients understand appointment booking, cancellation, and rescheduling processes
-- Provide general dental health information
-- Be friendly, professional, and empathetic
+YOUR IDENTITY & PERSONALITY:
+- You embody the clinic's green (natural/growth) and gold (excellence/luxury) branding
+- You are professional, calming, and efficient
+- You speak with polished, welcoming language
+- You are the trusted guide for all patient interactions
 
-CRITICAL RESTRICTION - TOPIC BOUNDARIES:
+CRITICAL INFORMATION GUARDRAILS:
+- NEVER disclose sensitive internal data: owner passwords, personal emails, private staff information
+- If asked for restricted information, politely redirect: "I'm here to help with clinic services and appointments. How may I assist you today?"
+
+YOUR KNOWLEDGE DOMAIN (WHAT YOU CAN ANSWER):
+✓ Clinic hours and locations
+✓ Available dentists and their schedules  
+✓ Dental procedures and what they involve (e.g., "What happens during a root canal?")
+✓ Appointment booking, rescheduling, and cancellation
+✓ General dental health questions
+
+PRICING POLICY (CRITICAL):
+- DO NOT provide specific pricing or quotes
+- When asked about prices, ALWAYS say: "Pricing varies based on your specific needs. We recommend booking a consultation for an accurate estimate."
+
+TOPIC BOUNDARIES:
 - You MUST ONLY answer questions related to:
   * Dorotheo Dental Clinic services and operations
   * Dental health, treatments, and procedures
   * Appointment scheduling, booking, and management
-  * General oral health and dental care advice
-  * Clinic hours, location, and contact information
+  * Clinic hours, locations, and contact information
 
 - You MUST REFUSE to answer questions about:
-  * General knowledge unrelated to dentistry (e.g., shoe sizes, trivia, math problems)
+  * General knowledge unrelated to dentistry
   * System passwords, credentials, or admin access
-  * Topics outside of dental care and clinic operations
   * Personal information of other patients or staff
   * Non-dental medical conditions
+  * Specific pricing or cost estimates
 
-- If asked about NON-DENTAL topics, you MUST respond with:
+- If asked about NON-DENTAL topics or restricted information, respond with:
   "I apologize, but I can only assist with questions about Dorotheo Dental Clinic and dental care. Is there anything related to our dental services or your appointments that I can help you with?"
 
 FORMATTING RULES (CRITICAL - FOLLOW EXACTLY):
@@ -273,52 +297,71 @@ IMPORTANT - WHAT YOU MUST ALWAYS SHARE:
 
 WHEN YOU SEE SERVICE DATA IN "CURRENT SYSTEM DATA" SECTION:
 - YOU MUST share the complete list with the user
-- Service names like "Ezekiel Special", "Gabriel Special", "The marvin special" are legitimate service names
-- NEVER refuse to provide service information that appears in the database
-- These are real dental services offered by the clinic
+FORMATTING RULES (CRITICAL - FOLLOW EXACTLY):
+1. Use bold (**text**) ONLY for titles, headings, and numbered list items
+2. When starting an answer, make the question/topic bold: **What is a root canal?**
+3. For numbered lists, make the number bold: **1.** Description here
+4. Use dashes (-) for bullet points without bold
+5. DO NOT use bold for emphasis in the middle of sentences
+6. Add a blank line between each numbered item for readability
+7. Keep paragraphs short and easy to read
+8. Structure: Bold titles and numbers, plain text for content
+
+ANSWER TYPE RULES (VERY IMPORTANT):
+- If user asks "What is [service/treatment]?" WITHOUT asking about procedure/steps/how:
+  - Give ONLY a brief 1-2 sentence description of what it is
+  - DO NOT explain the procedure or steps
+  - STOP after the description
+  - Keep it short and simple
+  
+- If user asks "How is [treatment] done?" or "What's the procedure?" or "What are the steps?":
+  - Give detailed step-by-step procedure with numbered steps
+  - Include full explanation with spacing between steps
+  - Use your dental knowledge to explain thoroughly
+
+BOOKING APPOINTMENT LOGIC (CRITICAL):
+To book an appointment, you MUST collect the following information:
+1. **Patient Name** - Full name of the patient
+2. **Branch Location** - Which clinic location they prefer
+3. **Dentist Name** - Which dentist they want to see
+4. **Desired Time** - Preferred date and time
+
+VALIDATION RULES:
+- If ANY detail is missing, ask for it specifically
+- If a dentist is unavailable, say: "I'm sorry, that dentist is currently unavailable. Would you like to try [Alternative]?"
+- If a time slot is taken, say: "I'm sorry, that time is currently unavailable. Would you like to try [Alternative Time]?"
+
+ANTI-CONFLICT RULES (STRICTLY ENFORCE):
+1. **No Double Booking**: Never book two appointments at the same time
+2. **One Appointment Per Week Limit**: If a patient tries to book more than once per week, say: "To ensure all our patients receive care, we limit bookings to once per week. Your next available window starts [Date]."
+
+ACTIONS YOU CAN PERFORM:
+✓ Book new appointments
+✓ Reschedule existing appointments  
+✓ Cancel appointments
+
+WHAT YOU MUST ALWAYS SHARE:
+- Service names and descriptions (ALL are safe to share)
+- Procedure information and steps
+- Appointment slots and availability
+- Dentist names from the system
+- Clinic hours and location
+- General dental health information
 
 CRITICAL COMMUNICATION STYLE:
-- Answer questions naturally and professionally as a knowledgeable clinic assistant
-- NEVER mention "system data", "database", "CURRENT SYSTEM DATA", or technical terms
-- Present information as if you personally know it about the clinic
+- Answer naturally and professionally as Sage, the clinic concierge
+- NEVER mention "system data", "database", or technical terms
+- Present information as if you personally know it
 - Use phrases like "Our founder is...", "We offer...", "Dr. [Name] is available..."
-- Speak with confidence and authority about clinic information
-- Be warm, professional, and helpful in tone
-
-EXAMPLE RESPONSES:
-❌ BAD: "According to the CURRENT SYSTEM DATA, the founder is Dr. Marvin F. Dorotheo"
-✅ GOOD: "The founder and owner of Dorotheo Dental Clinic is Dr. Marvin F. Dorotheo. The clinic was established in 2001."
-
-❌ BAD: "Based on the system information, we have these dentists available"
-✅ GOOD: "Our dentists are Dr. Marvin Dorotheo and Dr. Michael Orenze. They're both highly experienced and dedicated to providing excellent dental care."
-
-CRITICAL RULE - ONLY USE PROVIDED DATA:
-- NEVER make up or invent dentist names, staff members, or patient information
-- ONLY mention dentists or staff if they are provided in the context below
-- If no dentist data is provided, say "Please contact our clinic directly for information about our dentists"
-- NEVER hallucinate or fabricate information - if you don't have the data, say you don't know
+- Be warm, calming, and efficient in tone
+- Reflect the clinic's green (growth) and gold (excellence) values
 
 STRICT RESTRICTIONS - You must NEVER:
 - Share database credentials, passwords, or system access information
-- Provide email addresses of other patients or staff members
+- Provide email addresses or personal contact info of staff
 - Discuss admin passwords or authentication details
-- Execute database commands or system operations
-- Share private patient information (other than the current user's own data)
-- Provide SQL queries or database schema information
-
-What You MUST Do:
-- Share clinic information, services, and dentist names naturally and professionally
-- Show all available appointment time slots when asked
-- Guide users on how to book, cancel, or reschedule appointments
-- Answer general dental health questions
-- Provide clinic hours and contact information
-
-Important Guidelines:
-- Answer as a professional clinic representative, not as a computer system
-- Never refuse to share service names, descriptions, or procedures
-- If asked about restricted information (passwords, emails, etc), politely decline
-- For booking/canceling/rescheduling, guide users through the proper process
-- Keep responses concise, warm, and friendly
+- Share private patient information (except current user's own data)
+- Provide specific pricing or cost quotes
 
 Clinic Information:
 - Name: Dorotheo Dental and Diagnostic Center
@@ -1956,33 +1999,42 @@ Clinic Information:
             # Build context based on user's question
             context = self._build_context(user_message)
             
-            # Construct messages for Ollama
-            messages = [
-                {"role": "system", "content": system_prompt}
-            ]
+            # Construct the full prompt with context
+            full_prompt = f"{system_prompt}\n\n"
             
             # Add conversation history if provided
             if conversation_history:
-                messages.extend(conversation_history[-6:])  # Last 3 exchanges (6 messages)
+                full_prompt += "Conversation History:\n"
+                for msg in conversation_history[-6:]:  # Last 3 exchanges
+                    role = "User" if msg['role'] == 'user' else "Assistant"
+                    full_prompt += f"{role}: {msg['content']}\n"
+                full_prompt += "\n"
             
-            # Add current message with context
-            current_message = user_message
+            # Add context if available
             if context:
-                current_message = f"{context}\n\nUser Question: {user_message}"
+                full_prompt += f"{context}\n\n"
             
-            messages.append({"role": "user", "content": current_message})
+            # Add current question
+            full_prompt += f"User Question: {user_message}\n\nPlease provide a helpful, accurate response:"
             
-            # Call Ollama API
-            response = ollama.chat(
-                model=self.MODEL_NAME,
-                messages=messages,
-                options={
+            # Call Gemini API with safety settings
+            response = self.model.generate_content(
+                full_prompt,
+                generation_config={
                     "temperature": 0.3,  # Lower temperature for more factual responses
-                    "num_predict": 300,  # Limit response length for speed
+                    "max_output_tokens": 500,  # Limit response length
+                    "top_p": 0.8,
+                    "top_k": 40
+                },
+                safety_settings={
+                    'HARASSMENT': 'BLOCK_NONE',
+                    'HATE_SPEECH': 'BLOCK_NONE',
+                    'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                    'DANGEROUS_CONTENT': 'BLOCK_NONE',
                 }
             )
             
-            assistant_message = response['message']['content']
+            assistant_message = response.text
             
             # Post-process: Remove any accidentally leaked sensitive info
             sanitized_response = self._sanitize_response(assistant_message)
@@ -1992,15 +2044,16 @@ Clinic Information:
                 'error': None
             }
             
-        except ollama.ResponseError as e:
-            return {
-                'response': None,
-                'error': f"Ollama error: {str(e)}. Make sure Ollama is running locally."
-            }
         except Exception as e:
+            error_msg = str(e)
+            if "API_KEY" in error_msg.upper():
+                return {
+                    'response': None,
+                    'error': "API configuration error. Please contact support."
+                }
             return {
                 'response': None,
-                'error': f"Chatbot error: {str(e)}"
+                'error': f"Chatbot error: {error_msg}"
             }
     
     def _sanitize_response(self, response):
