@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { FileText, Calendar, Eye, Download, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { ClinicBadge } from "@/components/ClinicBadge"
+import { ClinicBadge } from "@/components/clinic-badge"
 
 interface ClinicLocation {
   id: number

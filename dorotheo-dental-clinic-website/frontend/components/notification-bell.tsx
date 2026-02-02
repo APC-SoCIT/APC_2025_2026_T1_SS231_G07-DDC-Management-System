@@ -31,6 +31,7 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [processingId, setProcessingId] = useState<number | null>(null)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   useEffect(() => {
     // Only fetch notifications for owner and staff users
@@ -128,10 +129,6 @@ export default function NotificationBell() {
   }
 
   const handleClearAll = async () => {
-    if (!confirm('Are you sure you want to clear all notifications? This cannot be undone.')) {
-      return
-    }
-
     try {
       const token = localStorage.getItem('token')
       if (!token) return
@@ -142,9 +139,9 @@ export default function NotificationBell() {
       // Clear local state
       setNotifications([])
       setUnreadCount(0)
+      setShowClearConfirm(false)
     } catch (error) {
       console.error('Failed to clear all notifications:', error)
-      alert('Failed to clear notifications. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -351,14 +348,33 @@ export default function NotificationBell() {
                 )}
               </div>
               {notifications.length > 0 && (
-                <button
-                  onClick={handleClearAll}
-                  disabled={loading}
-                  className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
-                >
-                  <X className="w-3 h-3" />
-                  Clear all notifications
-                </button>
+                showClearConfirm ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600">Clear all?</span>
+                    <button
+                      onClick={handleClearAll}
+                      disabled={loading}
+                      className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setShowClearConfirm(false)}
+                      className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    disabled={loading}
+                    className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear all notifications
+                  </button>
+                )
               )}
             </div>
 
