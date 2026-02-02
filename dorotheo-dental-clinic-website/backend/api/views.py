@@ -584,17 +584,110 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return missed_count
     
     def create(self, request, *args, **kwargs):
-        """Create appointment with double booking validation"""
-        # Extract date and time from request
+        """Create appointment with comprehensive booking validation"""
+        from datetime import datetime, timedelta
+        
+        # Extract data from request
         appointment_date = request.data.get('date')
         appointment_time = request.data.get('time')
+        patient_id = request.data.get('patient')
+        dentist_id = request.data.get('dentist')
+        service_id = request.data.get('service')
+        clinic_id = request.data.get('clinic')
         
-        # Check for existing appointments at the same date and time
+        # Get patient (use authenticated user if patient_id not provided)
+        if patient_id:
+            try:
+                patient = User.objects.get(id=patient_id)
+                logger.info(f"[Booking Validation] Patient from ID: {patient.id} - {patient.get_full_name()}")
+            except User.DoesNotExist:
+                return Response(
+                    {'error': 'Patient not found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            patient = request.user
+            logger.info(f"[Booking Validation] Patient from request.user: {patient.id} - {patient.get_full_name()}")
+        
+        # Validation checks
         if appointment_date and appointment_time:
             # Normalize time to HH:MM format for comparison
             time_normalized = appointment_time[:5] if len(appointment_time) > 5 else appointment_time
             
-            # Check if any confirmed/pending appointment exists at this time
+            # Convert date string to date object for comparisons
+            try:
+                appt_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Invalid date format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 1. Check for duplicate booking (same patient, same date, same time, same service)
+            duplicate_appointments = Appointment.objects.filter(
+                patient=patient,
+                date=appointment_date,
+                time__startswith=time_normalized,
+                service_id=service_id,
+                status__in=['confirmed', 'pending']
+            )
+            
+            if duplicate_appointments.exists():
+                return Response(
+                    {
+                        'error': 'Duplicate booking',
+                        'message': 'You already have an appointment for this service at this time. Please choose a different time slot.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 2. Check if patient already has appointment with same dentist on same day/time (different location)
+            if dentist_id:
+                same_dentist_appointments = Appointment.objects.filter(
+                    dentist_id=dentist_id,
+                    date=appointment_date,
+                    time__startswith=time_normalized,
+                    status__in=['confirmed', 'pending']
+                ).exclude(clinic_id=clinic_id)
+                
+                if same_dentist_appointments.exists():
+                    existing_appt = same_dentist_appointments.first()
+                    return Response(
+                        {
+                            'error': 'Dentist conflict',
+                            'message': f'This dentist already has an appointment at {existing_appt.clinic.name} at this time. Please choose a different time or dentist.'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # 3. Check for one week interval rule - patient can only book once per week
+            # Calculate week start (Monday) and end (Sunday) for the appointment date
+            week_start = appt_date - timedelta(days=appt_date.weekday())  # Monday
+            week_end = week_start + timedelta(days=6)  # Sunday
+            
+            logger.info(f"[Weekly Check] Patient: {patient.id}, Week: {week_start} to {week_end}")
+            
+            existing_weekly_appointments = Appointment.objects.filter(
+                patient=patient,
+                date__gte=week_start,
+                date__lte=week_end,
+                status__in=['confirmed', 'pending']
+            )
+            
+            logger.info(f"[Weekly Check] Found {existing_weekly_appointments.count()} existing appointments")
+            
+            if existing_weekly_appointments.exists():
+                existing_appt = existing_weekly_appointments.first()
+                logger.warning(f"[Weekly Check] BLOCKING: Existing appointment on {existing_appt.date}")
+                return Response(
+                    {
+                        'error': 'Weekly limit exceeded',
+                        'message': f'You can only book one appointment per week. You already have an appointment scheduled for {existing_appt.date}. Please wait until next week to book another appointment.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 4. Check for general time slot conflict (any appointment at same time)
             existing_appointments = Appointment.objects.filter(
                 date=appointment_date,
                 time__startswith=time_normalized,
@@ -684,19 +777,95 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         logger.info("📧 Email notifications queued in background thread")
     
     def update(self, request, *args, **kwargs):
-        """Update appointment with double booking validation"""
+        """Update appointment with comprehensive booking validation"""
+        from datetime import datetime, timedelta
+        
         instance = self.get_object()
         
         # Extract date and time from request
         appointment_date = request.data.get('date', instance.date)
         appointment_time = request.data.get('time', instance.time)
+        patient = instance.patient
+        dentist_id = request.data.get('dentist', instance.dentist_id)
+        service_id = request.data.get('service', instance.service_id)
+        clinic_id = request.data.get('clinic', instance.clinic_id)
         
         # Check for existing appointments at the same date and time
         if appointment_date and appointment_time:
             # Normalize time to HH:MM format for comparison
             time_normalized = str(appointment_time)[:5] if len(str(appointment_time)) > 5 else str(appointment_time)
             
-            # Check if any confirmed/pending appointment exists at this time (excluding current appointment)
+            # Convert date to date object if it's a string
+            if isinstance(appointment_date, str):
+                try:
+                    appt_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
+                except ValueError:
+                    return Response(
+                        {'error': 'Invalid date format'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                appt_date = appointment_date
+            
+            # 1. Check for duplicate booking (excluding current appointment)
+            duplicate_appointments = Appointment.objects.filter(
+                patient=patient,
+                date=appointment_date,
+                time__startswith=time_normalized,
+                service_id=service_id,
+                status__in=['confirmed', 'pending']
+            ).exclude(id=instance.id)
+            
+            if duplicate_appointments.exists():
+                return Response(
+                    {
+                        'error': 'Duplicate booking',
+                        'message': 'You already have an appointment for this service at this time. Please choose a different time slot.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 2. Check if dentist already has appointment at same time (different location)
+            if dentist_id:
+                same_dentist_appointments = Appointment.objects.filter(
+                    dentist_id=dentist_id,
+                    date=appointment_date,
+                    time__startswith=time_normalized,
+                    status__in=['confirmed', 'pending']
+                ).exclude(clinic_id=clinic_id).exclude(id=instance.id)
+                
+                if same_dentist_appointments.exists():
+                    existing_appt = same_dentist_appointments.first()
+                    return Response(
+                        {
+                            'error': 'Dentist conflict',
+                            'message': f'This dentist already has an appointment at {existing_appt.clinic.name} at this time. Please choose a different time or dentist.'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # 3. Check for one week interval rule (excluding current appointment)
+            week_start = appt_date - timedelta(days=appt_date.weekday())  # Monday
+            week_end = week_start + timedelta(days=6)  # Sunday
+            
+            existing_weekly_appointments = Appointment.objects.filter(
+                patient=patient,
+                date__gte=week_start,
+                date__lte=week_end,
+                status__in=['confirmed', 'pending']
+            ).exclude(id=instance.id)
+            
+            if existing_weekly_appointments.exists():
+                existing_appt = existing_weekly_appointments.first()
+                return Response(
+                    {
+                        'error': 'Weekly limit exceeded',
+                        'message': f'You can only book one appointment per week. You already have an appointment scheduled for {existing_appt.date}. Please wait until next week to book another appointment.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 4. General time slot conflict check (excluding current appointment)
             existing_appointments = Appointment.objects.filter(
                 date=appointment_date,
                 time__startswith=time_normalized,

@@ -143,7 +143,12 @@ export const api = {
       },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to create appointment")
+    if (!response.ok) {
+      const errorData = await response.json()
+      const error: any = new Error(errorData.message || "Failed to create appointment")
+      error.response = { data: errorData }
+      throw error
+    }
     return response.json()
   },
 
