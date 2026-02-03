@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Fragment, useEffect } from "react"
+import { useState, Fragment, useEffect, useRef } from "react"
 import { 
   Plus, 
   Eye, 
@@ -109,20 +109,23 @@ export default function StaffAppointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isBookingAppointment, setIsBookingAppointment] = useState(false)
   const [newAppointment, setNewAppointment] = useState({
     patient: "",
+    clinic: "",
     date: "",
     time: "",
     dentist: "",
     service: "",
     notes: "",
-    clinic: "",
   })
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [dentistAvailability, setDentistAvailability] = useState<any[]>([])
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([])
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
+  const patientDropdownRef = useRef<HTMLDivElement>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
   const [showBlockTimeSuccessModal, setShowBlockTimeSuccessModal] = useState(false)
@@ -144,7 +147,8 @@ export default function StaffAppointments() {
     created_by: number
     created_by_name: string
   }>>([])
-
+  const [sortColumn, setSortColumn] = useState<'patient' | 'treatment' | 'date' | 'time' | 'dentist' | 'status' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   // Generate time slots based on service duration from 10:00 AM to 8:00 PM
   const parseDateOnly = (dateStr?: string) => {
@@ -325,6 +329,18 @@ export default function StaffAppointments() {
     fetchAppointments()
   }, [token, selectedClinic])
 
+  // Handle clicking outside patient dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (patientDropdownRef.current && !patientDropdownRef.current.contains(event.target as Node)) {
+        setShowPatientDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   // Fetch blocked time slots
   useEffect(() => {
     const fetchBlockedTimeSlots = async () => {
@@ -430,6 +446,12 @@ export default function StaffAppointments() {
       return
     }
 
+    if (isBookingAppointment) {
+      return // Prevent double submission
+    }
+
+    setIsBookingAppointment(true)
+
     // Get the selected service duration
     const selectedService = services.find(s => s.id === Number(newAppointment.service))
     const duration = selectedService?.duration || 30
@@ -512,6 +534,8 @@ export default function StaffAppointments() {
       } else {
         alert("Failed to create appointment. Please try again.")
       }
+    } finally {
+      setIsBookingAppointment(false)
     }
   }
 
@@ -841,8 +865,66 @@ export default function StaffAppointments() {
     )
   }
 
-  const filteredAppointments = appointments
-    .filter((apt) => {
+  const handleSort = (column: 'patient' | 'treatment' | 'date' | 'time' | 'dentist' | 'status') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const getSortedAppointments = (appointmentsToSort: Appointment[]) => {
+    // If no sort column is selected, default to sorting by updated_at (most recent first)
+    if (!sortColumn) {
+      return [...appointmentsToSort].sort((a, b) => {
+        const aDate = new Date(a.updated_at || a.created_at).getTime()
+        const bDate = new Date(b.updated_at || b.created_at).getTime()
+        return bDate - aDate // Descending order (most recent first)
+      })
+    }
+
+    return [...appointmentsToSort].sort((a, b) => {
+      let aValue: string | number = ''
+      let bValue: string | number = ''
+
+      switch (sortColumn) {
+        case 'patient':
+          aValue = (a.patient_name || '').toLowerCase()
+          bValue = (b.patient_name || '').toLowerCase()
+          break
+        case 'treatment':
+          aValue = (a.service_name || '').toLowerCase()
+          bValue = (b.service_name || '').toLowerCase()
+          break
+        case 'date':
+          aValue = a.date || '0000-00-00'
+          bValue = b.date || '0000-00-00'
+          break
+        case 'time':
+          aValue = a.time || '00:00'
+          bValue = b.time || '00:00'
+          break
+        case 'dentist':
+          aValue = (a.dentist_name || '').toLowerCase()
+          bValue = (b.dentist_name || '').toLowerCase()
+          break
+        case 'status':
+          aValue = (a.status || '').toLowerCase()
+          bValue = (b.status || '').toLowerCase()
+          break
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  const filteredAppointments = getSortedAppointments(
+    appointments.filter((apt) => {
       // Filter by search query
       const matchesSearch = apt.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         apt.patient_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -860,12 +942,7 @@ export default function StaffAppointments() {
       
       return matchesSearch && matchesStatus && matchesClinic
     })
-    .sort((a, b) => {
-      // Sort by updated_at in descending order (most recent first)
-      const aDate = new Date(a.updated_at || a.created_at).getTime()
-      const bDate = new Date(b.updated_at || b.created_at).getTime()
-      return bDate - aDate
-    })
+  )
 
   if (isLoading) {
     return (
@@ -1063,13 +1140,63 @@ export default function StaffAppointments() {
           <table className="w-full">
             <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Patient</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Treatment</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Date</th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => handleSort('patient')}
+                >
+                  <div className="flex items-center gap-2">
+                    Patient
+                    {sortColumn === 'patient' && (
+                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => handleSort('treatment')}
+                >
+                  <div className="flex items-center gap-2">
+                    Treatment
+                    {sortColumn === 'treatment' && (
+                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => handleSort('date')}
+                >
+                  <div className="flex items-center gap-2">
+                    Date
+                    {sortColumn === 'date' && (
+                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Time</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Clinic</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Dentist</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Status</th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => handleSort('dentist')}
+                >
+                  <div className="flex items-center gap-2">
+                    Dentist
+                    {sortColumn === 'dentist' && (
+                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center gap-2">
+                    Status
+                    {sortColumn === 'status' && (
+                      sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
               </tr>
             </thead>
@@ -1582,62 +1709,89 @@ export default function StaffAppointments() {
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Patient <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Search patient by name or email..."
-                  value={patientSearchQuery}
-                  onChange={(e) => setPatientSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] mb-2"
-                />
-                <select
-                  value={selectedPatientId || ""}
-                  onChange={(e) => setSelectedPatientId(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
-                >
-                  <option value="">Select a patient...</option>
-                  {patients
-                    .filter((patient) => {
-                      if (!patientSearchQuery) return true
-                      const query = patientSearchQuery.toLowerCase()
-                      return (
-                        patient.first_name.toLowerCase().includes(query) ||
-                        patient.last_name.toLowerCase().includes(query) ||
-                        patient.email.toLowerCase().includes(query)
-                      )
-                    })
-                    .sort((a, b) => {
-                      // Get most recent completed appointment for each patient (across all clinics)
-                      const getLastCompletedDate = (patientId: number) => {
-                        const completedApts = allAppointments
-                          .filter(apt => apt.patient === patientId && apt.status === 'completed' && apt.completed_at)
-                          .sort((apt1, apt2) => {
-                            const date1 = new Date(apt1.completed_at!).getTime()
-                            const date2 = new Date(apt2.completed_at!).getTime()
-                            return date2 - date1 // Most recent first
-                          })
-                        return completedApts.length > 0 ? new Date(completedApts[0].completed_at!) : null
-                      }
+                <div className="relative" ref={patientDropdownRef}>
+                  <input
+                    type="text"
+                    placeholder="Search patient by name or email..."
+                    value={patientSearchQuery}
+                    onChange={(e) => {
+                      setPatientSearchQuery(e.target.value)
+                      setShowPatientDropdown(true)
+                    }}
+                    onFocus={() => setShowPatientDropdown(true)}
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    required
+                  />
+                  {showPatientDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-[var(--color-border)] rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {patients
+                        .filter((patient) => {
+                          if (!patientSearchQuery) return true
+                          const query = patientSearchQuery.toLowerCase()
+                          return (
+                            patient.first_name.toLowerCase().includes(query) ||
+                            patient.last_name.toLowerCase().includes(query) ||
+                            patient.email.toLowerCase().includes(query)
+                          )
+                        })
+                        .sort((a, b) => {
+                          // Get most recent completed appointment for each patient (across all clinics)
+                          const getLastCompletedDate = (patientId: number) => {
+                            const completedApts = allAppointments
+                              .filter(apt => apt.patient === patientId && apt.status === 'completed' && apt.completed_at)
+                              .sort((apt1, apt2) => {
+                                const date1 = new Date(apt1.completed_at!).getTime()
+                                const date2 = new Date(apt2.completed_at!).getTime()
+                                return date2 - date1 // Most recent first
+                              })
+                            return completedApts.length > 0 ? new Date(completedApts[0].completed_at!) : null
+                          }
 
-                      const aLastCompleted = getLastCompletedDate(a.id)
-                      const bLastCompleted = getLastCompletedDate(b.id)
+                          const aLastCompleted = getLastCompletedDate(a.id)
+                          const bLastCompleted = getLastCompletedDate(b.id)
 
-                      // Patients with recent completed appointments come first
-                      if (aLastCompleted && bLastCompleted) {
-                        return bLastCompleted.getTime() - aLastCompleted.getTime()
-                      }
-                      if (aLastCompleted && !bLastCompleted) return -1
-                      if (!aLastCompleted && bLastCompleted) return 1
+                          // Patients with recent completed appointments come first
+                          if (aLastCompleted && bLastCompleted) {
+                            return bLastCompleted.getTime() - aLastCompleted.getTime()
+                          }
+                          if (aLastCompleted && !bLastCompleted) return -1
+                          if (!aLastCompleted && bLastCompleted) return 1
 
-                      // If neither has completed appointments, sort alphabetically by name
-                      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
-                    })
-                    .map((patient) => (
-                      <option key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} - {patient.email}
-                      </option>
-                    ))}
-                </select>
+                          // If neither has completed appointments, sort alphabetically by name
+                          return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+                        })
+                        .map((patient) => (
+                          <div
+                            key={patient.id}
+                            onClick={() => {
+                              setSelectedPatientId(patient.id)
+                              setPatientSearchQuery(`${patient.first_name} ${patient.last_name} - ${patient.email}`)
+                              setShowPatientDropdown(false)
+                            }}
+                            className={`px-4 py-2.5 cursor-pointer hover:bg-gray-100 ${
+                              selectedPatientId === patient.id ? 'bg-blue-50' : ''
+                            }`}
+                          >
+                            <div className="font-medium">{patient.first_name} {patient.last_name}</div>
+                            <div className="text-sm text-gray-500">{patient.email}</div>
+                          </div>
+                        ))}
+                      {patients.filter((patient) => {
+                        if (!patientSearchQuery) return true
+                        const query = patientSearchQuery.toLowerCase()
+                        return (
+                          patient.first_name.toLowerCase().includes(query) ||
+                          patient.last_name.toLowerCase().includes(query) ||
+                          patient.email.toLowerCase().includes(query)
+                        )
+                      }).length === 0 && (
+                        <div className="px-4 py-2.5 text-gray-500 text-center">
+                          No patients found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {patients.length === 0 && (
                   <p className="text-sm text-amber-600 mt-1">No patients registered yet.</p>
                 )}
