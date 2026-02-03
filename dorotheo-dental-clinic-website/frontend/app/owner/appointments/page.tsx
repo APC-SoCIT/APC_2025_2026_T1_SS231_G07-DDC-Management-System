@@ -1396,7 +1396,7 @@ export default function OwnerAppointments() {
                   {/* Expanded Row */}
                   {expandedRow === apt.id && (
                     <tr>
-                      <td colSpan={7} className="bg-gradient-to-br from-gray-50 to-teal-50">
+                      <td colSpan={8} className="bg-gradient-to-br from-gray-50 to-teal-50">
                         <div className="px-6 py-6 animate-in slide-in-from-top-2 duration-300">
                           {editingRow === apt.id ? (
                             // Edit Mode
