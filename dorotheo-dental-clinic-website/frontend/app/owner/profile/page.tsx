@@ -55,7 +55,7 @@ export default function OwnerProfile() {
         phone: profile.phone,
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${user.id}/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${user.id}/`, {
         method: "PATCH",
         headers: {
           Authorization: `Token ${token}`,
@@ -295,7 +295,7 @@ export default function OwnerProfile() {
               }
 
               const promises = dates.map(date =>
-                fetch('http://127.0.0.1:8000/api/dentist-availability/', {
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
