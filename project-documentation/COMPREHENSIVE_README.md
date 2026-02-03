@@ -261,6 +261,7 @@ This project proposes a **transformative digital solution**: a comprehensive web
 - **Status Workflow**: Complete lifecycle management (pending → confirmed → completed/cancelled)
 - **Rescheduling System**: Patient-initiated reschedule requests with staff approval
 - **Cancellation Management**: Track cancellation reasons and patterns
+- **Patient Appointment History**: Dedicated pages for viewing all appointments for a specific patient (Owner & Staff portals)
 
 #### 4. Clinical Records Module
 - **Dental Records**: Comprehensive treatment history with dates and procedures

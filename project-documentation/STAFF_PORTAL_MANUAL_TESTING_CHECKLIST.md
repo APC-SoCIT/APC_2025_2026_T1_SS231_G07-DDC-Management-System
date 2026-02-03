@@ -755,6 +755,458 @@ _None yet_
 
 ---
 
+## 🧪 PHASE 2: Patient Appointments Page Testing
+
+**Implementation Date**: February 3, 2026  
+**Testing Date**: _____________  
+**Tester Name**: _____________  
+**Status**: 🔄 Pending Testing
+
+### Overview
+
+Phase 2 adds a dedicated patient appointments page to the Staff portal, matching the functionality available in the Owner portal. Staff can now view and manage all appointments for a specific patient from a dedicated page.
+
+**Implementation Summary**: [STAFF_PATIENT_APPOINTMENTS_PAGE_2026-02-03.md](./fixes-and-issues/STAFF_PATIENT_APPOINTMENTS_PAGE_2026-02-03.md)
+
+---
+
+### Task 2.1: Patient Appointments Page Navigation
+
+**Test File**: `frontend/app/staff/patients/[id]/page.tsx`, `frontend/app/staff/patients/[id]/appointments/page.tsx`  
+**Test URLs**: 
+- Patient Details: http://localhost:3000/staff/patients/[patient-id]
+- Patient Appointments: http://localhost:3000/staff/patients/[patient-id]/appointments
+
+#### Test Cases
+
+- [ ] **TC-2.1.1: Navigation from Patient Details**
+  - Navigate to any patient details page
+  - Locate the "Appointments" section
+  - Click "View all" button/link
+  - Verify redirect to `/staff/patients/[patient-id]/appointments`
+  - Verify URL contains correct patient ID
+  - Check browser console (F12) - should be 0 errors
+
+- [ ] **TC-2.1.2: Back Navigation**
+  - From patient appointments page, click "Back to [Patient Name] details" button
+  - Verify redirect back to patient details page
+  - Verify patient ID in URL remains correct
+
+- [ ] **TC-2.1.3: Direct URL Access**
+  - Copy a patient appointments URL (e.g., `/staff/patients/5/appointments`)
+  - Open in new browser tab
+  - Verify page loads correctly
+  - Verify appointments display for correct patient
+
+---
+
+### Task 2.2: Appointments Display
+
+#### Test Cases
+
+- [ ] **TC-2.2.1: Page Load and Layout**
+  - Navigate to patient appointments page
+  - Verify page title shows "All Appointments"
+  - Verify "Book Appointment" button appears in top-right
+  - Verify two sections: "Upcoming Appointments" and "Past Appointments"
+  - Verify back button shows patient name
+
+- [ ] **TC-2.2.2: Upcoming Appointments Section**
+  - Verify section header displays "Upcoming Appointments" with calendar icon
+  - Verify table headers: Treatment, Date, Time, Clinic, Dentist, Status
+  - Verify only future appointments with active statuses appear
+  - Verify appointments are displayed in chronological order
+  - If no upcoming appointments, verify "No upcoming appointments" message
+
+- [ ] **TC-2.2.3: Past Appointments Section**
+  - Verify section header displays "Past Appointments" with calendar icon
+  - Verify table headers match upcoming section
+  - Verify only past appointments appear (completed, cancelled, missed, or past dates)
+  - Verify appointments are displayed in reverse chronological order
+  - If no past appointments, verify "No past appointments" message
+
+- [ ] **TC-2.2.4: Appointment Row Display**
+  - Verify service name appears as colored badge
+  - Verify date format is correct (YYYY-MM-DD or localized)
+  - Verify time format is 12-hour with AM/PM
+  - Verify clinic badge displays with correct color
+  - Verify dentist name displays or "Not Assigned"
+  - Verify status badge has correct color coding:
+    - Confirmed: Green
+    - Pending: Yellow
+    - Cancelled: Red
+    - Completed: Blue
+    - Missed: Yellow-orange
+
+- [ ] **TC-2.2.5: Clinic Filtering**
+  - Select a specific clinic from clinic selector (if multi-clinic enabled)
+  - Verify only appointments for selected clinic are displayed
+  - Switch to "All Clinics"
+  - Verify all appointments appear regardless of clinic
+  - Verify filtering works for both upcoming and past sections
+
+---
+
+### Task 2.3: Expandable Appointment Details
+
+#### Test Cases
+
+- [ ] **TC-2.3.1: Expand Appointment**
+  - Click anywhere on an appointment row
+  - Verify row expands with smooth animation
+  - Verify chevron icon changes from down to up
+  - Verify expanded content displays below the row
+  - Verify background gradient appears (gray-50 to teal-50)
+
+- [ ] **TC-2.3.2: Collapse Appointment**
+  - Click the same appointment row again
+  - Verify row collapses with smooth animation
+  - Verify chevron icon changes from up to down
+  - Verify expanded content disappears
+
+- [ ] **TC-2.3.3: Expand Different Appointment**
+  - Expand one appointment
+  - Click a different appointment row
+  - Verify first appointment collapses
+  - Verify second appointment expands
+  - Verify only one appointment is expanded at a time
+
+- [ ] **TC-2.3.4: Appointment Details Card**
+  - Expand an appointment
+  - Verify "Appointment Details" card displays on the left
+  - Verify card shows:
+    - Service name
+    - Date with calendar icon
+    - Time with clock icon
+    - Clinic with map pin icon
+    - Dentist name
+    - Status badge
+    - Completed timestamp (if status is completed)
+
+- [ ] **TC-2.3.5: Uploaded Files Card**
+  - Expand an appointment
+  - Verify "Uploaded Files" card displays on the right
+  - Verify "Upload" button appears in card header
+  - Verify two subsections: "Documents" and "Dental Images"
+  - Verify document count displays (e.g., "Documents (3)")
+  - Verify image count displays (e.g., "Dental Images (2)")
+
+---
+
+### Task 2.4: Document Management
+
+#### Test Cases
+
+- [ ] **TC-2.4.1: Document Display**
+  - Expand an appointment with documents
+  - Verify documents appear in the "Documents" section
+  - Verify each document shows:
+    - File icon (red for PDF, blue for others)
+    - Document title
+    - Document type label
+    - Eye icon for preview
+  - Verify hover effect on document items
+
+- [ ] **TC-2.4.2: Document Preview (PDF)**
+  - Click a PDF document
+  - Verify preview modal opens
+  - Verify modal shows:
+    - Document title
+    - Document type
+    - PDF viewer with content
+    - Download button
+    - Close (X) button
+  - Verify PDF content is readable
+  - Click outside modal - verify it closes
+  - Click X button - verify modal closes
+
+- [ ] **TC-2.4.3: Document Preview (Image)**
+  - Click an image document (JPG, PNG)
+  - Verify preview modal opens
+  - Verify image displays correctly
+  - Verify download button works
+  - Test closing modal (outside click and X button)
+
+- [ ] **TC-2.4.4: Document Download**
+  - Open document preview
+  - Click download button
+  - Verify file downloads to browser's download folder
+  - Verify filename is correct
+
+- [ ] **TC-2.4.5: No Documents Display**
+  - Expand an appointment without documents
+  - Verify "No documents uploaded" message appears
+  - Verify message is clear and well-styled
+
+---
+
+### Task 2.5: Image Management
+
+#### Test Cases
+
+- [ ] **TC-2.5.1: Dental Image Display**
+  - Expand an appointment with dental images
+  - Verify images appear in "Dental Images" section
+  - Verify each image shows:
+    - Thumbnail preview (12x12 or similar)
+    - "Dental Image" label
+    - Upload date
+    - Eye icon for preview
+  - Verify hover effect changes eye icon color
+
+- [ ] **TC-2.5.2: Image Preview**
+  - Click a dental image
+  - Verify preview modal opens full-screen
+  - Verify modal shows:
+    - "Dental Image" title
+    - Image notes (if any)
+    - Full-size image
+    - Download button
+    - Close button
+  - Verify image is high quality and zoomable (if implemented)
+
+- [ ] **TC-2.5.3: Image Download**
+  - Open image preview
+  - Click download button
+  - Verify image downloads correctly
+  - Verify filename includes "dental-image" and ID
+
+- [ ] **TC-2.5.4: No Images Display**
+  - Expand an appointment without dental images
+  - Verify "No dental images uploaded" message appears
+
+---
+
+### Task 2.6: File Upload Functionality
+
+#### Test Cases
+
+- [ ] **TC-2.6.1: Open Upload Modal**
+  - Expand an appointment
+  - Click "Upload" button in Uploaded Files card
+  - Verify unified document upload modal opens
+  - Verify modal shows patient name
+  - Verify appointment is pre-selected
+  - Verify file type options (document or teeth image)
+
+- [ ] **TC-2.6.2: Upload Document**
+  - Open upload modal
+  - Select "Document" type
+  - Choose document type from dropdown
+  - Enter title and description
+  - Select a PDF file
+  - Click upload
+  - Verify success message
+  - Verify modal closes
+  - Verify document appears in appointment's documents list
+
+- [ ] **TC-2.6.3: Upload Dental Image**
+  - Open upload modal
+  - Select "Teeth Image" type
+  - Enter notes
+  - Select an image file (JPG, PNG)
+  - Click upload
+  - Verify success message
+  - Verify modal closes
+  - Verify image appears in appointment's images list
+
+- [ ] **TC-2.6.4: Upload Validation**
+  - Try uploading without selecting file
+  - Verify error message
+  - Try uploading wrong file type
+  - Verify error message
+  - Try uploading file too large (if limit exists)
+  - Verify error message
+
+- [ ] **TC-2.6.5: Cancel Upload**
+  - Open upload modal
+  - Fill in some fields
+  - Click "Cancel" or X button
+  - Verify modal closes without uploading
+  - Verify no new files appear
+
+---
+
+### Task 2.7: Book Appointment Functionality
+
+#### Test Cases
+
+- [ ] **TC-2.7.1: Open Book Appointment Modal**
+  - Click "Book Appointment" button in page header
+  - Verify modal opens
+  - Verify modal title shows "Book Appointment for [Patient Name]"
+  - Verify patient field is pre-filled and read-only
+  - Verify form has: Dentist, Service, Date, Time, Notes fields
+
+- [ ] **TC-2.7.2: Select Dentist**
+  - Open book appointment modal
+  - Click dentist dropdown
+  - Verify list of dentists appears
+  - Select a dentist
+  - Verify green checkmark message appears
+  - Verify calendar section appears on right
+
+- [ ] **TC-2.7.3: View Available Dates**
+  - After selecting dentist, view calendar
+  - Verify available dates are highlighted in green
+  - Verify past dates are disabled (grayed out)
+  - Verify dates beyond 90 days are disabled
+  - If dentist has no availability, verify warning message
+
+- [ ] **TC-2.7.4: Select Date**
+  - Click an available date on calendar
+  - Verify date is selected (visual feedback)
+  - Verify time slot dropdown appears below
+
+- [ ] **TC-2.7.5: Select Service**
+  - Select a service from dropdown
+  - Verify service is selected
+  - Note the service duration for time slot testing
+
+- [ ] **TC-2.7.6: View Time Slots**
+  - After selecting date and service
+  - View time slot dropdown
+  - Verify slots are generated based on service duration
+  - Verify past time slots are hidden (if today is selected)
+  - Verify booked slots are marked as "(Booked)" and disabled
+  - Verify available slots are enabled
+
+- [ ] **TC-2.7.7: Select Time Slot**
+  - Select an available time slot
+  - Verify green checkmark message appears
+  - Verify "Book Appointment" button becomes enabled
+
+- [ ] **TC-2.7.8: Add Notes**
+  - Enter text in "Additional Notes" field
+  - Verify text is accepted and displayed correctly
+  - Test with long text (should not break layout)
+
+- [ ] **TC-2.7.9: Submit Appointment**
+  - Fill all required fields (dentist, service, date, time)
+  - Click "Book Appointment" button
+  - Verify loading state (if implemented)
+  - Verify success modal appears
+  - Verify success modal shows:
+    - Patient name
+    - Date, time, service, dentist
+    - Confirmation message
+  - Click close or outside modal
+  - Verify success modal closes
+  - Verify appointment page refreshes
+  - Verify new appointment appears in upcoming appointments
+
+- [ ] **TC-2.7.10: Booking Validation**
+  - Try booking without selecting dentist
+  - Verify form validation prevents submission
+  - Try booking without service
+  - Verify validation error
+  - Try booking without date/time
+  - Verify validation error
+
+- [ ] **TC-2.7.11: Conflict Detection**
+  - Select a time slot that's already booked
+  - Try to submit
+  - Verify error message about time slot conflict
+  - Verify appointment is not created
+
+- [ ] **TC-2.7.12: Cancel Booking**
+  - Open book appointment modal
+  - Fill in some fields
+  - Click "Cancel" button
+  - Verify modal closes
+  - Verify no appointment is created
+  - Verify form is reset
+
+---
+
+### Task 2.8: Responsive Design
+
+#### Test Cases
+
+- [ ] **TC-2.8.1: Desktop View (1920x1080)**
+  - View patient appointments page on desktop
+  - Verify layout is not stretched or cramped
+  - Verify tables display all columns
+  - Verify modals are centered and appropriately sized
+  - Verify expanded appointment details show in 2-column grid
+
+- [ ] **TC-2.8.2: Laptop View (1366x768)**
+  - Resize browser to 1366x768
+  - Verify page remains functional
+  - Verify no horizontal scrolling
+  - Verify tables adapt appropriately
+
+- [ ] **TC-2.8.3: Tablet View (768x1024)**
+  - Test on tablet or resize browser
+  - Verify appointment cards stack vertically
+  - Verify modals are full-width or responsive
+  - Verify expanded details change to single column
+  - Verify book appointment form adapts
+
+- [ ] **TC-2.8.4: Mobile View (375x667)**
+  - Test on mobile device or resize browser
+  - Verify tables show all critical information
+  - Verify horizontal scroll works for wide content
+  - Verify buttons are touch-friendly (min 44x44px)
+  - Verify modals take full screen
+  - Verify calendar is usable on small screen
+
+---
+
+### Task 2.9: Error Handling and Edge Cases
+
+#### Test Cases
+
+- [ ] **TC-2.9.1: Patient Not Found**
+  - Navigate to invalid patient ID (e.g., `/staff/patients/999999/appointments`)
+  - Verify "Patient not found" message displays
+  - Verify "Back to Patients" button works
+
+- [ ] **TC-2.9.2: No Appointments**
+  - Navigate to patient with zero appointments
+  - Verify "No upcoming appointments" message in upcoming section
+  - Verify "No past appointments" message in past section
+  - Verify messages are clear and helpful
+
+- [ ] **TC-2.9.3: Network Error During Load**
+  - Disable network or throttle to slow 3G
+  - Navigate to patient appointments page
+  - Verify loading indicator appears
+  - Re-enable network
+  - Verify data loads after network recovery
+
+- [ ] **TC-2.9.4: Network Error During File Upload**
+  - Start uploading a file
+  - Disable network mid-upload
+  - Verify error message appears
+  - Verify user can retry
+
+- [ ] **TC-2.9.5: Network Error During Booking**
+  - Fill book appointment form
+  - Disable network
+  - Click "Book Appointment"
+  - Verify error message
+  - Re-enable network
+  - Verify user can retry without losing form data
+
+---
+
+### Issues Found During Phase 2 Testing
+
+#### Critical Issues
+_None yet_
+
+#### High Priority Issues
+_None yet_
+
+### Medium Priority Issues
+_None yet_
+
+### Low Priority Issues
+_None yet_
+
+---
+
 ## 📝 Testing Notes & Observations
 
 ### General Notes
