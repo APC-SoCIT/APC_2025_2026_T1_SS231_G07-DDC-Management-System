@@ -37,7 +37,9 @@ export default function OwnerDashboard() {
         setIsLoading(true)
         
         // Fetch patients
-        const patients = await api.getPatients(token)
+        const patientsResponse = await api.getPatients(token)
+        // Handle both array and paginated response formats
+        const patients = Array.isArray(patientsResponse) ? patientsResponse : (patientsResponse.results || [])
         setTotalPatients(patients.length)
         const active = patients.filter((p: any) => p.is_active_patient !== false).length
         setActivePatients(active)
