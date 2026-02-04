@@ -16,6 +16,7 @@ interface Appointment {
   service_name: string | null
   service_color: string | null
   status: string
+  patient_status?: 'waiting' | 'ongoing' | 'done'
 }
 
 export default function OwnerDashboard() {
@@ -67,16 +68,54 @@ export default function OwnerDashboard() {
     role: string
   }> = []
 
-  // Get appointments for today (filter out completed and missed)
+  // Get appointments for today (show all today's appointments)
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const todayAppointments = allAppointments
-    .filter(apt => 
-      apt.date === todayStr && 
-      apt.status !== 'completed' && 
-      apt.status !== 'missed'
-    )
+    .filter(apt => apt.date === todayStr)
     .sort((a, b) => a.time.localeCompare(b.time))
+
+  // Categorize appointments by patient status (default to pending if no status set)
+  const pendingAppointments = todayAppointments.filter(apt => !apt.patient_status)
+  const waitingAppointments = todayAppointments.filter(apt => apt.patient_status === 'waiting')
+  const ongoingAppointments = todayAppointments.filter(apt => apt.patient_status === 'ongoing')
+  const doneAppointments = todayAppointments.filter(apt => apt.patient_status === 'done')
+
+  // Handle patient status change (waiting, ongoing, done)
+  const handlePatientStatusChange = async (appointmentId: number, newPatientStatus: 'waiting' | 'ongoing' | 'done') => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      // Map patient_status to appointment status
+      let appointmentStatus: string
+      const updateData: any = { patient_status: newPatientStatus }
+      
+      if (newPatientStatus === 'waiting') {
+        appointmentStatus = 'waiting'
+        updateData.status = 'waiting'
+      } else if (newPatientStatus === 'ongoing') {
+        appointmentStatus = 'confirmed'
+        updateData.status = 'confirmed'
+      } else if (newPatientStatus === 'done') {
+        appointmentStatus = 'completed'
+        updateData.status = 'completed'
+        updateData.completed_at = new Date().toISOString()
+      }
+
+      // Update backend
+      await api.updateAppointment(appointmentId, updateData, token)
+
+      // Update local state
+      setAllAppointments(prevAppointments => 
+        prevAppointments.map(apt => 
+          apt.id === appointmentId ? { ...apt, patient_status: newPatientStatus, status: appointmentStatus } : apt
+        )
+      )
+    } catch (error) {
+      console.error('Error updating patient status:', error)
+    }
+  }
 
   // Get appointments for selected date
   const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
@@ -118,11 +157,27 @@ export default function OwnerDashboard() {
     return birthdays.filter(bd => bd.date === dateStr)
   }
 
+  const isPastDate = (day: number) => {
+    const today = new Date()
+    const compareDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    return compareDate < todayDate
+  }
+
   const isToday = (day: number) => {
     const today = new Date()
     return day === today.getDate() && 
            currentMonth.getMonth() === today.getMonth() && 
            currentMonth.getFullYear() === today.getFullYear()
+  }
+
+  // Format time from HH:MM:SS or HH:MM to 12-hour format (e.g., "9:00 AM")
+  const formatTime = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
   }
 
   const isSelectedDay = (day: number) => {
@@ -196,7 +251,7 @@ export default function OwnerDashboard() {
 
       {/* Today's Appointments Section */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-[var(--color-primary)]">Today's Appointments</h2>
           <Link href="/owner/appointments" className="text-sm text-[var(--color-primary)] hover:underline">
             View All
@@ -205,43 +260,126 @@ export default function OwnerDashboard() {
         {isLoading ? (
           <p className="text-center py-8 text-[var(--color-text-muted)]">Loading appointments...</p>
         ) : todayAppointments.length > 0 ? (
-          <div className="space-y-3">
-            {todayAppointments.map((apt) => (
-              <div
-                key={apt.id}
-                className="flex items-center justify-between p-4 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors"
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="text-center min-w-[60px]">
-                    <p className="text-lg font-bold text-[var(--color-primary)]">{apt.time}</p>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-[var(--color-text)]">{apt.patient_name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className="px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: apt.service_color || '#6B7280' }}
-                      >
-                        {apt.service_name || "Consultation"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <span
-                  className={`px-3 py-1 rounded-md text-xs font-semibold border-2 ${
-                    apt.status === "confirmed"
-                      ? "border-green-600 text-green-700 bg-green-50"
-                      : apt.status === "pending"
-                      ? "border-yellow-600 text-yellow-700 bg-yellow-50"
-                      : apt.status === "completed"
-                      ? "border-blue-600 text-blue-700 bg-blue-50"
-                      : "border-gray-600 text-gray-700 bg-gray-50"
-                  }`}
-                >
-                  {apt.status}
-                </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Pending Column */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Pending ({pendingAppointments.length})</h3>
               </div>
-            ))}
+              <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+                {pendingAppointments.length > 0 ? (
+                  pendingAppointments.map((apt) => (
+                    <div key={apt.id} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                          {apt.service_name || "Consultation"}
+                        </span>
+                        <div className="flex flex-col gap-1 pt-2">
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'waiting')} className="px-3 py-1 rounded text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors max-w-[120px]">Waiting</button>
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic py-4 px-4">No pending</p>
+                )}
+              </div>
+            </div>
+
+            {/* Waiting Column */}
+            <div className="border border-yellow-200 rounded-lg overflow-hidden bg-yellow-50">
+              <div className="bg-yellow-100 px-4 py-3 border-b border-yellow-200">
+                <h3 className="text-sm font-semibold text-yellow-700 uppercase tracking-wide">Waiting ({waitingAppointments.length})</h3>
+              </div>
+              <div className="divide-y divide-yellow-200 max-h-[600px] overflow-y-auto">
+                {waitingAppointments.length > 0 ? (
+                  waitingAppointments.map((apt) => (
+                    <div key={apt.id} className="p-4 bg-white hover:bg-yellow-50 transition-colors">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                          {apt.service_name || "Consultation"}
+                        </span>
+                        <div className="flex flex-col gap-1 pt-2">
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic py-4 px-4 bg-white">No waiting</p>
+                )}
+              </div>
+            </div>
+
+            {/* Ongoing Column */}
+            <div className="border border-blue-200 rounded-lg overflow-hidden bg-blue-50">
+              <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Ongoing ({ongoingAppointments.length})</h3>
+              </div>
+              <div className="divide-y divide-blue-200 max-h-[600px] overflow-y-auto">
+                {ongoingAppointments.length > 0 ? (
+                  ongoingAppointments.map((apt) => (
+                    <div key={apt.id} className="p-4 bg-white hover:bg-blue-50 transition-colors">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                          {apt.service_name || "Consultation"}
+                        </span>
+                        <div className="flex flex-col gap-1 pt-2">
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic py-4 px-4 bg-white">No ongoing</p>
+                )}
+              </div>
+            </div>
+
+            {/* Done Column */}
+            <div className="border border-green-200 rounded-lg overflow-hidden bg-green-50">
+              <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                <h3 className="text-sm font-semibold text-green-700 uppercase tracking-wide">Done ({doneAppointments.length})</h3>
+              </div>
+              <div className="divide-y divide-green-200 max-h-[600px] overflow-y-auto">
+                {doneAppointments.length > 0 ? (
+                  doneAppointments.map((apt) => (
+                    <div key={apt.id} className="p-4 bg-white hover:bg-green-50 transition-colors">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                          {apt.service_name || "Consultation"}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic py-4 px-4 bg-white">No completed</p>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <p className="text-center py-8 text-[var(--color-text-muted)]">No appointments scheduled for today</p>
@@ -289,9 +427,10 @@ export default function OwnerDashboard() {
               
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const day = i + 1
-                const hasApt = hasAppointment(day)
-                const hasBd = hasBirthday(day)
-                const birthdayList = getBirthdaysForDate(day)
+                const isPast = isPastDate(day)
+                const hasApt = !isPast && hasAppointment(day)
+                const hasBd = !isPast && hasBirthday(day)
+                const birthdayList = !isPast ? getBirthdaysForDate(day) : []
                 
                 return (
                   <button
@@ -302,11 +441,14 @@ export default function OwnerDashboard() {
                         ? "bg-[#0f766e] text-white shadow-lg"
                         : isToday(day)
                         ? "bg-blue-100 text-blue-700 ring-2 ring-blue-500"
+                        : isPast
+                        ? "text-gray-400 cursor-default"
                         : hasApt || hasBd
                         ? "bg-green-50 text-[var(--color-text)] hover:bg-green-100"
                         : "text-[var(--color-text)] hover:bg-[var(--color-background)]"
                     }`}
                     title={birthdayList.length > 0 ? `Birthday: ${birthdayList.map(b => b.name).join(', ')}` : ''}
+                    disabled={isPast}
                   >
                     {day}
                     <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
@@ -374,7 +516,7 @@ export default function OwnerDashboard() {
                       </div>
                       <div>
                         <p className="text-xs text-[var(--color-text-muted)] mb-1">Time</p>
-                        <p className="font-medium text-[var(--color-primary)]">{apt.time}</p>
+                        <p className="font-medium text-[var(--color-primary)]">{formatTime(apt.time)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-[var(--color-text-muted)] mb-1">Treatment</p>

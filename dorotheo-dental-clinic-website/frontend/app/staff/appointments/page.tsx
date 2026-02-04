@@ -49,6 +49,7 @@ interface Appointment {
   date: string
   time: string
   status: "confirmed" | "pending" | "waiting" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested"
+  patient_status?: 'waiting' | 'ongoing' | 'done'
   notes: string
   reschedule_date: string | null
   reschedule_time: string | null
@@ -315,7 +316,7 @@ export default function StaffAppointments() {
           setAppointments(allResponse)
         } else {
           const clinicId = selectedClinic?.id
-          const filtered = allResponse.filter(apt => 
+          const filtered = allResponse.filter((apt: Appointment) => 
             apt.clinic === clinicId || apt.clinic_data?.id === clinicId
           )
           setAppointments(filtered)
@@ -1315,34 +1316,18 @@ export default function StaffAppointments() {
                             <span>Wait</span>
                           </button>
                         )}
-                        {/* Mark as Pending Button - Only for appointments that aren't already pending or done */}
-                        {apt.status !== "pending" && apt.status !== "completed" && apt.status !== "missed" && apt.status !== "cancelled" && (
+                        {/* Mark as Ongoing Button - Only for appointments in waiting status */}
+                        {apt.status === "waiting" && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleStatusChange(apt.id, "pending")
+                              handleStatusChange(apt.id, "confirmed")
                             }}
-                            className="flex items-center gap-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded transition-colors font-medium text-xs"
-                            title="Mark as Pending"
+                            className="flex items-center gap-1 px-2 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded transition-colors font-medium text-xs"
+                            title="Mark as Ongoing"
                           >
                             <Hourglass className="w-3 h-3" />
-                            <span>Pend</span>
-                          </button>
-                        )}
-                        {/* Complete Button - For pending appointments */}
-                        {apt.status === "pending" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleApprove(apt.id)
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded transition-colors font-medium text-xs"
-                            title="Complete Appointment"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>Done</span>
+                            <span>Ongoing</span>
                           </button>
                         )}
                         {/* Complete Button - Only for confirmed appointments */}
