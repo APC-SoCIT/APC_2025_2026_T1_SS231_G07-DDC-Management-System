@@ -177,5 +177,8 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 )
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
+# Frontend URL for password reset links and other frontend redirects
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
 # Email timeout (seconds)
 EMAIL_TIMEOUT = 10
