@@ -154,48 +154,112 @@ This project is brought to you by the talented members of TechTalk.
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.8 or higher
-- Node.js 18 or higher
+- Python 3.11 or higher
+- Node.js 18 or higher  
+- pnpm (recommended) or npm
 - Git
 
-### Backend Setup (Local Windows)
+---
+
+### 🎯 Quick Start - Backend (RECOMMENDED)
+
+#### Windows PowerShell (Recommended)
+```powershell
+cd dorotheo-dental-clinic-website\backend
+.\setup.ps1
+```
+
+#### Windows Command Prompt
+```cmd
+cd dorotheo-dental-clinic-website\backend
+setup.bat
+```
+
+#### Linux/Mac/Git Bash
+```bash
+cd dorotheo-dental-clinic-website/backend
+chmod +x setup.sh
+./setup.sh
+```
+
+**That's it!** The script will:
+- ✅ Create virtual environment
+- ✅ Install all dependencies  
+- ✅ Set up database
+- ✅ Create 3 clinic locations (Bacoor 🟢, Alabang 🔵, Poblacion 🟣)
+- ✅ Create default user accounts
+- ✅ Display login credentials
+
+**Total time: ~2-3 minutes**
+
+📖 **For detailed instructions**, see [backend/README.md](dorotheo-dental-clinic-website/backend/README.md)
+
+---
+
+### 🔧 Backend Manual Setup (If Scripts Don't Work)
+
+<details>
+<summary>Click to expand manual setup instructions</summary>
 
 1. **Navigate to the backend directory:**
    ```powershell
-   cd "dorotheo-dental-clinic-website\backend"
-   ```
-   ```
-
-2. **Activate the virtual environment:**
-   ```powershell
-   & "venv\Scripts\Activate.ps1"
+   cd dorotheo-dental-clinic-website\backend
    ```
 
-3. **Install dependencies (first time only):**
+2. **Create virtual environment:**
    ```powershell
+   python -m venv venv
+   ```
+
+3. **Activate the virtual environment:**
+   ```powershell
+   # Windows PowerShell
+   .\venv\Scripts\Activate.ps1
+   
+   # Windows CMD
+   venv\Scripts\activate.bat
+   
+   # Linux/Mac/Git Bash
+   source venv/bin/activate
+   ```
+
+4. **Install dependencies:**
+   ```powershell
+   pip install --upgrade pip
    pip install -r requirements.txt
    ```
-   *Note: If `psycopg2-binary` fails to install (common on Windows), install core packages manually:*
-   ```powershell
-   pip install Django==4.2.7 djangorestframework==3.14.0 django-cors-headers==4.3.1 Pillow gunicorn whitenoise dj-database-url python-dotenv
-   ```
 
-4. **Run database migrations (first time or after model changes):**
+5. **Run database migrations:**
    ```powershell
    python manage.py migrate
    ```
 
-5. **Start the development server:**
+6. **Create clinic locations:**
+   ```powershell
+   python manage.py create_clinics
+   ```
+
+7. **Create initial accounts:**
+   ```powershell
+   python create_initial_accounts.py
+   ```
+
+8. **Start the development server:**
    ```powershell
    python manage.py runserver
    ```
 
+</details>
+
 The backend will be accessible at `http://127.0.0.1:8000/`.
 
-**Notes:**
-- Dependencies only need installation once per environment.
-- The project uses SQLite for local development (no PostgreSQL required).
-- For production, configure `DATABASE_URL` in `.env` for PostgreSQL.
+**Default Login Credentials:**
+- Owner: `owner@admin.dorotheo.com` / `owner123`
+- Receptionist: `receptionist@gmail.com` / `Receptionist2546!`
+- Dentist: `dentist@gmail.com` / `Dentist2546!`
+- Patient: `airoravinera@gmail.com` / `Airo2546!`
+
+---
 
 ### Frontend Setup (Local Development)
 
