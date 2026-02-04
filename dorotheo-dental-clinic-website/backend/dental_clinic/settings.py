@@ -153,13 +153,16 @@ else:
 
 # Email Backend Selection
 # For development: Use console or Mailtrap
-# For production: Use SMTP (Gmail, SendGrid, AWS SES, etc.)
+# For production: Use Resend API (HTTPS - works on Railway)
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
     'django.core.mail.backends.console.EmailBackend'  # Prints emails to console
 )
 
-# SMTP Configuration (for production)
+# Resend API Configuration (for Railway - bypasses blocked SMTP)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+
+# SMTP Configuration (for platforms that allow SMTP)
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
@@ -170,7 +173,7 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 # Default sender email
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
-    'Dorotheo Dental Clinic <noreply@dorothedentallossc.com.ph>'
+    'Dorotheo Dental Clinic <onboarding@resend.dev>'
 )
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
