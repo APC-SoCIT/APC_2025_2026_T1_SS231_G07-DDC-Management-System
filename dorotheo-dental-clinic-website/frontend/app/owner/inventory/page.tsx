@@ -1,11 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, AlertTriangle } from "lucide-react"
+import { Plus, AlertTriangle, Edit2, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 
 export default function OwnerInventory() {
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<any>(null)
   const [inventory, setInventory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
@@ -84,6 +87,80 @@ export default function OwnerInventory() {
     }
   }
 
+  const handleEdit = (item: any) => {
+    setSelectedItem(item)
+    setFormData({
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity.toString(),
+      min_stock: item.min_stock.toString(),
+      supplier: item.supplier,
+      cost: item.cost.toString(),
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const token = localStorage.getItem("token")
+      if (!token || !selectedItem) return
+
+      const itemData = {
+        name: formData.name,
+        category: formData.category,
+        quantity: parseInt(formData.quantity),
+        min_stock: parseInt(formData.min_stock),
+        supplier: formData.supplier,
+        cost: parseFloat(formData.cost),
+      }
+
+      await api.updateInventoryItem(selectedItem.id, itemData, token)
+      
+      setFormData({
+        name: "",
+        category: "",
+        quantity: "",
+        min_stock: "",
+        supplier: "",
+        cost: "",
+      })
+      
+      setShowEditModal(false)
+      setSelectedItem(null)
+      await fetchInventory()
+      
+      alert("Inventory item updated successfully!")
+    } catch (error: any) {
+      console.error("Failed to update inventory item:", error)
+      alert(error.message || "Failed to update inventory item")
+    }
+  }
+
+  const handleDeleteClick = (item: any) => {
+    setSelectedItem(item)
+    setShowDeleteModal(true)
+  }
+
+  const handleDelete = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token || !selectedItem) return
+
+      await api.deleteInventoryItem(selectedItem.id, token)
+      
+      setShowDeleteModal(false)
+      setSelectedItem(null)
+      await fetchInventory()
+      
+      alert("Inventory item deleted successfully!")
+    } catch (error: any) {
+      console.error("Failed to delete inventory item:", error)
+      alert(error.message || "Failed to delete inventory item")
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -134,18 +211,19 @@ export default function OwnerInventory() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Supplier</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Cost (PHP)</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Last Updated</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <p className="text-lg font-medium text-[var(--color-text)]">Loading inventory...</p>
                   </td>
                 </tr>
               ) : inventory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <p className="text-lg font-medium text-[var(--color-text)] mb-2">No Inventory Items</p>
                     <p className="text-sm text-[var(--color-text-muted)]">Click "Add Item" to start managing your inventory</p>
                   </td>
@@ -170,6 +248,24 @@ export default function OwnerInventory() {
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.supplier}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">₱{item.cost.toLocaleString()}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatDate(item.updated_at)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit item"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(item)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -282,6 +378,171 @@ export default function OwnerInventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
+            <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
+              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Edit Inventory Item</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setSelectedItem(null)
+                  setFormData({
+                    name: "",
+                    category: "",
+                    quantity: "",
+                    min_stock: "",
+                    supplier: "",
+                    cost: "",
+                  })
+                }}
+                className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Item Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Category</label>
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Quantity</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Min Stock</label>
+                  <input
+                    type="number"
+                    name="min_stock"
+                    value={formData.min_stock}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Supplier</label>
+                  <input
+                    type="text"
+                    name="supplier"
+                    value={formData.supplier}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Cost (PHP)</label>
+                  <input
+                    type="number"
+                    name="cost"
+                    value={formData.cost}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    step="0.01"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setSelectedItem(null)
+                    setFormData({
+                      name: "",
+                      category: "",
+                      quantity: "",
+                      min_stock: "",
+                      supplier: "",
+                      cost: "",
+                    })
+                  }}
+                  className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
+                >
+                  Update Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="border-b border-[var(--color-border)] px-6 py-4">
+              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Confirm Delete</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-[var(--color-text)] mb-4">
+                Are you sure you want to delete <strong>{selectedItem.name}</strong>? This action cannot be undone.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setSelectedItem(null)
+                  }}
+                  className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

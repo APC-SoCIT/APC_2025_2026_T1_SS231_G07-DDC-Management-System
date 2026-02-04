@@ -249,12 +249,19 @@ export default function NotificationBell() {
         return 'Cancellation Approved'
       case 'cancel_rejected':
         return 'Cancellation Rejected'
+      case 'inventory_alert':
+        return 'Low Stock Alert'
       default:
         return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
     }
   }
 
   const getNotificationColor = (type: string) => {
+    // Inventory alerts - orange/amber color for both staff and patients
+    if (type === 'inventory_alert') {
+      return 'bg-amber-100 text-amber-800'
+    }
+    
     // For patients - use new color scheme
     if (user?.user_type === 'patient') {
       // Green for confirmed/approved actions

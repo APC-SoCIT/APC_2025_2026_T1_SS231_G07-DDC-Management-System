@@ -1,12 +1,170 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, AlertTriangle } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Plus, AlertTriangle, Edit2, Trash2 } from "lucide-react"
+import { api } from "@/lib/api"
 
 export default function StaffInventory() {
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [inventory, setInventory] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [formData, setFormData] = useState({
+    name: "",
+    category: "",
+    quantity: "",
+    min_stock: "",
+    supplier: "",
+    cost: "",
+  })
 
-  const inventory: any[] = []  // Empty - will be populated from API
+  // Fetch inventory items on component mount
+  useEffect(() => {
+    fetchInventory()
+  }, [])
+
+  const fetchInventory = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) return
+      
+      const data = await api.getInventory(token)
+      setInventory(data)
+    } catch (error) {
+      console.error("Failed to fetch inventory:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        alert("Please login to add inventory items")
+        return
+      }
+
+      const itemData = {
+        name: formData.name,
+        category: formData.category,
+        quantity: parseInt(formData.quantity),
+        min_stock: parseInt(formData.min_stock),
+        supplier: formData.supplier,
+        cost: parseFloat(formData.cost),
+      }
+
+      await api.createInventoryItem(itemData, token)
+      
+      setFormData({
+        name: "",
+        category: "",
+        quantity: "",
+        min_stock: "",
+        supplier: "",
+        cost: "",
+      })
+      
+      setShowAddModal(false)
+      await fetchInventory()
+      
+      alert("Inventory item added successfully!")
+    } catch (error: any) {
+      console.error("Failed to add inventory item:", error)
+      alert(error.message || "Failed to add inventory item")
+    }
+  }
+
+  const handleEdit = (item: any) => {
+    setSelectedItem(item)
+    setFormData({
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity.toString(),
+      min_stock: item.min_stock.toString(),
+      supplier: item.supplier,
+      cost: item.cost.toString(),
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const token = localStorage.getItem("token")
+      if (!token || !selectedItem) return
+
+      const itemData = {
+        name: formData.name,
+        category: formData.category,
+        quantity: parseInt(formData.quantity),
+        min_stock: parseInt(formData.min_stock),
+        supplier: formData.supplier,
+        cost: parseFloat(formData.cost),
+      }
+
+      await api.updateInventoryItem(selectedItem.id, itemData, token)
+      
+      setFormData({
+        name: "",
+        category: "",
+        quantity: "",
+        min_stock: "",
+        supplier: "",
+        cost: "",
+      })
+      
+      setShowEditModal(false)
+      setSelectedItem(null)
+      await fetchInventory()
+      
+      alert("Inventory item updated successfully!")
+    } catch (error: any) {
+      console.error("Failed to update inventory item:", error)
+      alert(error.message || "Failed to update inventory item")
+    }
+  }
+
+  const handleDeleteClick = (item: any) => {
+    setSelectedItem(item)
+    setShowDeleteModal(true)
+  }
+
+  const handleDelete = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token || !selectedItem) return
+
+      await api.deleteInventoryItem(selectedItem.id, token)
+      
+      setShowDeleteModal(false)
+      setSelectedItem(null)
+      await fetchInventory()
+      
+      alert("Inventory item deleted successfully!")
+    } catch (error: any) {
+      console.error("Failed to delete inventory item:", error)
+      alert(error.message || "Failed to delete inventory item")
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -24,9 +182,22 @@ export default function StaffInventory() {
         </button>
       </div>
 
+      {/* Low Stock Alert */}
+      {inventory.length > 0 && inventory.some((item: any) => item.quantity <= item.min_stock) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-900">Low Stock Alert</p>
+            <p className="text-sm text-amber-700">
+              {inventory.filter((item: any) => item.quantity <= item.min_stock).length} item(s) below minimum stock level
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Inventory Table */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        {inventory.length === 0 ? (
+        {inventory.length === 0 && !loading ? (
           <div className="text-center py-12">
             <p className="text-[var(--color-text-muted)]">No inventory items yet. Add your first item to get started!</p>
           </div>
@@ -42,30 +213,57 @@ export default function StaffInventory() {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Supplier</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Cost (PHP)</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Last Updated</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">
-                {inventory.map((item) => (
-                  <tr key={item.id} className="hover:bg-[var(--color-background)] transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-[var(--color-text)]">{item.name}</p>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center">
+                      <p className="text-lg font-medium text-[var(--color-text)]">Loading inventory...</p>
                     </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.category}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={
-                          item.quantity <= item.minStock ? "text-red-600 font-medium" : "text-[var(--color-text-muted)]"
-                        }
-                      >
-                        {item.quantity}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.minStock}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.supplier}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.cost.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.lastUpdated}</td>
                   </tr>
-                ))}
+                ) : (
+                  inventory.map((item) => (
+                    <tr key={item.id} className="hover:bg-[var(--color-background)] transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-[var(--color-text)]">{item.name}</p>
+                      </td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.category}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={
+                            item.quantity <= item.min_stock ? "text-red-600 font-medium" : "text-[var(--color-text-muted)]"
+                          }
+                        >
+                          {item.quantity}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.min_stock}</td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.supplier}</td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">₱{item.cost.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatDate(item.updated_at)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit item"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(item)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -86,12 +284,16 @@ export default function StaffInventory() {
               </button>
             </div>
 
-            <form className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Item Name</label>
                   <input
                     type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                 </div>
@@ -99,6 +301,10 @@ export default function StaffInventory() {
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Category</label>
                   <input
                     type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                 </div>
@@ -106,6 +312,11 @@ export default function StaffInventory() {
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Quantity</label>
                   <input
                     type="number"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                 </div>
@@ -113,6 +324,11 @@ export default function StaffInventory() {
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Min Stock</label>
                   <input
                     type="number"
+                    name="min_stock"
+                    value={formData.min_stock}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                 </div>
@@ -120,6 +336,10 @@ export default function StaffInventory() {
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Supplier</label>
                   <input
                     type="text"
+                    name="supplier"
+                    value={formData.supplier}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                 </div>
@@ -127,6 +347,12 @@ export default function StaffInventory() {
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Cost (PHP)</label>
                   <input
                     type="number"
+                    name="cost"
+                    value={formData.cost}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    step="0.01"
                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                 </div>
@@ -148,6 +374,171 @@ export default function StaffInventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
+            <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
+              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Edit Inventory Item</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setSelectedItem(null)
+                  setFormData({
+                    name: "",
+                    category: "",
+                    quantity: "",
+                    min_stock: "",
+                    supplier: "",
+                    cost: "",
+                  })
+                }}
+                className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Item Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Category</label>
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Quantity</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Min Stock</label>
+                  <input
+                    type="number"
+                    name="min_stock"
+                    value={formData.min_stock}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Supplier</label>
+                  <input
+                    type="text"
+                    name="supplier"
+                    value={formData.supplier}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Cost (PHP)</label>
+                  <input
+                    type="number"
+                    name="cost"
+                    value={formData.cost}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    step="0.01"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setSelectedItem(null)
+                    setFormData({
+                      name: "",
+                      category: "",
+                      quantity: "",
+                      min_stock: "",
+                      supplier: "",
+                      cost: "",
+                    })
+                  }}
+                  className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
+                >
+                  Update Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="border-b border-[var(--color-border)] px-6 py-4">
+              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Confirm Delete</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-[var(--color-text)] mb-4">
+                Are you sure you want to delete <strong>{selectedItem.name}</strong>? This action cannot be undone.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setSelectedItem(null)
+                  }}
+                  className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
