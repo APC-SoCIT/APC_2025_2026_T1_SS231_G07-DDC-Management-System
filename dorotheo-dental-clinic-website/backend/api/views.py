@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 from .email_service import (
     send_appointment_confirmation,
     send_appointment_cancelled,
-    notify_staff_new_appointment
+    notify_staff_new_appointment,
+    send_password_reset_email,
+    send_password_reset_confirmation
 )
 
 from .models import (
@@ -206,21 +208,10 @@ def request_password_reset(request):
         logger.info("[Password Reset] Token generated: %s", token)
         logger.info("[Password Reset] Reset link: %s", reset_link)
 
-        # Send reset email (uses console backend locally by default)
+        # Send styled reset email
         logger.info("[Password Reset] Attempting to send email to %s...", email)
         try:
-            send_mail(
-                subject='Dorotheo Dental Clinic - Password Reset',
-                message=(
-                    "You requested a password reset for your Dorotheo Dental Clinic account.\n\n"
-                    f"Reset link: {reset_link}\n"
-                    f"Token: {token}\n\n"
-                    "This link expires in 1 hour. If you did not request this, you can ignore this email."
-                ),
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@dorotheodental.local'),
-                recipient_list=[email],
-                fail_silently=False,  # Show errors for debugging
-            )
+            send_password_reset_email(user, reset_link, token, expires_in_hours=1)
             logger.info("[Password Reset] Email sent successfully!")
         except Exception as e:
             logger.error("[Password Reset] Email error: %s", str(e))
@@ -276,6 +267,13 @@ def reset_password(request):
         # Mark token as used
         reset_token.is_used = True
         reset_token.save()
+        
+        # Send confirmation email
+        try:
+            send_password_reset_confirmation(user)
+            logger.info("[Password Reset] Confirmation email sent to %s", user.email)
+        except Exception as e:
+            logger.error("[Password Reset] Failed to send confirmation email: %s", str(e))
         
         return Response({'message': 'Password reset successfully'})
     
