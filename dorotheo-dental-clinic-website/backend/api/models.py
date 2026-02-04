@@ -111,6 +111,12 @@ class Appointment(models.Model):
         ('reschedule_requested', 'Reschedule Requested'),
         ('cancel_requested', 'Cancel Requested'),
     )
+    PATIENT_STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('waiting', 'Waiting'),
+        ('ongoing', 'Ongoing'),
+        ('done', 'Done'),
+    )
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments')
     dentist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dentist_appointments')
     service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True)
@@ -118,6 +124,7 @@ class Appointment(models.Model):
     date = models.DateField()
     time = models.TimeField()
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='confirmed')
+    patient_status = models.CharField(max_length=20, choices=PATIENT_STATUS_CHOICES, default='pending', help_text="Patient's current status in clinic workflow")
     notes = models.TextField(blank=True)
     
     # Reschedule request fields
