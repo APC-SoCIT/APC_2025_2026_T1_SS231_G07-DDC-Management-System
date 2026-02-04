@@ -53,10 +53,18 @@ class ResendEmailBackend(BaseEmailBackend):
             if not from_email:
                 from_email = settings.DEFAULT_FROM_EMAIL
 
+            # Override recipients for testing (if TEST_EMAIL_OVERRIDE is set)
+            test_override = os.environ.get('TEST_EMAIL_OVERRIDE', '')
+            recipients = [test_override] if test_override else message.to
+            
+            # Log original recipients if overriding
+            if test_override and message.to != [test_override]:
+                logger.info(f"[TEST MODE] Redirecting email from {message.to} to {test_override}")
+
             # Prepare email data for Resend
             email_data = {
                 "from": from_email,
-                "to": message.to,
+                "to": recipients,
                 "subject": message.subject,
             }
 
