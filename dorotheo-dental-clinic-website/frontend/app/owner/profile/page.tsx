@@ -228,7 +228,7 @@ export default function OwnerProfile() {
             if (data.mode === 'specific') {
               // Save specific dates
               const promises = data.dates!.map(date =>
-                fetch('http://127.0.0.1:8000/api/dentist-availability/', {
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
