@@ -1292,6 +1292,51 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
 
+    def create_low_stock_notification(self, inventory_item):
+        """Create notification for low stock inventory item"""
+        print(f"[INVENTORY] Creating low stock notification for {inventory_item.name}")
+        # Get all staff and owner users
+        recipients = User.objects.filter(Q(user_type='staff') | Q(user_type='owner'))
+        print(f"[INVENTORY] Found {recipients.count()} recipients (staff/owner)")
+        
+        # Create notification message
+        message = f"Low Stock Alert: {inventory_item.name} (Category: {inventory_item.category}) has only {inventory_item.quantity} units left."
+        
+        # Create notification for each recipient
+        for recipient in recipients:
+            notification = AppointmentNotification.objects.create(
+                recipient=recipient,
+                appointment=None,  # No appointment associated
+                notification_type='inventory_alert',
+                message=message
+            )
+            print(f"[INVENTORY] Created notification {notification.id} for {recipient.email}")
+    
+    def perform_create(self, serializer):
+        """Check for low stock after creating inventory item"""
+        item = serializer.save()
+        print(f"[INVENTORY] Created item: {item.name}, Qty: {item.quantity}, Min: {item.min_stock}, Is Low: {item.is_low_stock}")
+        
+        # Check if item is low stock immediately after creation
+        if item.is_low_stock:
+            self.create_low_stock_notification(item)
+    
+    def perform_update(self, serializer):
+        """Check for low stock after updating inventory item"""
+        old_item = self.get_object()
+        was_low_stock = old_item.is_low_stock
+        
+        item = serializer.save()
+        print(f"[INVENTORY] Updated item: {item.name}, Was Low: {was_low_stock}, Is Low: {item.is_low_stock}")
+        print(f"[INVENTORY] Qty: {item.quantity}, Min: {item.min_stock}")
+        
+        # Only create notification if item just became low stock (not already low)
+        if item.is_low_stock and not was_low_stock:
+            print(f"[INVENTORY] Item just became low stock, creating notification")
+            self.create_low_stock_notification(item)
+        else:
+            print(f"[INVENTORY] No notification needed (was_low: {was_low_stock}, is_low: {item.is_low_stock})")
+
     @action(detail=False, methods=['get'])
     def low_stock(self, request):
         low_stock_items = [item for item in InventoryItem.objects.all() if item.is_low_stock]

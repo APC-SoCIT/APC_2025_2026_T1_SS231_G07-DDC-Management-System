@@ -436,7 +436,7 @@ class BlockedTimeSlot(models.Model):
 
 
 class AppointmentNotification(models.Model):
-    """Notifications for staff and owner about appointment activities"""
+    """Notifications for staff and owner about appointment activities and inventory alerts"""
     NOTIFICATION_TYPES = (
         ('new_appointment', 'New Appointment'),
         ('reschedule_request', 'Reschedule Request'),
@@ -447,6 +447,7 @@ class AppointmentNotification(models.Model):
         ('reschedule_rejected', 'Reschedule Rejected'),
         ('cancel_approved', 'Cancellation Approved'),
         ('cancel_rejected', 'Cancellation Rejected'),
+        ('inventory_alert', 'Inventory Low Stock Alert'),
     )
     
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointment_notifications')
