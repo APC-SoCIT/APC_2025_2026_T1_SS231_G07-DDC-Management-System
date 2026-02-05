@@ -189,8 +189,8 @@ export default function PatientProfile() {
                 type="date"
                 value={profile.birthday}
                 onChange={(e) => setProfile({ ...profile, birthday: e.target.value })}
-                disabled={!isEditing}
-                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+                disabled={true}
+                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50 disabled:cursor-not-allowed"
               />
             </div>
 

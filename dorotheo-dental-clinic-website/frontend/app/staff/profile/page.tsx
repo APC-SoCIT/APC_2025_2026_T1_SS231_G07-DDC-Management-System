@@ -107,8 +107,8 @@ export default function StaffProfile() {
               type="text"
               value={profile.firstName}
               onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
-              disabled={!isEditing}
-              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+              disabled={true}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -118,8 +118,8 @@ export default function StaffProfile() {
               type="text"
               value={profile.lastName}
               onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
-              disabled={!isEditing}
-              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+              disabled={true}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50 disabled:cursor-not-allowed"
             />
           </div>
 
