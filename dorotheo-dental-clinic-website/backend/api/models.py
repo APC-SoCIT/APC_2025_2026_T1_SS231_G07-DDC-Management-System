@@ -208,11 +208,19 @@ class InventoryItem(models.Model):
     quantity = models.IntegerField(default=0)
     min_stock = models.IntegerField(default=10)
     supplier = models.CharField(max_length=200, blank=True)
-    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Cost per unit")
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Total cost (unit_cost × quantity)")
+    clinic = models.ForeignKey('ClinicLocation', on_delete=models.CASCADE, null=True, blank=True, related_name='inventory_items', help_text="Clinic where this item is stored")
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        # Auto-calculate total cost
+        self.cost = self.unit_cost * self.quantity
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return self.name
+        clinic_name = self.clinic.name if self.clinic else "No Clinic"
+        return f"{self.name} - {clinic_name}"
 
     @property
     def is_low_stock(self):

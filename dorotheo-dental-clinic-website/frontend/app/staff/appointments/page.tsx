@@ -1710,6 +1710,20 @@ export default function StaffAppointments() {
                                       <p className="text-[var(--color-text-muted)] mb-2 font-medium">Notes</p>
                                       <p className="text-sm leading-relaxed">{apt.notes || "No notes"}</p>
                                     </div>
+                                    {apt.status === "completed" && (
+                                      <div className="pt-3 border-t border-[var(--color-border)]">
+                                        <button
+                                          onClick={() => {
+                                            // Placeholder - functionality to be implemented
+                                            alert("Invoice creation feature coming soon!")
+                                          }}
+                                          className="w-full px-4 py-2.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium flex items-center justify-center gap-2"
+                                        >
+                                          <FileText className="w-4 h-4" />
+                                          Create Invoice
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>

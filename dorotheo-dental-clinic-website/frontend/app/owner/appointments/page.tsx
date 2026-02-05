@@ -1638,7 +1638,7 @@ export default function OwnerAppointments() {
                                       <Clock className="w-4 h-4 text-[var(--color-text-muted)]" />
                                       <div>
                                         <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Time</p>
-                                        <p className="font-medium">{apt.time}</p>
+                                        <p className="font-medium">{formatTime(apt.time)}</p>
                                       </div>
                                     </div>
                                     <div>
@@ -1679,6 +1679,20 @@ export default function OwnerAppointments() {
                                       <div>
                                         <p className="text-[var(--color-text-muted)] text-xs mb-1">Last Updated</p>
                                         <p className="text-sm">{new Date(apt.updated_at).toLocaleString()}</p>
+                                      </div>
+                                    )}
+                                    {apt.status === "completed" && (
+                                      <div className="pt-3 border-t border-[var(--color-border)]">
+                                        <button
+                                          onClick={() => {
+                                            // Placeholder - functionality to be implemented
+                                            alert("Invoice creation feature coming soon!")
+                                          }}
+                                          className="w-full px-4 py-2.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium flex items-center justify-center gap-2"
+                                        >
+                                          <FileText className="w-4 h-4" />
+                                          Create Invoice
+                                        </button>
                                       </div>
                                     )}
                                   </div>

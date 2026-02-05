@@ -35,10 +35,11 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       console.log('[ClinicContext] Fetching clinics from:', url);
       
       const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        cache: 'no-store',
       });
 
       console.log('[ClinicContext] Response status:', response.status);
@@ -57,15 +58,17 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           if (clinic) {
             setSelectedClinicState(clinic);
           } else if (data.length > 0) {
-            // If saved clinic not found, default to first clinic
-            setSelectedClinicState(data[0]);
+            // If saved clinic not found, default to "all"
+            setSelectedClinicState('all');
           }
         } else if (data.length > 0) {
-          // No saved selection, default to first clinic
-          setSelectedClinicState(data[0]);
+          // No saved selection, default to "all"
+          setSelectedClinicState('all');
         }
       } else {
         console.error('[ClinicContext] Failed to load clinics, status:', response.status);
+        const text = await response.text();
+        console.error('[ClinicContext] Response:', text);
       }
     } catch (error) {
       console.error('[ClinicContext] Error loading clinics:', error);
