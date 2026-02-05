@@ -232,7 +232,38 @@ Write-Host "      Production (Railway/Vercel) will install psycopg2-binary autom
 Write-Host "      when connecting to PostgreSQL (Supabase)." -ForegroundColor DarkGray
 Write-Host ""
 
-# Ask user if they want to start the servers automatically
+# Automatically start both servers
+Write-Host "========================================================================" -ForegroundColor Cyan
+Write-Host "STARTING SERVERS AUTOMATICALLY..." -ForegroundColor Cyan
+Write-Host "========================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Start frontend in a new PowerShell window
+Write-Host "[1/2] Starting frontend server in new terminal..." -ForegroundColor Cyan
+$frontendPath = Join-Path (Split-Path (Get-Location) -Parent) "frontend"
+if (Test-Path $frontendPath) {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$frontendPath'; Write-Host 'FRONTEND SERVER' -ForegroundColor Magenta; Write-Host ''; pnpm dev"
+    Write-Host "[OK] Frontend terminal opened!" -ForegroundColor Green
+} else {
+    Write-Host "[WARNING] Frontend directory not found. Skipping frontend server." -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Start backend in current terminal
+Write-Host "[2/2] Starting backend server in this terminal..." -ForegroundColor Cyan
+Write-Host "" 
+Write-Host "========================================================================" -ForegroundColor Magenta
+Write-Host "BACKEND SERVER" -ForegroundColor Magenta
+Write-Host "========================================================================" -ForegroundColor Magenta
+Write-Host ""
+Write-Host "Backend: http://localhost:8000" -ForegroundColor Green
+Write-Host "Frontend: http://localhost:3000" -ForegroundColor Green
+Write-Host ""
+Write-Host "Press CTRL+C to stop the backend server" -ForegroundColor Yellow
+Write-Host "Close the frontend terminal window to stop the frontend server" -ForegroundColor Yellow
+Write-Host "" -ForegroundColor Yellow
+
+python manage.py runserver
 Write-Host "========================================================================" -ForegroundColor Cyan
 Write-Host "AUTO-START SERVERS" -ForegroundColor Cyan
 Write-Host "========================================================================" -ForegroundColor Cyan

@@ -229,27 +229,23 @@ echo "      Production (Railway/Vercel) will install psycopg2-binary automatical
 echo "      when connecting to PostgreSQL (Supabase)."
 echo ""
 
-# Ask user if they want to start the servers automatically
+# Automatically start both servers
 echo "========================================================================"
-echo "AUTO-START SERVERS"
+echo "STARTING SERVERS AUTOMATICALLY..."
 echo "========================================================================"
 echo ""
-read -p "Do you want to start both servers now? (Y/N): " startServers
 
-if [[ "$startServers" == "Y" ]] || [[ "$startServers" == "y" ]]; then
-    echo ""
-    echo "Starting servers..."
-    echo ""
-    
-    # Detect OS and open appropriate terminal for frontend
+# Detect OS and open appropriate terminal for frontend
+echo "[1/2] Starting frontend server in new terminal..."
+if [ -d "$FRONTEND_PATH" ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS - use osascript to open Terminal
         osascript -e "tell application \"Terminal\" to do script \"cd '$FRONTEND_PATH' && echo '========================================' && echo 'FRONTEND SERVER' && echo '========================================' && echo '' && pnpm dev\""
         echo "[OK] Frontend server starting in new Terminal window..."
     elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
-        # Windows Git Bash - use start to open new window
-        start bash -c "cd '$FRONTEND_PATH'; echo '========================================'; echo 'FRONTEND SERVER'; echo '========================================'; echo ''; pnpm dev; exec bash"
-        echo "[OK] Frontend server starting in new window..."
+        # Windows Git Bash - use PowerShell to open new window
+        powershell.exe -Command "Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd ''$FRONTEND_PATH''; Write-Host ''FRONTEND SERVER'' -ForegroundColor Magenta; Write-Host ''''; pnpm dev'"
+        echo "[OK] Frontend server starting in new PowerShell window..."
     else
         # Linux - try common terminal emulators
         if command -v gnome-terminal &> /dev/null; then
@@ -263,30 +259,25 @@ if [[ "$startServers" == "Y" ]] || [[ "$startServers" == "y" ]]; then
         fi
         echo "[OK] Frontend server starting in new window..."
     fi
-    
-    echo "[OK] Backend server starting in this window..."
-    echo ""
-    echo "========================================================================"
-    echo "SERVERS RUNNING"
-    echo "========================================================================"
-    echo ""
-    echo "Backend:  http://localhost:8000"
-    echo "Frontend: http://localhost:3000"
-    echo ""
-    echo "Press Ctrl+C to stop the backend server"
-    echo "Close the frontend terminal window to stop the frontend server"
-    echo ""
-    echo "========================================"
-    echo "BACKEND SERVER"
-    echo "========================================"
-    echo ""
-    
-    # Start backend server in current terminal (venv already activated)
-    # Suppress Django system check warnings for development
-    python manage.py runserver --skip-checks
 else
-    echo ""
-    echo "Servers not started. You can start them manually later."
-    echo ""
+    echo "[WARNING] Frontend directory not found. Skipping frontend server."
 fi
+echo ""
+
+# Start backend in current terminal
+echo "[2/2] Starting backend server in this terminal..."
+echo ""
+echo "========================================================================"
+echo "BACKEND SERVER"
+echo "========================================================================"
+echo ""
+echo "Backend:  http://localhost:8000"
+echo "Frontend: http://localhost:3000"
+echo ""
+echo "Press Ctrl+C to stop the backend server"
+echo "Close the frontend terminal window to stop the frontend server"
+echo ""
+
+# Start backend server in current terminal (venv already activated)
+python manage.py runserver
 echo ""

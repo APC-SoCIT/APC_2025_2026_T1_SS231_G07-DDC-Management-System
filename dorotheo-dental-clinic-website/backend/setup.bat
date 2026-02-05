@@ -99,4 +99,37 @@ echo 🌐 Server will be available at: http://localhost:8000
 echo 🔧 Django Admin Panel: http://localhost:8000/admin
 echo.
 echo ========================================================================
-pause
+echo.
+echo ========================================================================
+echo 🚀 STARTING SERVERS AUTOMATICALLY...
+echo ========================================================================
+echo.
+
+REM Start frontend in a new command prompt window
+echo [1/2] Starting frontend server in new terminal...
+cd ..
+if exist "frontend" (
+    start "FRONTEND SERVER" cmd /k "cd frontend && echo FRONTEND SERVER && echo. && pnpm dev"
+    echo [OK] Frontend terminal opened!
+) else (
+    echo [WARNING] Frontend directory not found. Skipping frontend server.
+)
+cd backend
+echo.
+
+REM Start backend in current terminal
+echo [2/2] Starting backend server in this terminal...
+echo.
+echo ========================================================================
+echo BACKEND SERVER
+echo ========================================================================
+echo.
+echo Backend: http://localhost:8000
+echo Frontend: http://localhost:3000
+echo.
+echo Press CTRL+C to stop the backend server
+echo Close the frontend terminal window to stop the frontend server
+echo.
+
+call venv\Scripts\activate.bat
+python manage.py runserver
