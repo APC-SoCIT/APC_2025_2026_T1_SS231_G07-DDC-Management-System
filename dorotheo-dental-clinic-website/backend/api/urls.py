@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    UserViewSet, ServiceViewSet, AppointmentViewSet, ToothChartViewSet,
+    UserViewSet, ServiceViewSet, AppointmentViewSet,
     DentalRecordViewSet, DocumentViewSet, InventoryItemViewSet, BillingViewSet,
     ClinicLocationViewSet, TreatmentPlanViewSet, TeethImageViewSet,
     StaffAvailabilityViewSet, DentistAvailabilityViewSet, DentistNotificationViewSet, AppointmentNotificationViewSet,
@@ -15,7 +15,6 @@ router = DefaultRouter()
 router.register('users', UserViewSet)
 router.register('services', ServiceViewSet)
 router.register('appointments', AppointmentViewSet)
-router.register('tooth-charts', ToothChartViewSet)
 router.register('dental-records', DentalRecordViewSet)
 router.register('documents', DocumentViewSet)
 router.register('inventory', InventoryItemViewSet)

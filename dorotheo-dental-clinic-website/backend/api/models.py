@@ -156,16 +156,6 @@ class Appointment(models.Model):
         return f"{self.patient.get_full_name()} - {self.date} {self.time}"
 
 
-class ToothChart(models.Model):
-    patient = models.OneToOneField(User, on_delete=models.CASCADE, related_name='tooth_chart')
-    chart_data = models.JSONField(default=dict)
-    notes = models.TextField(blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Tooth Chart - {self.patient.get_full_name()}"
-
-
 class DentalRecord(models.Model):
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dental_records')
     appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
