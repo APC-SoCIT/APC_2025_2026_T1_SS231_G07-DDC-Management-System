@@ -105,12 +105,19 @@ echo 🚀 STARTING SERVERS AUTOMATICALLY...
 echo ========================================================================
 echo.
 
-REM Start frontend in a new command prompt window
-echo [1/2] Starting frontend server in new terminal...
+REM Instructions for frontend in VS Code terminal
+echo [1/2] Frontend Server Setup
 cd ..
 if exist "frontend" (
-    start "FRONTEND SERVER" cmd /k "cd frontend && echo FRONTEND SERVER && echo. && pnpm dev"
-    echo [OK] Frontend terminal opened!
+    echo.
+    echo ACTION REQUIRED: Open a new terminal in VS Code now:
+    echo 1. Press Ctrl+Shift+`  (or click the '+' icon in terminal panel)
+    echo 2. Copy and paste this command:
+    echo.
+    echo    cd frontend ^&^& pnpm dev
+    echo.
+    echo Waiting 10 seconds for you to open the terminal...
+    timeout /t 10 /nobreak >nul
 ) else (
     echo [WARNING] Frontend directory not found. Skipping frontend server.
 )
@@ -128,7 +135,7 @@ echo Backend: http://localhost:8000
 echo Frontend: http://localhost:3000
 echo.
 echo Press CTRL+C to stop the backend server
-echo Close the frontend terminal window to stop the frontend server
+echo Close the frontend terminal to stop the frontend server
 echo.
 
 call venv\Scripts\activate.bat

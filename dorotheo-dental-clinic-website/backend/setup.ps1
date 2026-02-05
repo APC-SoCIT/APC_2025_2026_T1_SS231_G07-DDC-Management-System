@@ -238,12 +238,19 @@ Write-Host "STARTING SERVERS AUTOMATICALLY..." -ForegroundColor Cyan
 Write-Host "========================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Start frontend in a new PowerShell window
-Write-Host "[1/2] Starting frontend server in new terminal..." -ForegroundColor Cyan
+# Instructions for frontend in VS Code terminal
+Write-Host "[1/2] Frontend Server Setup" -ForegroundColor Cyan
 $frontendPath = Join-Path (Split-Path (Get-Location) -Parent) "frontend"
 if (Test-Path $frontendPath) {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$frontendPath'; Write-Host 'FRONTEND SERVER' -ForegroundColor Magenta; Write-Host ''; pnpm dev"
-    Write-Host "[OK] Frontend terminal opened!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "ACTION REQUIRED: Open a new terminal in VS Code now:" -ForegroundColor Yellow
+    Write-Host "1. Press Ctrl+Shift+`  (or click the '+' icon in terminal panel)" -ForegroundColor White
+    Write-Host "2. Copy and paste this command:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "   cd '$frontendPath'; pnpm dev" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Waiting 10 seconds for you to open the terminal..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
 } else {
     Write-Host "[WARNING] Frontend directory not found. Skipping frontend server." -ForegroundColor Yellow
 }
@@ -260,7 +267,7 @@ Write-Host "Backend: http://localhost:8000" -ForegroundColor Green
 Write-Host "Frontend: http://localhost:3000" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press CTRL+C to stop the backend server" -ForegroundColor Yellow
-Write-Host "Close the frontend terminal window to stop the frontend server" -ForegroundColor Yellow
+Write-Host "Close the frontend terminal to stop the frontend server" -ForegroundColor Yellow
 Write-Host "" -ForegroundColor Yellow
 
 python manage.py runserver

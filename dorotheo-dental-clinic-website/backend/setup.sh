@@ -235,30 +235,18 @@ echo "STARTING SERVERS AUTOMATICALLY..."
 echo "========================================================================"
 echo ""
 
-# Detect OS and open appropriate terminal for frontend
-echo "[1/2] Starting frontend server in new terminal..."
+# Instructions for frontend in VS Code terminal
+echo "[1/2] Frontend Server Setup"
 if [ -d "$FRONTEND_PATH" ]; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS - use osascript to open Terminal
-        osascript -e "tell application \"Terminal\" to do script \"cd '$FRONTEND_PATH' && echo '========================================' && echo 'FRONTEND SERVER' && echo '========================================' && echo '' && pnpm dev\""
-        echo "[OK] Frontend server starting in new Terminal window..."
-    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
-        # Windows Git Bash - use PowerShell to open new window
-        powershell.exe -Command "Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd ''$FRONTEND_PATH''; Write-Host ''FRONTEND SERVER'' -ForegroundColor Magenta; Write-Host ''''; pnpm dev'"
-        echo "[OK] Frontend server starting in new PowerShell window..."
-    else
-        # Linux - try common terminal emulators
-        if command -v gnome-terminal &> /dev/null; then
-            gnome-terminal -- bash -c "cd '$FRONTEND_PATH'; echo '========================================'; echo 'FRONTEND SERVER'; echo '========================================'; echo ''; pnpm dev; exec bash"
-        elif command -v xterm &> /dev/null; then
-            xterm -e "cd '$FRONTEND_PATH'; echo '========================================'; echo 'FRONTEND SERVER'; echo '========================================'; echo ''; pnpm dev; exec bash" &
-        elif command -v konsole &> /dev/null; then
-            konsole -e bash -c "cd '$FRONTEND_PATH'; echo '========================================'; echo 'FRONTEND SERVER'; echo '========================================'; echo ''; pnpm dev; exec bash" &
-        else
-            echo "[WARNING] Could not detect terminal emulator. Please start frontend manually."
-        fi
-        echo "[OK] Frontend server starting in new window..."
-    fi
+    echo ""
+    echo "ACTION REQUIRED: Open a new terminal in VS Code now:"
+    echo "1. Press Ctrl+Shift+\`  (or click the '+' icon in terminal panel)"
+    echo "2. Copy and paste this command:"
+    echo ""
+    echo "   cd '$FRONTEND_PATH' && pnpm dev"
+    echo ""
+    echo "Waiting 10 seconds for you to open the terminal..."
+    sleep 10
 else
     echo "[WARNING] Frontend directory not found. Skipping frontend server."
 fi
@@ -275,7 +263,7 @@ echo "Backend:  http://localhost:8000"
 echo "Frontend: http://localhost:3000"
 echo ""
 echo "Press Ctrl+C to stop the backend server"
-echo "Close the frontend terminal window to stop the frontend server"
+echo "Close the frontend terminal to stop the frontend server"
 echo ""
 
 # Start backend server in current terminal (venv already activated)
