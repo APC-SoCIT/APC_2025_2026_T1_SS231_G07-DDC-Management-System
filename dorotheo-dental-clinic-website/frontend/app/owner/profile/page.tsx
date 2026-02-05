@@ -30,6 +30,7 @@ export default function OwnerProfile() {
     lastName: "",
     email: "",
     phone: "",
+    birthday: "",
   })
 
   // Load user data when component mounts
@@ -40,6 +41,7 @@ export default function OwnerProfile() {
         lastName: user.last_name || "",
         email: user.email || "",
         phone: user.phone || "",
+        birthday: user.birthday || "",
       })
     }
   }, [user])
@@ -53,6 +55,7 @@ export default function OwnerProfile() {
         last_name: profile.lastName,
         email: profile.email,
         phone: profile.phone,
+        birthday: profile.birthday,
       }
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${user.id}/`, {
@@ -75,6 +78,7 @@ export default function OwnerProfile() {
         last_name: updatedUser.last_name,
         email: updatedUser.email,
         phone: updatedUser.phone,
+        birthday: updatedUser.birthday,
       })
       
       setIsEditing(false)
@@ -159,6 +163,17 @@ export default function OwnerProfile() {
               type="tel"
               value={profile.phone}
               onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              disabled={!isEditing}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Birthday</label>
+            <input
+              type="date"
+              value={profile.birthday}
+              onChange={(e) => setProfile({ ...profile, birthday: e.target.value })}
               disabled={!isEditing}
               className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
             />

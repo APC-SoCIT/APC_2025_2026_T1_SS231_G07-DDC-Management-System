@@ -66,37 +66,90 @@ class UserSerializer(serializers.ModelSerializer):
         
         return None
     
+    def validate_first_name(self, value):
+        """Validate first name is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("First name is required")
+        return value
+    
+    def validate_last_name(self, value):
+        """Validate last name is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Last name is required")
+        return value
+    
+    def validate_email(self, value):
+        """Validate email is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Email is required")
+        return value
+    
+    def validate_username(self, value):
+        """Validate username is unique and not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Username is required")
+        
+        # Check if username already exists (only for new users, not updates)
+        if not self.instance:  # Creating new user
+            if User.objects.filter(username=value).exists():
+                raise serializers.ValidationError("This username is already taken")
+        else:  # Updating existing user
+            if User.objects.filter(username=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError("This username is already taken")
+        
+        return value
+    
+    def validate_phone(self, value):
+        """Validate phone number is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Contact number is required")
+        return value
+    
+    def validate_address(self, value):
+        """Validate address is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Address is required")
+        return value
+    
     def validate_birthday(self, value):
         """Validate birthday based on user type: patients must be 6 months+, staff must be 18+"""
-        if value:
-            today = timezone.now().date()
-            age_in_days = (today - value).days
-            
-            # Check if birthday is in the future (applies to all users)
-            if value > today:
-                raise serializers.ValidationError("Birthday cannot be in the future")
-            
-            # Apply age restrictions based on user type
+        if not value:
             user_type = self.initial_data.get('user_type')
+            if user_type == 'staff':
+                raise serializers.ValidationError("Birthdate is required")
+            return value
             
-            if user_type == 'patient':
-                # Check if younger than 6 months (approximately 183 days)
-                if age_in_days < 183:
-                    raise serializers.ValidationError("Patient must be at least 6 months old to register")
-                
-                # Check if 100 years old or older (exactly 36525 days or more)
-                if age_in_days >= 36525:
-                    raise serializers.ValidationError("Patient must be younger than 100 years old")
+        today = timezone.now().date()
+        age_in_days = (today - value).days
+        
+        # Check if birthday is in the future (applies to all users)
+        if value > today:
+            raise serializers.ValidationError("Birthday cannot be in the future")
+        
+        # Apply age restrictions based on user type
+        user_type = self.initial_data.get('user_type')
+        
+        if user_type == 'patient':
+            # Check if younger than 6 months (approximately 183 days)
+            if age_in_days < 183:
+                raise serializers.ValidationError("Patient must be at least 6 months old to register")
             
-            elif user_type == 'staff':
-                # Calculate actual age in years
-                age = today.year - value.year
-                # Adjust if birthday hasn't occurred yet this year
-                if (today.month, today.day) < (value.month, value.day):
-                    age -= 1
-                
-                if age < 18:
-                    raise serializers.ValidationError("Staff member must be at least 18 years old")
+            # Check if 100 years old or older (exactly 36525 days or more)
+            if age_in_days >= 36525:
+                raise serializers.ValidationError("Patient must be younger than 100 years old")
+        
+        elif user_type == 'staff':
+            # Check if the person is at least 18 years old
+            # Calculate their 18th birthday
+            try:
+                eighteenth_birthday = value.replace(year=value.year + 18)
+            except ValueError:
+                # Handle leap year edge case (Feb 29 -> Feb 28)
+                eighteenth_birthday = value.replace(year=value.year + 18, day=28)
+            
+            # They must have already had their 18th birthday
+            if today < eighteenth_birthday:
+                raise serializers.ValidationError("Staff member must be at least 18 years old")
         
         return value
 

@@ -27,6 +27,7 @@ interface Notification {
 export default function NotificationBell() {
   const { user } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [birthdayNotifications, setBirthdayNotifications] = useState<Array<{name: string, role: string}>>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -41,17 +42,63 @@ export default function NotificationBell() {
     
     fetchNotifications()
     fetchUnreadCount()
+    fetchBirthdays()
     
     // Poll for new notifications every 30 seconds only for owner/staff
     const interval = setInterval(() => {
       fetchUnreadCount()
       if (isOpen) {
         fetchNotifications()
+        fetchBirthdays()
       }
     }, 30000)
     
     return () => clearInterval(interval)
   }, [isOpen, user])
+
+  const fetchBirthdays = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      
+      // Fetch staff members
+      const staffData = await api.getStaff(token)
+      const allStaff = staffData.filter((s: any) => s.user_type === 'staff')
+      
+      // Add owner if they have a birthday
+      const allPeople = [...allStaff]
+      if (user?.birthday) {
+        allPeople.push({
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          birthday: user.birthday,
+          role: 'Owner',
+          user_type: 'owner'
+        })
+      }
+      
+      // Check for today's birthdays
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      
+      const todaysBirthdays = allPeople
+        .filter((person: any) => {
+          if (!person.birthday) return false
+          const birthDate = new Date(person.birthday)
+          const birthdayThisYear = `${today.getFullYear()}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`
+          return birthdayThisYear === todayStr
+        })
+        .map((person: any) => ({
+          name: `${person.first_name} ${person.last_name}`,
+          role: person.user_type === 'owner' ? 'Owner' : person.role === 'dentist' ? 'Dentist' : 'Receptionist'
+        }))
+      
+      setBirthdayNotifications(todaysBirthdays)
+    } catch (error) {
+      console.error('Failed to fetch birthdays:', error)
+    }
+  }
 
   const fetchNotifications = async () => {
     try {
@@ -322,9 +369,9 @@ export default function NotificationBell() {
         className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
       >
         <Bell className="w-6 h-6 text-gray-700" />
-        {unreadCount > 0 && (
+        {(unreadCount + birthdayNotifications.length) > 0 && (
           <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {(unreadCount + birthdayNotifications.length) > 9 ? '9+' : (unreadCount + birthdayNotifications.length)}
           </span>
         )}
       </button>
@@ -387,13 +434,35 @@ export default function NotificationBell() {
 
             {/* Notifications List */}
             <div className="overflow-y-auto flex-1">
-              {notifications.length === 0 ? (
+              {notifications.length === 0 && birthdayNotifications.length === 0 ? (
                 <div className="px-4 py-8 text-center text-gray-500">
                   <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                   <p>No notifications yet</p>
                 </div>
               ) : (
-                notifications.map((notif) => (
+                <>
+                  {/* Birthday Notifications */}
+                  {birthdayNotifications.map((birthday, index) => (
+                    <div
+                      key={`birthday-${index}`}
+                      className="px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">🎉</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            {birthday.name}'s birthday is today!
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Wish them a happy birthday!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Appointment Notifications */}
+                  {notifications.map((notif) => (
                   <div
                     key={notif.id}
                     className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
@@ -484,7 +553,8 @@ export default function NotificationBell() {
                       )}
                     </div>
                   </div>
-                ))
+                ))}
+                </>
               )}
             </div>
 
