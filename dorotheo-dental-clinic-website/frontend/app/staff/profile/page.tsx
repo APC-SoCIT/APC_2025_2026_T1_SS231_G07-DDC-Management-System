@@ -16,6 +16,7 @@ export default function StaffProfile() {
     lastName: "",
     email: "",
     phone: "",
+    birthday: "",
     address: "",
   })
 
@@ -27,6 +28,7 @@ export default function StaffProfile() {
         lastName: user.last_name || "",
         email: user.email || "",
         phone: (user as any).phone || "",
+        birthday: (user as any).birthday || "",
         address: (user as any).address || "",
       })
     }
@@ -142,6 +144,17 @@ export default function StaffProfile() {
               onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
               disabled={!isEditing}
               className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Birthdate</label>
+            <input
+              type="date"
+              value={profile.birthday}
+              onChange={(e) => setProfile({ ...profile, birthday: e.target.value })}
+              disabled={true}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50 disabled:cursor-not-allowed"
             />
           </div>
 

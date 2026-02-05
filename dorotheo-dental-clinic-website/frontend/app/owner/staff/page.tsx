@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Search, Edit2 } from "lucide-react"
+import { Plus, Trash2, Search, Edit2, CheckCircle, Copy } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -13,6 +13,7 @@ interface StaffMember {
   last_name: string
   phone: string
   address: string
+  birthday?: string
   user_type: string
   role: string
 }
@@ -25,6 +26,9 @@ export default function OwnerStaff() {
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null)
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [addStaffError, setAddStaffError] = useState("")
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successCredentials, setSuccessCredentials] = useState({ username: "", password: "" })
   const [newStaff, setNewStaff] = useState({
     firstName: "",
     lastName: "",
@@ -72,6 +76,7 @@ export default function OwnerStaff() {
         password: newStaff.password,
         first_name: newStaff.firstName,
         last_name: newStaff.lastName,
+        birthday: newStaff.birthdate,
         phone: newStaff.phone,
         address: newStaff.address,
         user_type: 'staff',  // Always set as staff
@@ -81,9 +86,11 @@ export default function OwnerStaff() {
       await api.createStaff(staffData, token)
       await fetchStaff()
       setShowAddModal(false)
+      setAddStaffError("")
       
-      // Show success message with login instructions
-      alert(`Staff member added successfully!\n\nLogin credentials:\nUsername: ${loginUsername}\nPassword: ${newStaff.password}\n\nThey can now log in using their username.`)
+      // Show success modal with login credentials
+      setSuccessCredentials({ username: loginUsername, password: newStaff.password })
+      setShowSuccessModal(true)
       
       setNewStaff({
         firstName: "",
@@ -96,9 +103,16 @@ export default function OwnerStaff() {
         address: "",
         role: "",
       })
-    } catch (error) {
-      console.error("Error adding staff:", error)
-      alert("Failed to add staff member. Please try again.")
+    } catch (error: any) {
+      // Check if it's a birthday validation error
+      const errorMessage = error.response?.data?.birthday?.[0] || error.response?.data?.birthday
+      if (errorMessage && typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('18')) {
+        setAddStaffError("Staff must be 18 years old and above.")
+      } else if (error.response?.data?.birthday) {
+        setAddStaffError("Staff must be 18 years old and above.")
+      } else {
+        setAddStaffError("Staff must be 18 years old and above.")
+      }
     }
   }
 
@@ -133,6 +147,7 @@ export default function OwnerStaff() {
         last_name: editingStaff.last_name,
         email: editingStaff.email,
         phone: editingStaff.phone,
+        birthday: editingStaff.birthday,
         address: editingStaff.address,
         role: editingStaff.role,
       }
@@ -222,6 +237,7 @@ export default function OwnerStaff() {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Name</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Email</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Phone</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Birthdate</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Address</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Role</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
@@ -235,6 +251,9 @@ export default function OwnerStaff() {
                     </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{member.email}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{member.phone}</td>
+                    <td className="px-6 py-4 text-[var(--color-text-muted)]">
+                      {member.birthday ? new Date(member.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                    </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{member.address}</td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -371,9 +390,15 @@ export default function OwnerStaff() {
                   type="date"
                   required
                   value={newStaff.birthdate}
-                  onChange={(e) => setNewStaff({ ...newStaff, birthdate: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, birthdate: e.target.value })
+                    setAddStaffError("") // Clear error when user changes birthdate
+                  }}
                   className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
+                {addStaffError && (
+                  <p className="text-red-500 text-sm mt-1 font-medium">{addStaffError}</p>
+                )}
               </div>
 
               <div>
@@ -512,6 +537,18 @@ export default function OwnerStaff() {
 
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                  Birthdate
+                </label>
+                <input
+                  type="date"
+                  value={editingStaff.birthday || ''}
+                  onChange={(e) => setEditingStaff({ ...editingStaff, birthday: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Address <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -558,6 +595,88 @@ export default function OwnerStaff() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              {/* Success Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="bg-green-100 rounded-full p-3">
+                  <CheckCircle className="w-12 h-12 text-green-600" />
+                </div>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl font-serif font-bold text-center text-[var(--color-primary)] mb-2">
+                Staff Member Added Successfully!
+              </h2>
+              <p className="text-center text-[var(--color-text-muted)] mb-6">
+                The new staff member can now log in using the credentials below.
+              </p>
+
+              {/* Credentials Box */}
+              <div className="bg-[var(--color-background)] rounded-lg p-4 mb-6 border border-[var(--color-border)]">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">
+                    Username
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={successCredentials.username}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-white border border-[var(--color-border)] rounded-lg text-[var(--color-text)] font-medium"
+                    />
+                    <button
+                      onClick={() => navigator.clipboard.writeText(successCredentials.username)}
+                      className="p-2 hover:bg-white rounded-lg transition-colors"
+                      title="Copy username"
+                    >
+                      <Copy className="w-4 h-4 text-[var(--color-text-muted)]" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">
+                    Password
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={successCredentials.password}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-white border border-[var(--color-border)] rounded-lg text-[var(--color-text)] font-medium"
+                    />
+                    <button
+                      onClick={() => navigator.clipboard.writeText(successCredentials.password)}
+                      className="p-2 hover:bg-white rounded-lg transition-colors"
+                      title="Copy password"
+                    >
+                      <Copy className="w-4 h-4 text-[var(--color-text-muted)]" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Note */}
+              <p className="text-xs text-center text-[var(--color-text-muted)] mb-6">
+                Make sure to save these credentials securely. They can be used to log in immediately.
+              </p>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
+              >
+                Got it!
+              </button>
+            </div>
           </div>
         </div>
       )}

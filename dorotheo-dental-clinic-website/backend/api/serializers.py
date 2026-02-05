@@ -67,22 +67,36 @@ class UserSerializer(serializers.ModelSerializer):
         return None
     
     def validate_birthday(self, value):
-        """Validate that birthday is more than 6 months old and younger than 100 years"""
+        """Validate birthday based on user type: patients must be 6 months+, staff must be 18+"""
         if value:
             today = timezone.now().date()
             age_in_days = (today - value).days
             
-            # Check if younger than 6 months (approximately 183 days)
-            if age_in_days < 183:
-                raise serializers.ValidationError("Patient must be at least 6 months old to register")
-            
-            # Check if 100 years old or older (exactly 36525 days or more)
-            if age_in_days >= 36525:
-                raise serializers.ValidationError("Patient must be younger than 100 years old")
-            
-            # Check if birthday is in the future
+            # Check if birthday is in the future (applies to all users)
             if value > today:
                 raise serializers.ValidationError("Birthday cannot be in the future")
+            
+            # Apply age restrictions based on user type
+            user_type = self.initial_data.get('user_type')
+            
+            if user_type == 'patient':
+                # Check if younger than 6 months (approximately 183 days)
+                if age_in_days < 183:
+                    raise serializers.ValidationError("Patient must be at least 6 months old to register")
+                
+                # Check if 100 years old or older (exactly 36525 days or more)
+                if age_in_days >= 36525:
+                    raise serializers.ValidationError("Patient must be younger than 100 years old")
+            
+            elif user_type == 'staff':
+                # Calculate actual age in years
+                age = today.year - value.year
+                # Adjust if birthday hasn't occurred yet this year
+                if (today.month, today.day) < (value.month, value.day):
+                    age -= 1
+                
+                if age < 18:
+                    raise serializers.ValidationError("Staff member must be at least 18 years old")
         
         return value
 
