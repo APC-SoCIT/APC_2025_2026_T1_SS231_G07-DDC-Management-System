@@ -11,6 +11,7 @@ interface User {
   first_name: string
   last_name: string
   phone?: string
+  birthday?: string
   role?: string  // For staff: 'receptionist' or 'dentist'
 }
 

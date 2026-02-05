@@ -28,6 +28,7 @@ export default function StaffDashboard() {
   const [activePatients, setActivePatients] = useState(0)
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   const [lowStockCount, setLowStockCount] = useState(0)
+  const [staffMembers, setStaffMembers] = useState<Array<{id: number, first_name: string, last_name: string, birthday?: string, role: string}>>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Fetch real data
@@ -56,6 +57,10 @@ export default function StaffDashboard() {
         // Fetch low stock count
         const stockData = await api.getLowStockCount(token)
         setLowStockCount(stockData.count)
+
+        // Fetch staff members for birthdays
+        const staffData = await api.getStaff(token)
+        setStaffMembers(staffData.filter((s: any) => s.user_type === 'staff'))
       } catch (error) {
         console.error("Error fetching data:", error)
       } finally {
@@ -66,12 +71,37 @@ export default function StaffDashboard() {
     fetchData()
   }, [token, selectedClinic])
 
-  // No sample birthday data - will be filled with real data
+  // Build birthdays array from staff members and owner
   const birthdays: Array<{
     name: string
     date: string
     role: string
-  }> = []
+  }> = [
+    ...staffMembers
+      .filter(staff => staff.birthday)
+      .map(staff => {
+        const birthDate = new Date(staff.birthday!)
+        const thisYear = currentMonth.getFullYear()
+        const birthdayThisYear = new Date(thisYear, birthDate.getMonth(), birthDate.getDate())
+        const dateStr = `${thisYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`
+        
+        return {
+          name: `${staff.first_name} ${staff.last_name}`,
+          date: dateStr,
+          role: staff.role === 'dentist' ? 'Dentist' : staff.role === 'receptionist' ? 'Receptionist' : 'Staff'
+        }
+      }),
+    // Add owner birthday if available
+    ...(user?.birthday ? [{
+      name: `${user.first_name} ${user.last_name}`,
+      date: (() => {
+        const birthDate = new Date(user.birthday)
+        const thisYear = currentMonth.getFullYear()
+        return `${thisYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`
+      })(),
+      role: 'Owner'
+    }] : [])
+  ]
 
   // Get appointments for today (show all today's appointments)
   const today = new Date()
@@ -502,7 +532,7 @@ export default function StaffDashboard() {
                 </div>
                 {getBirthdaysForDate(selectedDate.getDate()).map((birthday, idx) => (
                   <div key={idx} className="text-sm text-pink-800">
-                    🎉 {birthday.name} ({birthday.role})
+                    🎉 {birthday.name}
                   </div>
                 ))}
               </div>
