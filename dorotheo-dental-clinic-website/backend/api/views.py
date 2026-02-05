@@ -153,11 +153,13 @@ def login(request):
     user = authenticate(username=username, password=password)
     
     # If authentication fails, try to find user by email and authenticate
+    # Allow email login for all user types (patients, staff, and owner)
     if not user:
         try:
             user_obj = User.objects.get(email=username)
             user = authenticate(username=user_obj.username, password=password)
             logger.info("[Django] Found user by email: %s, trying with username: %s", username, user_obj.username)
+                
         except User.DoesNotExist:
             logger.info("[Django] No user found with email: %s", username)
     

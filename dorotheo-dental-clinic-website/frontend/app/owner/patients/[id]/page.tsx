@@ -13,6 +13,7 @@ import {
   MapPin,
   User,
   Trash2,
+  Edit2,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -332,9 +333,19 @@ export default function PatientDetailPage() {
 
               {/* Patient Info */}
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-gray-900 mb-6">
-                  {patient.first_name} {patient.last_name}
-                </h1>
+                <div className="flex items-start justify-between mb-6">
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {patient.first_name} {patient.last_name}
+                  </h1>
+                  <button
+                    onClick={() => router.push(`/owner/patients/${patientId}/edit`)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                    title="Edit Patient"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Email</p>

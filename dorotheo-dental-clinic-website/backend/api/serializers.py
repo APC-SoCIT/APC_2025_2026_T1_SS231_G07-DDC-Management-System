@@ -152,6 +152,17 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Staff member must be at least 18 years old")
         
         return value
+    
+    def validate(self, data):
+        """Validate that password and confirm_password match if confirm_password is provided"""
+        confirm_password = self.initial_data.get('confirm_password')
+        password = data.get('password')
+        
+        if confirm_password and password:
+            if password != confirm_password:
+                raise serializers.ValidationError({"confirm_password": "Passwords do not match"})
+        
+        return data
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)

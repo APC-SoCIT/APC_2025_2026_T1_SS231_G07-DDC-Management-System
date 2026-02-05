@@ -35,6 +35,7 @@ export default function OwnerStaff() {
     email: "",
     username: "",
     password: "",
+    confirmPassword: "",
     birthdate: "",
     phone: "",
     address: "",
@@ -66,6 +67,12 @@ export default function OwnerStaff() {
     
     if (!token) return
 
+    // Check if passwords match
+    if (newStaff.password !== newStaff.confirmPassword) {
+      setAddStaffError("Passwords do not match")
+      return
+    }
+
     try {
       // Create login username from username + @dorotheo.com
       const loginUsername = `${newStaff.username}@dorotheo.com`
@@ -74,6 +81,7 @@ export default function OwnerStaff() {
         username: loginUsername,  // Full email for login
         email: newStaff.email,    // Separate email field
         password: newStaff.password,
+        confirm_password: newStaff.confirmPassword,
         first_name: newStaff.firstName,
         last_name: newStaff.lastName,
         birthday: newStaff.birthdate,
@@ -98,6 +106,7 @@ export default function OwnerStaff() {
         email: "",
         username: "",
         password: "",
+        confirmPassword: "",
         birthdate: "",
         phone: "",
         address: "",
@@ -293,8 +302,8 @@ export default function OwnerStaff() {
       {/* Add Staff Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
-            <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white">
               <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Add Staff Member</h2>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -376,10 +385,34 @@ export default function OwnerStaff() {
                   required
                   minLength={8}
                   value={newStaff.password}
-                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, password: e.target.value })
+                    setAddStaffError("") // Clear error when user changes password
+                  }}
                   placeholder="8 characters minimum"
                   className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newStaff.confirmPassword}
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, confirmPassword: e.target.value })
+                    setAddStaffError("") // Clear error when user changes confirm password
+                  }}
+                  placeholder="Re-enter password"
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+                {addStaffError && addStaffError.includes("match") && (
+                  <p className="text-red-500 text-sm mt-1 font-medium">{addStaffError}</p>
+                )}
               </div>
 
               <div>
