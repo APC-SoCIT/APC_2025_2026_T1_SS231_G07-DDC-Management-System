@@ -161,7 +161,7 @@ This project is brought to you by the talented members of TechTalk.
 
 ---
 
-### 🎯 Quick Start - Backend (RECOMMENDED)
+### 🎯 Quick Start - Full Setup (RECOMMENDED)
 
 #### Windows PowerShell (Recommended)
 ```powershell
@@ -169,30 +169,188 @@ cd dorotheo-dental-clinic-website\backend
 .\setup.ps1
 ```
 
-#### Windows Command Prompt
+**That's it!** The script will:
+- ✅ Check Python, Node.js, and pnpm installation
+- ✅ Create virtual environment
+- ✅ Install all backend dependencies  
+- ✅ Set up database
+- ✅ Create 3 clinic locations (Bacoor 🟢, Alabang 🔵, Poblacion 🟣)
+- ✅ Create default user accounts
+- ✅ Install all frontend dependencies (279 packages)
+- ✅ Display login credentials and startup instructions
+
+**Total time: ~3-5 minutes**
+
+#### Alternative Scripts (Backend Only)
+
+If you prefer to use alternative scripts or only want to setup the backend:
+
+**Windows Command Prompt:**
 ```cmd
 cd dorotheo-dental-clinic-website\backend
 setup.bat
 ```
 
-#### Linux/Mac/Git Bash
+**Linux/Mac/Git Bash:**
 ```bash
 cd dorotheo-dental-clinic-website/backend
 chmod +x setup.sh
 ./setup.sh
 ```
 
-**That's it!** The script will:
-- ✅ Create virtual environment
-- ✅ Install all dependencies  
-- ✅ Set up database
-- ✅ Create 3 clinic locations (Bacoor 🟢, Alabang 🔵, Poblacion 🟣)
-- ✅ Create default user accounts
-- ✅ Display login credentials
-
-**Total time: ~2-3 minutes**
-
 📖 **For detailed instructions**, see [backend/README.md](dorotheo-dental-clinic-website/backend/README.md)
+
+---
+
+## ⚠️ Troubleshooting
+
+Common issues you may encounter during setup and their solutions:
+
+### PowerShell Script Parsing Error
+**Error:**
+```
+At setup.ps1:81 char:54
++ Write-Host "   ✅ 3 clinic locations created (Bacoor, Alabang, Pobla ...
++                                                      ~
+Missing argument in parameter list.
+```
+
+**Solution:** This error occurs with older versions of the script. The current version uses ASCII markers instead of emojis. If you encounter this, pull the latest version or use the `.bat` (Windows CMD) or `.sh` (Linux/Mac) alternative scripts.
+
+---
+
+### psycopg2-binary Build Failure
+**Error:**
+```
+ERROR: Failed to build 'psycopg2-binary' when getting requirements to build wheel
+Error: pg_config executable not found.
+```
+
+**Cause:** The `psycopg2-binary` package requires PostgreSQL libraries to build from source on Python 3.13+.
+
+**Solution:** The setup script automatically skips psycopg2-binary for local development since SQLite is used locally. If installing manually:
+
+```powershell
+# Install dependencies without psycopg2-binary:
+python -m pip install Django==4.2.7 djangorestframework==3.14.0 django-cors-headers==4.3.1 "Pillow>=10.3.0" gunicorn==21.2.0 whitenoise==6.6.0 dj-database-url==2.1.0 python-dotenv==1.0.0 google-generativeai==0.3.2 resend==0.8.0
+```
+
+**Note:** Production deployments (Railway/Vercel) use PostgreSQL (Supabase) and install psycopg2-binary automatically with pre-installed libraries.
+
+**Local vs Production:**
+```
+┌─────────────────┬────────────────┬──────────────────────┐
+│ Environment     │ Database       │ psycopg2-binary      │
+├─────────────────┼────────────────┼──────────────────────┤
+│ Local Dev       │ SQLite         │ Not needed           │
+│ Production      │ PostgreSQL     │ Auto-installed       │
+│                 │ (Supabase)     │                      │
+└─────────────────┴────────────────┴──────────────────────┘
+```
+
+---
+
+### ModuleNotFoundError: No module named 'django'
+**Error:**
+```
+ImportError: Couldn't import Django. Are you sure it's installed and available on your PYTHONPATH environment variable?
+```
+
+**Cause:** Running Django commands before installing dependencies.
+
+**Solution:**
+```powershell
+# Activate virtual environment first
+.\venv\Scripts\Activate.ps1
+
+# Then install dependencies
+python -m pip install -r requirements.txt
+# OR use the command from Issue 2 fix to skip psycopg2-binary
+```
+
+---
+
+### Navigation/Path Errors
+**Error:**
+```
+cd : Cannot find path '...\backend\dorotheo-dental-clinic-website\backend' because it does not exist.
+```
+
+**Cause:** Already in the backend directory when trying to navigate with relative paths.
+
+**Solution:**
+```powershell
+# Check current directory
+pwd
+
+# If already in backend directory, just run commands directly:
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+---
+
+### Frontend Peer Dependency Warnings
+**Warning:**
+```
+WARN Issues with peer dependencies found
+vaul 0.9.9
+├── ✕ unmet peer react@"^16.8 || ^17.0 || ^18.0": found 19.2.4
+```
+
+**Cause:** Some UI components haven't officially added React 19 support yet but still work correctly.
+
+**Impact:** This is a warning only and does not affect functionality. The application works correctly with React 19.
+
+**Solution:** No action needed. These warnings are safe to ignore.
+
+---
+
+### Deprecated Next.js Version Warning
+**Warning:**
+```
+WARN deprecated next@15.1.3: This version has a security vulnerability.
+```
+
+**Solution:**
+```powershell
+cd dorotheo-dental-clinic-website\frontend
+pnpm update next
+```
+
+---
+
+### pnpm Not Installed
+**Error:**
+```
+pnpm : The term 'pnpm' is not recognized as the name of a cmdlet, function, script file, or operable program.
+```
+
+**Solution:** The setup script automatically installs pnpm if not found. To install manually:
+```powershell
+npm install -g pnpm
+```
+
+---
+
+### Node.js Not Installed
+**Error:**
+```
+[ERROR] Node.js is not installed!
+```
+
+**Solution:** Install Node.js 18 or higher from [https://nodejs.org/](https://nodejs.org/). Download the LTS (Long Term Support) version.
+
+---
+
+## 💡 Pro Tips for First-Time Setup
+
+1. **Always activate the virtual environment** before running Python commands
+2. **Use `python -m pip`** instead of just `pip` for more reliable package installation
+3. **Check your current directory** with `pwd` before navigating
+4. **If automated scripts fail**, use the manual setup instructions below
+5. **Two-database approach**: SQLite for local dev (zero setup), PostgreSQL (Supabase) for production
+6. **Production deployment platforms** (Railway/Vercel) automatically install psycopg2-binary - you don't need it locally
 
 ---
 
@@ -261,7 +419,32 @@ The backend will be accessible at `http://127.0.0.1:8000/`.
 
 ---
 
-### Frontend Setup (Local Development)
+## 🚀 Starting the Application
+
+After running the setup script, you need to start BOTH servers:
+
+### Backend Server
+```powershell
+# In backend\ directory
+.\venv\Scripts\Activate.ps1
+python manage.py runserver
+```
+Backend will be at: `http://localhost:8000`
+
+### Frontend Server
+```powershell
+# In frontend\ directory (open a NEW terminal)
+pnpm dev
+```
+Frontend will be at: `http://localhost:3000`
+
+**💡 TIP:** Keep both terminals open - you need both servers running simultaneously!
+
+---
+
+### Frontend Setup (Manual - Only if setup.ps1 wasn't used)
+
+> **Note:** If you ran `.\setup.ps1` from the backend directory, frontend dependencies are already installed. This section is only needed if you used `.bat` or `.sh` scripts which only setup the backend.
 
 1. **Navigate to the frontend directory:**
    ```bash
