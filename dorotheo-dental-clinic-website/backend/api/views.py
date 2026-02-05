@@ -1281,6 +1281,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(clinic_id=clinic_id)
         
         return queryset
+    
+    def destroy(self, request, *args, **kwargs):
+        """Only owners can delete documents"""
+        if request.user.user_type != 'owner':
+            return Response(
+                {'error': 'Only owners can delete documents'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):

@@ -1,409 +1,535 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Upload, Download, Trash2, File, FileImage, FileText, X } from "lucide-react"
+import { useRouter, useParams } from "next/navigation"
+import { ArrowLeft, FileText, Upload, Download, X, Activity, Scan, Image as ImageIcon, FileHeart, StickyNote } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import UnifiedDocumentUpload from "@/components/unified-document-upload"
+import { ClinicBadge } from "@/components/clinic-badge"
 
-interface FileAttachment {
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+const BACKEND_URL = API_BASE_URL.replace('/api', '')
+
+interface Patient {
   id: number
-  patient: number
-  patient_name: string
-  file: string
-  file_url: string
-  file_extension: string
-  file_type: "xray" | "photo" | "document" | "report" | "other"
-  title: string
-  description: string
-  file_size: number
-  uploaded_by: number
-  uploaded_by_name: string
-  uploaded_at: string
+  first_name: string
+  last_name: string
 }
 
-const FILE_TYPE_OPTIONS = [
-  { value: "xray", label: "X-Ray", icon: "🦷" },
-  { value: "photo", label: "Photo", icon: "📷" },
-  { value: "document", label: "Document", icon: "📄" },
-  { value: "report", label: "Report", icon: "📊" },
-  { value: "other", label: "Other", icon: "📎" },
-]
+interface ClinicLocation {
+  id: number
+  name: string
+  address: string
+  city: string
+  state: string
+  zipcode: string
+  phone: string
+  email: string
+}
 
-export default function StaffPatientFiles() {
-  const params = useParams()
+interface Document {
+  id: number
+  document_type: string
+  document_type_display: string
+  file: string
+  file_url?: string
+  title: string
+  description?: string
+  uploaded_at: string
+  appointment?: number
+  appointment_date?: string
+  appointment_time?: string
+  service_name?: string
+  dentist_name?: string
+  clinic?: number | null
+  clinic_data?: ClinicLocation | null
+}
+
+type TabType = 'all' | 'xray' | 'dental_image' | 'scan' | 'medical_certificate' | 'note' | 'report'
+
+export default function StaffPatientFilesPage() {
   const router = useRouter()
+  const params = useParams()
+  const patientId = params.id as string
   const { token } = useAuth()
-  const patientId = parseInt(params.id as string)
 
-  const [files, setFiles] = useState<FileAttachment[]>([])
+  const [patient, setPatient] = useState<Patient | null>(null)
+  const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [uploadData, setUploadData] = useState({
-    file_type: "document",
-    title: "",
-    description: "",
-  })
-  const [patientName, setPatientName] = useState("")
-  const [filterType, setFilterType] = useState<string>("all")
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('all')
 
   useEffect(() => {
-    fetchFiles()
-    fetchPatientInfo()
-  }, [patientId, token])
+    if (!token || !patientId) return
+    fetchData()
+  }, [token, patientId])
 
-  const fetchFiles = async () => {
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedDocument) {
+          setSelectedDocument(null)
+        } else if (showUploadModal) {
+          setShowUploadModal(false)
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [selectedDocument, showUploadModal])
+
+  useEffect(() => {
+    if (selectedDocument) {
+      const fileUrl = selectedDocument.file_url || selectedDocument.file
+      // Fetch file as blob and create object URL
+      fetch(fileUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob)
+          setPdfBlobUrl(url)
+        })
+        .catch(err => {
+          console.error('Failed to load file:', err)
+          setPdfBlobUrl(null)
+        })
+    } else {
+      // Clean up blob URL when modal closes
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+        setPdfBlobUrl(null)
+      }
+    }
+  }, [selectedDocument])
+
+  const fetchData = async () => {
     if (!token) return
-    
+
     try {
       setIsLoading(true)
-      const response = await api.getFilesByPatient(patientId, token)
-      setFiles(response)
+      const [patientData, documentsData] = await Promise.all([
+        api.getPatientById(Number.parseInt(patientId), token),
+        api.getDocuments(Number.parseInt(patientId), token),
+      ])
+
+      setPatient(patientData)
+      // Filter documents for this patient
+      const patientDocs = documentsData.filter(
+        (doc: any) => doc.patient === Number.parseInt(patientId)
+      )
+      setDocuments(patientDocs)
     } catch (error) {
-      console.error("Error fetching files:", error)
-      alert("Failed to load files")
+      console.error("Failed to fetch data:", error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const fetchPatientInfo = async () => {
-    if (!token) return
-    
-    try {
-      const response = await api.getPatients(token)
-      const patient = response.find((p: any) => p.id === patientId)
-      if (patient) {
-        setPatientName(`${patient.first_name} ${patient.last_name}`)
-      }
-    } catch (error) {
-      console.error("Error fetching patient info:", error)
+  // Filter documents by active tab
+  const getFilteredDocuments = () => {
+    if (activeTab === 'all') {
+      // Sort by upload date, newest first
+      return [...documents].sort((a, b) => 
+        new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      )
     }
+    return documents.filter(doc => doc.document_type === activeTab)
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
-      if (!uploadData.title) {
-        setUploadData({ ...uploadData, title: e.target.files[0].name })
-      }
-    }
+  const filteredDocuments = getFilteredDocuments()
+
+  // Count documents by type
+  const xrayCount = documents.filter(d => d.document_type === 'xray').length
+  const dentalImageCount = documents.filter(d => d.document_type === 'dental_image').length
+  const scanCount = documents.filter(d => d.document_type === 'scan').length
+  const medCertCount = documents.filter(d => d.document_type === 'medical_certificate').length
+  const noteCount = documents.filter(d => d.document_type === 'note').length
+  const reportCount = documents.filter(d => d.document_type === 'report').length
+
+  const handleDownloadImage = (fileUrl: string, filename: string) => {
+    fetch(fileUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      })
+      .catch(error => {
+        console.error('Download failed:', error)
+        // Fallback to direct link
+        const link = document.createElement('a')
+        link.href = fileUrl
+        link.download = filename
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      })
   }
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!token || !selectedFile) return
+  const renderDocumentCard = (doc: Document) => {
+    const fileUrl = doc.file_url || doc.file
+    const isImage = doc.document_type === 'xray' || doc.document_type === 'dental_image' || doc.document_type === 'scan'
 
-    try {
-      setUploading(true)
-      const formData = new FormData()
-      formData.append("file", selectedFile)
-      formData.append("patient", patientId.toString())
-      formData.append("file_type", uploadData.file_type)
-      formData.append("title", uploadData.title)
-      formData.append("description", uploadData.description)
-
-      await api.uploadFile(formData, token)
-      
-      setShowUploadModal(false)
-      setSelectedFile(null)
-      setUploadData({ file_type: "document", title: "", description: "" })
-      fetchFiles()
-      alert("File uploaded successfully!")
-    } catch (error) {
-      console.error("Error uploading file:", error)
-      alert("Failed to upload file")
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleDelete = async (fileId: number, fileName: string) => {
-    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return
-    if (!token) return
-
-    try {
-      await api.deleteFile(fileId, token)
-      fetchFiles()
-      alert("File deleted successfully!")
-    } catch (error) {
-      console.error("Error deleting file:", error)
-      alert("Failed to delete file")
-    }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i]
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const getFileIcon = (fileType: string, extension: string) => {
-    if (fileType === "xray" || fileType === "photo" || extension.match(/\.(jpg|jpeg|png|gif|bmp)$/i)) {
-      return <FileImage className="w-8 h-8 text-blue-500" />
-    }
-    if (extension.match(/\.(pdf)$/i)) {
-      return <FileText className="w-8 h-8 text-red-500" />
-    }
-    return <File className="w-8 h-8 text-gray-500" />
-  }
-
-  const filteredFiles = filterType === "all" 
-    ? files 
-    : files.filter(f => f.file_type === filterType)
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-[var(--color-text-muted)] hover:text-[var(--color-primary)] mb-4 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Patients
-          </button>
-          
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-[var(--color-text)] mb-2">
-                Patient Files
-              </h1>
-              <p className="text-[var(--color-text-muted)]">
-                Patient: <span className="font-semibold text-[var(--color-primary)]">{patientName || "Loading..."}</span>
-              </p>
+    if (isImage) {
+      return (
+        <div
+          key={doc.id}
+          onClick={() => setSelectedDocument(doc)}
+          className="border border-gray-200 rounded-lg p-3 hover:shadow-md cursor-pointer transition-all group"
+        >
+          {doc.clinic_data && (
+            <div className="mb-2">
+              <ClinicBadge clinic={doc.clinic_data} size="sm" />
             </div>
-            
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-            >
-              <Upload className="w-5 h-5" />
-              Upload File
-            </button>
+          )}
+          <div className="relative rounded overflow-hidden mb-2 bg-gray-100">
+            <img
+              src={fileUrl}
+              alt={doc.title}
+              className="w-full h-40 object-cover"
+              onError={(e) => {
+                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='160'%3E%3Crect width='200' height='160' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%23999'%3ENo image%3C/text%3E%3C/svg%3E"
+              }}
+            />
           </div>
-
-          {/* Filter Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                filterType === "all"
-                  ? "bg-[var(--color-primary)] text-white"
-                  : "bg-white border border-[var(--color-border)] text-[var(--color-text)] hover:bg-gray-50"
-              }`}
-            >
-              All Files ({files.length})
-            </button>
-            {FILE_TYPE_OPTIONS.map(type => {
-              const count = files.filter(f => f.file_type === type.value).length
-              return (
-                <button
-                  key={type.value}
-                  onClick={() => setFilterType(type.value)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                    filterType === type.value
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "bg-white border border-[var(--color-border)] text-[var(--color-text)] hover:bg-gray-50"
-                  }`}
-                >
-                  {type.icon} {type.label} ({count})
-                </button>
-              )
-            })}
-          </div>
+          {doc.title && (
+            <h4 className="font-medium text-sm text-gray-900 mb-1 line-clamp-1 group-hover:text-green-600">{doc.title}</h4>
+          )}
+          <p className="text-xs text-gray-500">
+            {new Date(doc.uploaded_at).toLocaleDateString()}
+          </p>
+          {doc.description && (
+            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{doc.description}</p>
+          )}
         </div>
+      )
+    }
 
-        {/* Files Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {isLoading ? (
-            <div className="col-span-full text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
-              <p className="mt-4 text-[var(--color-text-muted)]">Loading files...</p>
-            </div>
-          ) : filteredFiles.length === 0 ? (
-            <div className="col-span-full bg-white rounded-xl border border-[var(--color-border)] p-12 text-center">
-              <Upload className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-[var(--color-text-muted)] mb-4">
-                {filterType === "all" ? "No files uploaded yet" : `No ${filterType} files`}
+    return (
+      <div
+        key={doc.id}
+        onClick={() => setSelectedDocument(doc)}
+        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group"
+      >
+        {doc.clinic_data && (
+          <div className="mb-2">
+            <ClinicBadge clinic={doc.clinic_data} size="sm" />
+          </div>
+        )}
+        <div className="flex items-start gap-3">
+          <FileText className="w-8 h-8 text-gray-600 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-green-600">
+                {doc.title || "Document"}
               </p>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="text-[var(--color-primary)] hover:underline"
-              >
-                Upload your first file
-              </button>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded whitespace-nowrap">
+                {doc.document_type_display}
+              </span>
             </div>
-          ) : (
-            filteredFiles.map((file) => (
-              <div
-                key={file.id}
-                className="bg-white rounded-xl border border-[var(--color-border)] p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  {getFileIcon(file.file_type, file.file_extension)}
-                  <div className="flex gap-2">
-                    <a
-                      href={file.file_url}
-                      download
-                      className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Download"
-                    >
-                      <Download className="w-4 h-4 text-blue-600" />
-                    </a>
-                    <button
-                      onClick={() => handleDelete(file.id, file.title)}
-                      className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </button>
-                  </div>
-                </div>
-
-                <h3 className="font-semibold text-[var(--color-text)] mb-2 truncate">
-                  {file.title}
-                </h3>
-                
-                {file.description && (
-                  <p className="text-sm text-[var(--color-text-muted)] mb-3 line-clamp-2">
-                    {file.description}
+            {doc.appointment_date ? (
+              <div className="mt-1">
+                <p className="text-xs text-gray-600">
+                  {new Date(doc.appointment_date).toLocaleDateString()} at {doc.appointment_time}
+                </p>
+                {doc.service_name && (
+                  <p className="text-xs text-gray-600 font-medium">
+                    {doc.service_name}
                   </p>
                 )}
-
-                <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)]">
-                  <span className="px-2 py-1 bg-gray-100 rounded">
-                    {FILE_TYPE_OPTIONS.find(t => t.value === file.file_type)?.label || file.file_type}
-                  </span>
-                  <span>{formatFileSize(file.file_size)}</span>
-                </div>
-
-                <div className="mt-2 text-xs text-[var(--color-text-muted)]">
-                  <p>Uploaded by: {file.uploaded_by_name}</p>
-                  <p>Date: {formatDate(file.uploaded_at)}</p>
-                </div>
+                {doc.dentist_name && (
+                  <p className="text-xs text-gray-500">
+                    {doc.dentist_name}
+                  </p>
+                )}
               </div>
-            ))
-          )}
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+      </div>
+    )
+  }
+
+  if (!patient) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-gray-500 mb-4">Patient not found</p>
+        <button
+          onClick={() => router.push("/staff/patients")}
+          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+        >
+          Back to Patients
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto">
+      {/* Back Button */}
+      <button
+        onClick={() => router.push(`/staff/patients/${patientId}`)}
+        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+      >
+        <ArrowLeft className="w-5 h-5" />
+        <span>Back to {patient.first_name} {patient.last_name} details</span>
+      </button>
+
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Patient Files</h1>
+        <button
+          onClick={() => setShowUploadModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+        >
+          <Upload className="w-4 h-4" />
+          Upload File
+        </button>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 mb-6">
+        <div className="flex flex-wrap gap-2 -mb-px">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'all'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            All Files
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {filteredDocuments.length}
+            </span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('xray')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'xray'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Scan className="w-4 h-4" />
+            X-Ray
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {xrayCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('dental_image')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'dental_image'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            Dental Pictures
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {dentalImageCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('scan')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'scan'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileHeart className="w-4 h-4" />
+            Dental Scan
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {scanCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('medical_certificate')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'medical_certificate'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Medical Cert
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {medCertCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('note')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'note'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <StickyNote className="w-4 h-4" />
+            Notes
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {noteCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('report')}
+            className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'report'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Reports
+            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+              {reportCount}
+            </span>
+          </button>
         </div>
       </div>
 
+      {/* Document Grid */}
+      {filteredDocuments.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">
+            {activeTab === 'all' 
+              ? 'No files uploaded yet'
+              : `No ${activeTab.replace('_', ' ')} files found`}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredDocuments.map(doc => renderDocumentCard(doc))}
+        </div>
+      )}
+
       {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-[var(--color-text)]">Upload File</h2>
+      {showUploadModal && patient && (
+        <UnifiedDocumentUpload
+          patientId={Number.parseInt(patientId)}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          onClose={() => setShowUploadModal(false)}
+          onUploadSuccess={() => {
+            setShowUploadModal(false)
+            fetchData()
+          }}
+        />
+      )}
+
+      {/* Document Preview Modal */}
+      {selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  {selectedDocument.title || "Document"}
+                </h3>
+                {selectedDocument.description && (
+                  <p className="text-sm text-gray-600 mt-1">{selectedDocument.description}</p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                    {selectedDocument.document_type_display}
+                  </span>
+                  {selectedDocument.clinic_data && (
+                    <ClinicBadge clinic={selectedDocument.clinic_data} size="sm" />
+                  )}
+                </div>
+                {selectedDocument.appointment_date && (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <p className="text-xs font-medium text-gray-700 mb-1">Linked Appointment:</p>
+                    <p className="text-xs text-gray-600">
+                      {new Date(selectedDocument.appointment_date).toLocaleDateString()} at {selectedDocument.appointment_time}
+                    </p>
+                    {selectedDocument.service_name && (
+                      <p className="text-xs text-gray-600">Service: {selectedDocument.service_name}</p>
+                    )}
+                    {selectedDocument.dentist_name && (
+                      <p className="text-xs text-gray-600">Dentist: {selectedDocument.dentist_name}</p>
+                    )}
+                  </div>
+                )}
+              </div>
               <button
-                onClick={() => {
-                  setShowUploadModal(false)
-                  setSelectedFile(null)
-                  setUploadData({ file_type: "document", title: "", description: "" })
-                }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => setSelectedDocument(null)}
+                className="ml-4 text-gray-400 hover:text-gray-600"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
             
-            <form onSubmit={handleUpload} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
-                  File *
-                </label>
-                <input
-                  type="file"
-                  onChange={handleFileSelect}
-                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              {(selectedDocument.document_type === 'xray' || 
+                selectedDocument.document_type === 'dental_image' || 
+                selectedDocument.document_type === 'scan') ? (
+                <img
+                  src={selectedDocument.file_url || selectedDocument.file}
+                  alt={selectedDocument.title}
+                  className="max-w-full h-auto mx-auto"
                 />
-                {selectedFile && (
-                  <p className="text-sm text-green-600 mt-2">
-                    Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
-                  File Type *
-                </label>
-                <select
-                  value={uploadData.file_type}
-                  onChange={(e) => setUploadData({ ...uploadData, file_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  required
-                >
-                  {FILE_TYPE_OPTIONS.map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.icon} {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={uploadData.title}
-                  onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  placeholder="Enter file title"
-                  required
+              ) : pdfBlobUrl ? (
+                <iframe
+                  src={pdfBlobUrl}
+                  className="w-full h-full min-h-[500px]"
+                  title={selectedDocument.title}
                 />
-              </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500">Loading document...</p>
+                </div>
+              )}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-2">
-                  Description (Optional)
-                </label>
-                <textarea
-                  value={uploadData.description}
-                  onChange={(e) => setUploadData({ ...uploadData, description: e.target.value })}
-                  className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] min-h-[100px]"
-                  placeholder="Add any notes about this file..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={uploading}
-                  className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors disabled:opacity-50"
-                >
-                  {uploading ? "Uploading..." : "Upload File"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    setSelectedFile(null)
-                    setUploadData({ file_type: "document", title: "", description: "" })
-                  }}
-                  className="flex-1 px-6 py-3 border border-[var(--color-border)] text-[var(--color-text)] rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  const fileUrl = selectedDocument.file_url || selectedDocument.file
+                  handleDownloadImage(fileUrl, selectedDocument.title || 'document')
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                onClick={() => setSelectedDocument(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
