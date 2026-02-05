@@ -232,4 +232,46 @@ Write-Host "      Production (Railway/Vercel) will install psycopg2-binary autom
 Write-Host "      when connecting to PostgreSQL (Supabase)." -ForegroundColor DarkGray
 Write-Host ""
 
-Read-Host "Press Enter to exit"
+# Ask user if they want to start the servers automatically
+Write-Host "========================================================================" -ForegroundColor Cyan
+Write-Host "AUTO-START SERVERS" -ForegroundColor Cyan
+Write-Host "========================================================================" -ForegroundColor Cyan
+Write-Host ""
+$startServers = Read-Host "Do you want to start both servers now? (Y/N)"
+
+if ($startServers -eq "Y" -or $startServers -eq "y") {
+    Write-Host "" 
+    Write-Host "Starting servers..." -ForegroundColor Green
+    Write-Host "" 
+    
+    # Start frontend server in a new PowerShell window
+    $frontendCmd = "cd '$frontendPath'; Write-Host '========================================' -ForegroundColor Magenta; Write-Host 'FRONTEND SERVER' -ForegroundColor Magenta; Write-Host '========================================' -ForegroundColor Magenta; Write-Host ''; pnpm dev"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
+    
+    Write-Host "[OK] Frontend server starting in new window..." -ForegroundColor Green
+    Write-Host "[OK] Backend server starting in this window..." -ForegroundColor Green
+    Write-Host "" 
+    Write-Host "========================================================================" -ForegroundColor Yellow
+    Write-Host "SERVERS RUNNING" -ForegroundColor Yellow
+    Write-Host "========================================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Backend:  http://localhost:8000" -ForegroundColor Green
+    Write-Host "Frontend: http://localhost:3000" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Press Ctrl+C to stop the backend server" -ForegroundColor Yellow
+    Write-Host "Close the frontend terminal window to stop the frontend server" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host "BACKEND SERVER" -ForegroundColor Magenta
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ""
+    
+    # Start backend server in current window (venv already activated)
+    # Suppress Django system check warnings for development
+    python manage.py runserver --skip-checks
+} else {
+    Write-Host ""
+    Write-Host "Servers not started. You can start them manually later." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+}
