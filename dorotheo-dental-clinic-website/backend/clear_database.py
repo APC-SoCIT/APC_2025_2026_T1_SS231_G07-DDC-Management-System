@@ -14,7 +14,7 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from api.models import (
-    Service, Appointment, ToothChart, DentalRecord,
+    Service, Appointment, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage
 )
@@ -38,7 +38,6 @@ def clear_all_data():
         ('Inventory Items', InventoryItem),
         ('Documents', Document),
         ('Dental Records', DentalRecord),
-        ('Tooth Charts', ToothChart),
         ('Appointments', Appointment),
         ('Services', Service),
         ('Users', User),

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from datetime import timedelta
 from .models import (
-    User, Service, Appointment, ToothChart, DentalRecord, 
+    User, Service, Appointment, DentalRecord, 
     Document, InventoryItem, Billing, ClinicLocation, 
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification, 
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
@@ -92,12 +92,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Appointment
-        fields = '__all__'
-
-
-class ToothChartSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ToothChart
         fields = '__all__'
 
 

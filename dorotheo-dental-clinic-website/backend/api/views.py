@@ -27,7 +27,7 @@ from .email_service import (
 )
 
 from .models import (
-    User, Service, Appointment, ToothChart, DentalRecord,
+    User, Service, Appointment, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification,
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
@@ -35,7 +35,7 @@ from .models import (
 )
 from .serializers import (
     UserSerializer, ServiceSerializer, AppointmentSerializer,
-    ToothChartSerializer, DentalRecordSerializer, DocumentSerializer,
+    DentalRecordSerializer, DocumentSerializer,
     InventoryItemSerializer, BillingSerializer, ClinicLocationSerializer,
     TreatmentPlanSerializer, TeethImageSerializer, StaffAvailabilitySerializer,
     DentistAvailabilitySerializer, DentistNotificationSerializer, AppointmentNotificationSerializer, 
@@ -1231,11 +1231,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         upcoming = Appointment.objects.filter(date__gte=date.today(), status__in=['confirmed', 'reschedule_requested', 'cancel_requested'])
         serializer = self.get_serializer(upcoming, many=True)
         return Response(serializer.data)
-
-
-class ToothChartViewSet(viewsets.ModelViewSet):
-    queryset = ToothChart.objects.all()
-    serializer_class = ToothChartSerializer
 
 
 class DentalRecordViewSet(viewsets.ModelViewSet):

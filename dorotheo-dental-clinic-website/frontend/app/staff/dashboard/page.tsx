@@ -393,10 +393,9 @@ export default function StaffDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Interactive Calendar */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-[var(--color-border)] p-6">
-          <div className="flex items-center justify-between mb-6">
+      {/* Interactive Calendar - Full Width */}
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+        <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-[var(--color-primary)]">Appointment Calendar</h2>
             <div className="flex items-center gap-2">
               <button 
@@ -447,7 +446,7 @@ export default function StaffDashboard() {
                       isSelectedDay(day)
                         ? "bg-[#0f766e] text-white shadow-lg"
                         : isToday(day)
-                        ? "bg-blue-100 text-blue-700 ring-2 ring-blue-500"
+                        ? "bg-green-100 text-green-700 ring-2 ring-green-500"
                         : isPast
                         ? "text-gray-400 cursor-default"
                         : hasApt || hasBd
@@ -459,7 +458,7 @@ export default function StaffDashboard() {
                   >
                     {day}
                     <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-                      {hasApt && <div className="w-1 h-1 bg-blue-500 rounded-full" />}
+                      {hasApt && <div className="w-1 h-1 bg-green-700 rounded-full" />}
                       {hasBd && <div className="w-1 h-1 bg-pink-500 rounded-full" />}
                     </div>
                   </button>
@@ -471,12 +470,12 @@ export default function StaffDashboard() {
           {/* Legend */}
           <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)] pt-4">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-100 ring-2 ring-blue-500 rounded" />
+              <div className="w-3 h-3 bg-green-100 ring-2 ring-green-500 rounded" />
               <span>Today</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded flex items-center justify-center">
-                <div className="w-1 h-1 bg-blue-500 rounded-full" />
+                <div className="w-1 h-1 bg-green-700 rounded-full" />
               </div>
               <span>Has Appointments</span>
             </div>
@@ -543,26 +542,6 @@ export default function StaffDashboard() {
               <p className="text-center text-[var(--color-text-muted)] py-8">No appointments for this date</p>
             )}
           </div>
-        </div>
-
-        {/* Patient Summary */}
-        <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-          <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-6">Patient Summary</h2>
-          <div className="space-y-4">
-            <div className="p-4 bg-[var(--color-background)] rounded-lg">
-              <p className="text-sm text-[var(--color-text-muted)] mb-1">Active Patients</p>
-              <p className="text-2xl font-bold text-[var(--color-text)]">0</p>
-            </div>
-            <div className="p-4 bg-[var(--color-background)] rounded-lg">
-              <p className="text-sm text-[var(--color-text-muted)] mb-1">Inactive Patients</p>
-              <p className="text-2xl font-bold text-[var(--color-text)]">0</p>
-            </div>
-            <div className="p-4 bg-[var(--color-background)] rounded-lg">
-              <p className="text-sm text-[var(--color-text-muted)] mb-1">New This Month</p>
-              <p className="text-2xl font-bold text-[var(--color-text)]">0</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )

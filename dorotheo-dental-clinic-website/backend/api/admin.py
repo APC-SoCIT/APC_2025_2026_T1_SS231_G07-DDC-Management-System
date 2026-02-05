@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    User, Service, Appointment, ToothChart, DentalRecord,
+    User, Service, Appointment, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability,
     DentistNotification, AppointmentNotification, PasswordResetToken, BlockedTimeSlot
@@ -33,12 +33,6 @@ class AppointmentAdmin(admin.ModelAdmin):
     search_fields = ('patient__username', 'patient__email', 'notes')
     ordering = ('-date', '-time')
     date_hierarchy = 'date'
-
-@admin.register(ToothChart)
-class ToothChartAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'updated_at')
-    search_fields = ('patient__username',)
-    ordering = ('patient',)
 
 @admin.register(DentalRecord)
 class DentalRecordAdmin(admin.ModelAdmin):
