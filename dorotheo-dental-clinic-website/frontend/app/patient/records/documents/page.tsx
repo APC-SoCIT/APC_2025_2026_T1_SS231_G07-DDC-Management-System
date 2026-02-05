@@ -177,6 +177,100 @@ export default function Documents() {
     }
   }
 
+  // Filter documents by type
+  const medicalCertificates = documents.filter(doc => doc.document_type === 'medical_certificate')
+  const reports = documents.filter(doc => doc.document_type === 'report')
+  const notes = documents.filter(doc => doc.document_type === 'note')
+
+  const renderDocumentCard = (doc: Document) => (
+    <div
+      key={doc.id}
+      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col gap-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDocumentTypeColor(doc.document_type)} w-fit`}>
+            {getDocumentTypeLabel(doc.document_type)}
+          </span>
+          {doc.clinic_data && <ClinicBadge clinic={doc.clinic_data} size="sm" />}
+        </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => handleView(doc)}
+            className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
+            title="View"
+          >
+            <Eye className="w-4 h-4 text-gray-600" />
+          </button>
+          <button
+            onClick={() => handleDownload(doc.file_url || doc.file, `${doc.title}.${doc.file.split('.').pop()}`)}
+            className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
+            title="Download"
+          >
+            <Download className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+      </div>
+
+      <div 
+        className="mb-3 h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" 
+        onClick={() => handleView(doc)}
+      >
+        {(doc.file_url || doc.file).match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+          <img
+            src={doc.file_url || doc.file}
+            alt={doc.title}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.currentTarget
+              target.style.display = 'none'
+              const parent = target.parentElement
+              if (parent) {
+                const icon = document.createElement('div')
+                icon.className = 'flex items-center justify-center'
+                icon.innerHTML = '<svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>'
+                parent.appendChild(icon)
+              }
+            }}
+          />
+        ) : (doc.file_url || doc.file).match(/\.pdf$/i) ? (
+          <div className="flex flex-col items-center justify-center gap-2">
+            <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+            </svg>
+            <span className="text-xs font-medium text-gray-600">PDF</span>
+          </div>
+        ) : (
+          <FileText className="w-12 h-12 text-gray-400" />
+        )}
+      </div>
+
+      <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
+        {doc.title}
+      </h3>
+      {doc.description && (
+        <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+          {doc.description}
+        </p>
+      )}
+      <div className="space-y-1 text-xs text-gray-600">
+        {doc.service_name && (
+          <p><span className="font-semibold text-gray-700">Service:</span> {doc.service_name}</p>
+        )}
+        {doc.dentist_name && (
+          <p><span className="font-semibold text-gray-700">Dentist:</span> {doc.dentist_name}</p>
+        )}
+        {formatAppointmentDateTime(doc.appointment_date, doc.appointment_time) && (
+          <p><span className="font-semibold text-gray-700">Appointment:</span> {formatAppointmentDateTime(doc.appointment_date, doc.appointment_time)}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 mt-2 border-t border-gray-200">
+        <Calendar className="w-3 h-3" />
+        <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+      </div>
+    </div>
+  )
+
   return (
     <div className="space-y-6">
       <div>
@@ -184,110 +278,75 @@ export default function Documents() {
         <p className="text-[var(--color-text-muted)]">View your medical certificates, notes, and other documents</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        {isLoading ? (
+      {isLoading ? (
+        <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
           </div>
-        ) : documents.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex flex-col gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDocumentTypeColor(doc.document_type)} w-fit`}>
-                      {getDocumentTypeLabel(doc.document_type)}
-                    </span>
-                    {doc.clinic_data && <ClinicBadge clinic={doc.clinic_data} size="sm" />}
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleView(doc)}
-                      className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
-                      title="View"
-                    >
-                      <Eye className="w-4 h-4 text-gray-600" />
-                    </button>
-                    <button
-                      onClick={() => handleDownload(doc.file_url || doc.file, `${doc.title}.${doc.file.split('.').pop()}`)}
-                      className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
-                      title="Download"
-                    >
-                      <Download className="w-4 h-4 text-gray-600" />
-                    </button>
-                  </div>
-                </div>
-
-                <div 
-                  className="mb-3 h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" 
-                  onClick={() => handleView(doc)}
-                >
-                  {(doc.file_url || doc.file).match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <img
-                      src={doc.file_url || doc.file}
-                      alt={doc.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.currentTarget
-                        target.style.display = 'none'
-                        const parent = target.parentElement
-                        if (parent) {
-                          const icon = document.createElement('div')
-                          icon.className = 'flex items-center justify-center'
-                          icon.innerHTML = '<svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>'
-                          parent.appendChild(icon)
-                        }
-                      }}
-                    />
-                  ) : (doc.file_url || doc.file).match(/\.pdf$/i) ? (
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-xs font-medium text-gray-600">PDF</span>
-                    </div>
-                  ) : (
-                    <FileText className="w-12 h-12 text-gray-400" />
-                  )}
-                </div>
-
-                <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-                  {doc.title}
-                </h3>
-                {doc.description && (
-                  <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                    {doc.description}
-                  </p>
-                )}
-                <div className="space-y-1 text-xs text-gray-600">
-                  {doc.service_name && (
-                    <p><span className="font-semibold text-gray-700">Service:</span> {doc.service_name}</p>
-                  )}
-                  {doc.dentist_name && (
-                    <p><span className="font-semibold text-gray-700">Dentist:</span> {doc.dentist_name}</p>
-                  )}
-                  {formatAppointmentDateTime(doc.appointment_date, doc.appointment_time) && (
-                    <p><span className="font-semibold text-gray-700">Appointment:</span> {formatAppointmentDateTime(doc.appointment_date, doc.appointment_time)}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500 pt-2 border-t border-gray-200">
-                  <Calendar className="w-3 h-3" />
-                  <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
-                </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Medical Certificates Section */}
+          <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-red-600" />
               </div>
-            ))}
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Medical Certificates</h2>
+                <p className="text-sm text-gray-600">Official medical documentation</p>
+              </div>
+            </div>
+            {medicalCertificates.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {medicalCertificates.map((doc) => renderDocumentCard(doc))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm py-4">No medical certificates</p>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400 opacity-30" />
-            <p className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</p>
-            <p className="text-sm text-gray-600">Medical certificates and notes will appear here</p>
+
+          {/* Reports Section */}
+          <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Reports</h2>
+                <p className="text-sm text-gray-600">Treatment and examination reports</p>
+              </div>
+            </div>
+            {reports.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {reports.map((doc) => renderDocumentCard(doc))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm py-4">No reports</p>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Notes Section */}
+          <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Notes (PDF)</h2>
+                <p className="text-sm text-gray-600">Additional notes and documentation</p>
+              </div>
+            </div>
+            {notes.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {notes.map((doc) => renderDocumentCard(doc))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm py-4">No notes</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Document Preview Modal */}
       {selectedDocument && (
