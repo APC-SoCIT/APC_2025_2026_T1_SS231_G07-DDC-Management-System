@@ -212,6 +212,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     is_low_stock = serializers.BooleanField(read_only=True)
+    clinic_name = serializers.CharField(source='clinic.name', read_only=True)
 
     class Meta:
         model = InventoryItem
