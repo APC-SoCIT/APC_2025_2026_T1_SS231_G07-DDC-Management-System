@@ -31,6 +31,7 @@ export default function OwnerProfile() {
     email: "",
     phone: "",
     birthday: "",
+    username: "",
   })
 
   // Load user data when component mounts
@@ -42,6 +43,7 @@ export default function OwnerProfile() {
         email: user.email || "",
         phone: user.phone || "",
         birthday: user.birthday || "",
+        username: user.username || "",
       })
     }
   }, [user])
@@ -154,6 +156,16 @@ export default function OwnerProfile() {
               onChange={(e) => setProfile({ ...profile, email: e.target.value })}
               disabled={!isEditing}
               className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Username</label>
+            <input
+              type="text"
+              value={profile.username}
+              disabled={true}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
             />
           </div>
 

@@ -1,31 +1,16 @@
 "use client"
 
-import { useState, Fragment, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { 
   Search, 
   Plus, 
-  Eye, 
   ChevronDown, 
   ChevronUp, 
-  Edit2, 
-  Save, 
-  X, 
   Trash2,
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  FileText,
-  DollarSign,
-  Camera,
-  Upload,
   Archive,
   ArchiveRestore
 } from "lucide-react"
-import TeethImageUpload from "@/components/teeth-image-upload"
-import DocumentUpload from "@/components/document-upload"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -60,12 +45,6 @@ export default function OwnerPatients() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive" | "new" | "archived">("all")
   const [showAddModal, setShowAddModal] = useState(false)
-  const [expandedRow, setExpandedRow] = useState<number | null>(null)
-  const [editingRow, setEditingRow] = useState<number | null>(null)
-  const [editedData, setEditedData] = useState<Partial<Patient>>({})
-  const [showImageUpload, setShowImageUpload] = useState(false)
-  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [patients, setPatients] = useState<Patient[]>([])
   const [archivedPatients, setArchivedPatients] = useState<Patient[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
@@ -317,26 +296,7 @@ export default function OwnerPatients() {
   )
 
   const handleRowClick = (patientId: number) => {
-    // Navigate to patient detail page
     router.push(`/owner/patients/${patientId}`)
-  }
-
-  const handleEdit = (patient: Patient, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setEditingRow(patient.id)
-    setEditedData({ ...patient })
-    setExpandedRow(patient.id)
-  }
-
-  const handleSave = (patientId: number) => {
-    setPatients(patients.map((p) => (p.id === patientId ? { ...p, ...editedData } as Patient : p)))
-    setEditingRow(null)
-    setEditedData({})
-  }
-
-  const handleCancel = () => {
-    setEditingRow(null)
-    setEditedData({})
   }
 
   const handleDelete = async (patientId: number, e: React.MouseEvent) => {
@@ -347,29 +307,27 @@ export default function OwnerPatients() {
     }
     
     try {
-      await api.deleteUser(patientId, token!)
+      // Use the API's delete endpoint for patients (users with user_type='patient')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${patientId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Token ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete patient')
+      }
+      
       // Remove from both patients and archived patients lists
       setPatients(patients.filter((p) => p.id !== patientId))
       setArchivedPatients(archivedPatients.filter((p) => p.id !== patientId))
-      setExpandedRow(null)
       alert("Patient deleted successfully")
     } catch (error: any) {
       console.error("Error deleting patient:", error)
-      const errorMessage = error?.response?.data?.error || error?.message || "Failed to delete patient"
+      const errorMessage = error?.message || "Failed to delete patient"
       alert(errorMessage)
     }
-  }
-
-  const handleUploadImage = (patient: Patient, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelectedPatient(patient)
-    setShowImageUpload(true)
-  }
-
-  const handleUploadDocument = (patient: Patient, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelectedPatient(patient)
-    setShowDocumentUpload(true)
   }
 
   const handleAddPatient = async (e: React.FormEvent) => {
@@ -588,15 +546,15 @@ export default function OwnerPatients() {
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
               {filteredPatients.map((patient) => (
-                <Fragment key={patient.id}>
-                  {/* Main Row - Clickable */}
-                  <tr
-                    onClick={() => handleRowClick(patient.id)}
-                    className="hover:bg-[var(--color-background)] transition-all duration-200 cursor-pointer"
-                  >
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-[var(--color-text)]">{patient.name}</p>
-                    </td>
+                <tr key={patient.id} className="hover:bg-[var(--color-background)] transition-all duration-200">
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => handleRowClick(patient.id)}
+                      className="font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline hover:scale-105 transition-all duration-200 cursor-pointer text-left"
+                    >
+                      {patient.name}
+                    </button>
+                  </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.email}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.phone}</td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatLastVisit(patient.lastVisit)}</td>
@@ -609,323 +567,37 @@ export default function OwnerPatients() {
                         {patient.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRowClick(patient.id)
-                          }}
-                          className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4 text-[var(--color-primary)]" />
-                        </button>
-                        {activeTab !== "archived" ? (
-                          <>
-                            <button
-                              onClick={(e) => handleEdit(patient, e)}
-                              className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4 text-blue-600" />
-                            </button>
-                            <button
-                              onClick={(e) => handleArchive(patient.id, e)}
-                              className="p-2 hover:bg-orange-50 rounded-lg transition-colors"
-                              title="Archive Patient"
-                            >
-                              <Archive className="w-4 h-4 text-orange-600" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDelete(patient.id, e)}
-                              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          </>
-                        ) : (
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      {activeTab !== "archived" ? (
+                        <>
                           <button
-                            onClick={(e) => handleRestore(patient.id, e)}
-                            className="p-2 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Restore Patient"
+                            onClick={(e) => handleArchive(patient.id, e)}
+                            className="p-2 hover:bg-orange-50 rounded-lg transition-colors"
+                            title="Archive Patient"
                           >
-                            <ArchiveRestore className="w-4 h-4 text-green-600" />
+                            <Archive className="w-4 h-4 text-orange-600" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* Expanded Row */}
-                  {expandedRow === patient.id && (
-                    <tr>
-                      <td colSpan={6} className="bg-gradient-to-br from-gray-50 to-blue-50">
-                        <div
-                          className="px-6 py-6 animate-in slide-in-from-top-2 duration-300"
+                          <button
+                            onClick={(e) => handleDelete(patient.id, e)}
+                            className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={(e) => handleRestore(patient.id, e)}
+                          className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Restore Patient"
                         >
-                          {editingRow === patient.id ? (
-                            // Edit Mode
-                            <div className="space-y-6">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-[var(--color-primary)]">
-                                  Edit Patient Information
-                                </h3>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => handleSave(patient.id)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-                                  >
-                                    <Save className="w-4 h-4" />
-                                    Save Changes
-                                  </button>
-                                  <button
-                                    onClick={handleCancel}
-                                    className="flex items-center gap-2 px-4 py-2 border border-[var(--color-border)] rounded-lg hover:bg-white transition-colors"
-                                  >
-                                    <X className="w-4 h-4" />
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <label className="block text-sm font-medium mb-1.5">Full Name *</label>
-                                  <input
-                                    type="text"
-                                    value={editedData.name || ""}
-                                    onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium mb-1.5">Email (Read-only)</label>
-                                  <input
-                                    type="email"
-                                    value={editedData.email || ""}
-                                    readOnly
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                                    title="Email cannot be edited"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium mb-1.5">Phone (Read-only)</label>
-                                  <input
-                                    type="tel"
-                                    value={editedData.phone || ""}
-                                    readOnly
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                                    title="Phone cannot be edited"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium mb-1.5">Address (Read-only)</label>
-                                  <input
-                                    type="text"
-                                    value={editedData.address || ""}
-                                    readOnly
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                                    title="Address cannot be edited"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium mb-1.5">Date of Birth (Read-only)</label>
-                                  <input
-                                    type="date"
-                                    value={editedData.dateOfBirth || ""}
-                                    readOnly
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                                    title="Date of Birth cannot be edited"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium mb-1.5">Gender (Read-only)</label>
-                                  <input
-                                    type="text"
-                                    value={editedData.gender || ""}
-                                    readOnly
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                                    title="Gender cannot be edited"
-                                  />
-                                </div>
-                                <div className="md:col-span-2">
-                                  <label className="block text-sm font-medium mb-1.5">Notes *</label>
-                                  <textarea
-                                    value={editedData.notes || ""}
-                                    onChange={(e) => setEditedData({ ...editedData, notes: e.target.value })}
-                                    rows={3}
-                                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                                    placeholder="Add notes about this patient..."
-                                  />
-                                  <p className="text-xs text-gray-500 mt-1">* Only Name and Notes can be edited</p>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            // View Mode
-                            <div className="space-y-6">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-[var(--color-primary)]">
-                                  Patient Details
-                                </h3>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={(e) => handleUploadImage(patient, e)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                  >
-                                    <Camera className="w-4 h-4" />
-                                    Upload Teeth Image
-                                  </button>
-                                  <button
-                                    onClick={(e) => handleUploadDocument(patient, e)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                  >
-                                    <Upload className="w-4 h-4" />
-                                    Upload X-Ray/Document
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Personal Information Card */}
-                                <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
-                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
-                                    <User className="w-5 h-5" />
-                                    Personal Information
-                                  </h4>
-                                  <div className="space-y-3 text-sm">
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-0.5">Full Name</p>
-                                      <p className="font-medium">{patient.name}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-0.5">Age / Gender</p>
-                                      <p className="font-medium">{patient.age} years / {patient.gender}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-0.5">Date of Birth</p>
-                                      <p className="font-medium">{patient.dateOfBirth}</p>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                      <Mail className="w-4 h-4 text-[var(--color-text-muted)] mt-0.5" />
-                                      <div>
-                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Email</p>
-                                        <p className="font-medium">{patient.email}</p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                      <Phone className="w-4 h-4 text-[var(--color-text-muted)] mt-0.5" />
-                                      <div>
-                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Phone</p>
-                                        <p className="font-medium">{patient.phone}</p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                      <MapPin className="w-4 h-4 text-[var(--color-text-muted)] mt-0.5" />
-                                      <div>
-                                        <p className="text-[var(--color-text-muted)] text-xs mb-0.5">Address</p>
-                                        <p className="font-medium">{patient.address}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Dental Records Card */}
-                                <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
-                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
-                                    <FileText className="w-5 h-5" />
-                                    Dental Records
-                                  </h4>
-                                  <div className="space-y-4 text-sm">
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-2 font-medium">Medical History</p>
-                                      <ul className="space-y-1">
-                                        {patient.medicalHistory.map((item, idx) => (
-                                          <li key={idx} className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                            <span>{item}</span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-2 font-medium">Allergies</p>
-                                      <ul className="space-y-1">
-                                        {patient.allergies.map((item, idx) => (
-                                          <li key={idx} className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                                            <span>{item}</span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                    <div className="pt-2 border-t border-[var(--color-border)]">
-                                      <p className="text-[var(--color-text-muted)] mb-1 font-medium">Notes</p>
-                                      <p className="text-sm">{patient.notes}</p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Appointments & Billing Card */}
-                                <div className="bg-white rounded-xl p-5 border border-[var(--color-border)] shadow-sm">
-                                  <h4 className="font-semibold text-[var(--color-primary)] mb-4 flex items-center gap-2">
-                                    <Calendar className="w-5 h-5" />
-                                    Appointments & Billing
-                                  </h4>
-                                  <div className="space-y-4 text-sm">
-                                    <div>
-                                      <p className="text-[var(--color-text-muted)] mb-2 font-medium">Upcoming Appointments</p>
-                                      {patient.upcomingAppointments.length > 0 ? (
-                                        <div className="space-y-2">
-                                          {patient.upcomingAppointments.map((apt, idx) => (
-                                            <div key={idx} className="bg-blue-50 rounded-lg p-3">
-                                              <p className="font-medium text-blue-900">{apt.type}</p>
-                                              <p className="text-xs text-blue-700 mt-1">
-                                                {apt.date} at {apt.time}
-                                              </p>
-                                              <p className="text-xs text-blue-600 mt-0.5">with {apt.doctor}</p>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <p className="text-[var(--color-text-muted)] italic">No upcoming appointments</p>
-                                      )}
-                                    </div>
-
-                                    <div className="pt-3 border-t border-[var(--color-border)]">
-                                      <div className="flex items-center gap-2 mb-3">
-                                        <DollarSign className="w-4 h-4 text-[var(--color-text-muted)]" />
-                                        <p className="font-medium">Financial Summary</p>
-                                      </div>
-                                      <div className="space-y-2">
-                                        <div className="flex justify-between">
-                                          <span className="text-[var(--color-text-muted)]">Past Visits:</span>
-                                          <span className="font-semibold">{patient.pastAppointments}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-[var(--color-text-muted)]">Total Billed:</span>
-                                          <span className="font-semibold">₱{patient.totalBilled.toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-[var(--color-text-muted)]">Balance:</span>
-                                          <span className={`font-semibold ${patient.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                            ₱{patient.balance.toLocaleString()}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                          <ArchiveRestore className="w-4 h-4 text-green-600" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -1059,38 +731,6 @@ export default function OwnerPatients() {
         </div>
       )}
 
-      {/* Teeth Image Upload Modal */}
-      {showImageUpload && selectedPatient && (
-        <TeethImageUpload
-          patientId={selectedPatient.id}
-          patientName={selectedPatient.name}
-          onClose={() => {
-            setShowImageUpload(false)
-            setSelectedPatient(null)
-          }}
-          onSuccess={() => {
-            // Refresh patient data or show success message
-            setShowImageUpload(false)
-            setSelectedPatient(null)
-          }}
-        />
-      )}
-
-      {/* Document Upload Modal */}
-      {showDocumentUpload && selectedPatient && (
-        <DocumentUpload
-          patientId={selectedPatient.id}
-          patientName={selectedPatient.name}
-          onClose={() => {
-            setShowDocumentUpload(false)
-            setSelectedPatient(null)
-          }}
-          onUploadSuccess={() => {
-            setShowDocumentUpload(false)
-            setSelectedPatient(null)
-          }}
-        />
-      )}
     </div>
   )
 }
