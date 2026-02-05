@@ -1130,16 +1130,6 @@ export default function OwnerAppointments() {
             Pending
           </button>
           <button
-            onClick={() => setStatusFilter("completed")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              statusFilter === "completed"
-                ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            Completed
-          </button>
-          <button
             onClick={() => setStatusFilter("missed")}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
               statusFilter === "missed"
@@ -1158,6 +1148,16 @@ export default function OwnerAppointments() {
             }`}
           >
             Cancelled
+          </button>
+          <button
+            onClick={() => setStatusFilter("completed")}
+            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              statusFilter === "completed"
+                ? "bg-[var(--color-primary)] text-white"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Completed
           </button>
         </div>
       </div>
