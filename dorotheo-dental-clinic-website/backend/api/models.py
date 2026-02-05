@@ -455,6 +455,7 @@ class AppointmentNotification(models.Model):
         ('cancel_approved', 'Cancellation Approved'),
         ('cancel_rejected', 'Cancellation Rejected'),
         ('inventory_alert', 'Inventory Low Stock Alert'),
+        ('inventory_restock', 'Inventory Restocked'),
     )
     
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointment_notifications')

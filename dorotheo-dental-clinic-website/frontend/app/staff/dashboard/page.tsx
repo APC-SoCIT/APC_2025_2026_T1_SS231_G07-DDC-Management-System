@@ -27,6 +27,7 @@ export default function StaffDashboard() {
   const [totalPatients, setTotalPatients] = useState(0)
   const [activePatients, setActivePatients] = useState(0)
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
+  const [lowStockCount, setLowStockCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
   // Fetch real data
@@ -51,6 +52,10 @@ export default function StaffDashboard() {
         console.log('[Staff Dashboard] Fetched appointments:', appointments)
         console.log('[Staff Dashboard] Sample appointment dates:', appointments.slice(0, 3).map((a: any) => a.date))
         setAllAppointments(appointments)
+
+        // Fetch low stock count
+        const stockData = await api.getLowStockCount(token)
+        setLowStockCount(stockData.count)
       } catch (error) {
         console.error("Error fetching data:", error)
       } finally {
@@ -244,7 +249,9 @@ export default function StaffDashboard() {
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">0</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">
+            {isLoading ? "..." : lowStockCount}
+          </p>
           <p className="text-sm text-[var(--color-text-muted)]">Stock Alerts</p>
         </div>
       </div>
