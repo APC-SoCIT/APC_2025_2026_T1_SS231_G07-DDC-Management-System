@@ -43,12 +43,27 @@ echo ""
 echo "[Step 3/9] Checking pnpm installation..."
 if ! command -v pnpm &> /dev/null; then
     echo "[WARNING] pnpm is not installed! Installing pnpm..."
-    npm install -g pnpm
-    if [ $? -eq 0 ]; then
-        echo "[OK] pnpm installed successfully!"
+    # Use the official pnpm installation method (no sudo required)
+    curl -fsSL https://get.pnpm.io/install.sh | sh -
+    
+    # Source the shell configuration to update PATH
+    if [ -f "$HOME/.bashrc" ]; then
+        export PNPM_HOME="$HOME/.local/share/pnpm"
+        export PATH="$PNPM_HOME:$PATH"
+    fi
+    if [ -f "$HOME/.zshrc" ]; then
+        export PNPM_HOME="$HOME/.local/share/pnpm"
+        export PATH="$PNPM_HOME:$PATH"
+    fi
+    
+    # Check if pnpm is now available
+    if command -v pnpm &> /dev/null; then
+        PNPM_VERSION=$(pnpm --version 2>&1)
+        echo "[OK] pnpm $PNPM_VERSION installed successfully!"
     else
         echo "[ERROR] Failed to install pnpm!"
-        echo "You can install it manually: npm install -g pnpm"
+        echo "Please install it manually using: curl -fsSL https://get.pnpm.io/install.sh | sh -"
+        echo "Then restart your terminal and run this script again."
         exit 1
     fi
 else
