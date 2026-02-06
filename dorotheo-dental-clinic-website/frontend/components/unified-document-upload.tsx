@@ -131,7 +131,9 @@ export default function UnifiedDocumentUpload({
       return
     }
 
-    if (selectedType !== 'xray' && selectedType !== 'scan' && selectedType !== 'picture' && !title) {
+    // Title is optional for images (xray, scan, picture) but required for documents
+    const isImageType = selectedType === 'xray' || selectedType === 'scan' || selectedType === 'picture'
+    if (!isImageType && !title) {
       setError('Please enter a title for this document')
       return
     }
@@ -140,27 +142,22 @@ export default function UnifiedDocumentUpload({
     setError('')
 
     try {
-      if (selectedType === 'xray' || selectedType === 'scan' || selectedType === 'picture') {
-        // Upload as teeth image
-        await api.uploadTeethImage(
-          patientId,
-          file,
-          '', // notes
-          token,
-          selectedAppointment
-        )
-      } else {
-        // Upload as document
-        await api.uploadDocument(
-          patientId,
-          file,
-          selectedType,
-          title,
-          '', // description
-          token,
-          selectedAppointment
-        )
-      }
+      // Map 'picture' to 'dental_image' for the API
+      const apiDocumentType = selectedType === 'picture' ? 'dental_image' : selectedType
+      
+      // Generate a title if it's an image type and no title provided
+      const documentTitle = title || `${documentTypeConfig[selectedType].label} - ${new Date().toLocaleDateString()}`
+      
+      // Upload as document (works for both images and documents)
+      await api.uploadDocument(
+        patientId,
+        file,
+        apiDocumentType,
+        documentTitle,
+        '', // description
+        token,
+        selectedAppointment
+      )
 
       setFile(null)
       setTitle('')

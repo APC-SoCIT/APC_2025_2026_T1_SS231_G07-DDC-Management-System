@@ -48,14 +48,39 @@ export default function TeethImages() {
       try {
         setIsLoading(true)
         
-        console.log("Fetching teeth images for patient:", user.id)
+        console.log("Fetching dental images for patient:", user.id)
         
-        // Fetch all patient teeth images
-        const images = await api.getPatientTeethImages(user.id, token)
-        console.log("All teeth images:", images)
+        // Fetch all patient documents
+        const docs = await api.getDocuments(user.id, token)
+        console.log("All documents:", docs)
+        
+        // Filter only image types (xray, dental_image, scan)
+        const imageDocuments = docs.filter((doc: any) => 
+          doc.document_type === 'xray' || 
+          doc.document_type === 'dental_image' || 
+          doc.document_type === 'scan'
+        )
+        
+        // Convert to TeethImage format
+        const images = imageDocuments.map((doc: any) => ({
+          id: doc.id,
+          image: doc.file,
+          image_url: doc.file_url || doc.file,
+          uploaded_at: doc.uploaded_at,
+          uploaded_by: doc.uploaded_by,
+          uploaded_by_name: doc.uploaded_by_name,
+          notes: doc.description || '',
+          is_latest: false,
+          document_type: doc.document_type,
+          title: doc.title,
+          clinic: doc.clinic,
+          clinic_data: doc.clinic_data
+        }))
+        
+        console.log("Filtered image documents:", images)
         setAllImages(images)
       } catch (error) {
-        console.error("Error fetching teeth images:", error)
+        console.error("Error fetching dental images:", error)
       } finally {
         setIsLoading(false)
       }

@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, Prefetch, Max
 from django.utils import timezone
 from django.conf import settings
 from datetime import date, timedelta
@@ -348,11 +348,42 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def patients(self, request):
-        patients = User.objects.filter(user_type='patient')
+        """
+        Optimized patient list endpoint with N+1 fix.
+        Uses select_related and prefetch_related to minimize queries.
+        """
+        # Build optimized query with JOINs and prefetching
+        patients = User.objects.filter(
+            user_type='patient'
+        ).select_related(
+            'assigned_clinic'  # JOIN for clinic data (1 query)
+        ).prefetch_related(
+            Prefetch(
+                'appointments',
+                queryset=Appointment.objects.filter(
+                    status='completed'
+                ).select_related('service', 'dentist').order_by('-completed_at', '-date', '-time')[:1],
+                to_attr='last_appointment_cache'
+            )
+        ).annotate(
+            last_completed_appointment=Max('appointments__completed_at')
+        )
         
-        # Update patient status based on last appointment (2-year rule)
+        # Update patient status using prefetched data (no additional queries)
+        two_years_ago = timezone.now().date() - timedelta(days=730)
+        patients_to_update = []
+        
         for patient in patients:
-            patient.update_patient_status()
+            if hasattr(patient, 'last_appointment_cache') and patient.last_appointment_cache:
+                last_apt = patient.last_appointment_cache[0]
+                new_status = last_apt.date >= two_years_ago
+                if patient.is_active_patient != new_status:
+                    patient.is_active_patient = new_status
+                    patients_to_update.append(patient)
+        
+        # Bulk update (1 query for all updates)
+        if patients_to_update:
+            User.objects.bulk_update(patients_to_update, ['is_active_patient'])
         
         serializer = self.get_serializer(patients, many=True)
         return Response(serializer.data)
@@ -1281,6 +1312,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(clinic_id=clinic_id)
         
         return queryset
+    
+    def destroy(self, request, *args, **kwargs):
+        """Only owners can delete documents"""
+        if request.user.user_type != 'owner':
+            return Response(
+                {'error': 'Only owners can delete documents'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):

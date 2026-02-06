@@ -32,11 +32,38 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def get_last_appointment_date(self, obj):
-        """Get the last appointment datetime for patients (returns full datetime for accurate sorting)"""
+        """
+        Get the last appointment datetime for patients.
+        Optimized to use prefetched data to avoid N+1 queries.
+        """
         if obj.user_type == 'patient':
-            last_datetime = obj.get_last_appointment_date()
-            # Return the datetime as is - DRF will serialize it properly as ISO format
-            return last_datetime
+            # First, try to use prefetched data from the view
+            if hasattr(obj, 'last_appointment_cache') and obj.last_appointment_cache:
+                apt = obj.last_appointment_cache[0]
+                if hasattr(apt, 'completed_at') and apt.completed_at:
+                    return apt.completed_at
+                # Fallback: combine date and time
+                from datetime import datetime
+                return datetime.combine(apt.date, apt.time)
+            
+            # Second, check for annotated field
+            if hasattr(obj, 'last_completed_appointment') and obj.last_completed_appointment:
+                return obj.last_completed_appointment
+            
+            # Only as last resort, query the database
+            # This should rarely happen if views are properly using prefetch_related
+            try:
+                last_apt = obj.appointments.filter(status='completed').order_by(
+                    '-completed_at', '-date', '-time'
+                ).first()
+                if last_apt:
+                    if last_apt.completed_at:
+                        return last_apt.completed_at
+                    from datetime import datetime
+                    return datetime.combine(last_apt.date, last_apt.time)
+            except Exception:
+                pass
+        
         return None
     
     def validate_birthday(self, value):

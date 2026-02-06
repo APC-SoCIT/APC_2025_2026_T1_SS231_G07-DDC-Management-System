@@ -59,6 +59,7 @@ interface Document {
   document_type: string
   document_type_display: string
   file: string
+  file_url?: string
   title: string
   description?: string
   uploaded_at: string
@@ -93,10 +94,8 @@ export default function PatientDetailPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [dentalRecords, setDentalRecords] = useState<DentalRecord[]>([])
   const [documents, setDocuments] = useState<Document[]>([])
-  const [teethImages, setTeethImages] = useState<TeethImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
 
@@ -109,9 +108,7 @@ export default function PatientDetailPage() {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (selectedImage) {
-          setSelectedImage(null)
-        } else if (selectedDocument) {
+        if (selectedDocument) {
           setSelectedDocument(null)
         } else if (showUploadModal) {
           setShowUploadModal(false)
@@ -121,7 +118,7 @@ export default function PatientDetailPage() {
 
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [selectedImage, selectedDocument, showUploadModal])
+  }, [selectedDocument, showUploadModal])
 
   useEffect(() => {
     if (selectedDocument) {
@@ -151,19 +148,17 @@ export default function PatientDetailPage() {
     try {
       setIsLoading(true)
 
-      // Fetch patient details, appointments, dental records, documents, and teeth images
+      // Fetch patient details, appointments, dental records, and documents
       const [
         patientData,
         appointmentsData,
         dentalRecordsData,
         documentsData,
-        teethImagesData,
       ] = await Promise.all([
         api.getPatientById(Number.parseInt(patientId), token),
         api.getAppointments(token),
         api.getDentalRecords(Number.parseInt(patientId), token),
         api.getDocuments(Number.parseInt(patientId), token),
-        api.getPatientTeethImages(Number.parseInt(patientId), token),
       ])
 
       console.log("Patient data from API:", patientData)
@@ -186,9 +181,6 @@ export default function PatientDetailPage() {
       // getDentalRecords and getDocuments already filter by patient ID on the backend
       setDentalRecords(dentalRecordsData)
       setDocuments(documentsData)
-
-      // Filter teeth images for this patient (getPatientTeethImages already filters)
-      setTeethImages(teethImagesData)
     } catch (error) {
       console.error("Error fetching patient data:", error)
     } finally {
@@ -655,40 +647,45 @@ export default function PatientDetailPage() {
             {/* Teeth Images & X-rays */}
             <div>
               <h3 className="font-medium text-gray-900 mb-3">Teeth Images & X-rays</h3>
-              {teethImages.length === 0 ? (
+              {documents.filter((doc) => doc.document_type === 'xray' || doc.document_type === 'dental_image' || doc.document_type === 'scan').length === 0 ? (
                 <p className="text-gray-500 text-sm">No teeth images or x-rays</p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {teethImages.map((img) => {
-                    // Construct full image URL
-                    const imageUrl = img.image.startsWith('http') 
-                      ? img.image 
-                      : `${BACKEND_URL}${img.image}`
-                    
-                    return (
-                      <div
-                        key={img.id}
-                        onClick={() => setSelectedImage(img)}
-                        className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <img
-                          src={imageUrl}
-                          alt={img.image_type || 'Dental image'}
-                          className="w-full h-32 object-cover rounded"
-                          onError={(e) => {
-                            console.error('Image failed to load:', imageUrl)
-                            e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E'
-                          }}
-                        />
-                        <p className="text-xs text-gray-600 mt-2">
-                          {img.image_type_display || "Dental Image"}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(img.uploaded_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )
-                  })}
+                  {documents
+                    .filter((doc) => doc.document_type === 'xray' || doc.document_type === 'dental_image' || doc.document_type === 'scan')
+                    .map((doc) => {
+                      // Use file_url if available, otherwise construct from file
+                      const fileUrl = doc.file_url || doc.file
+                      const imageUrl = fileUrl.startsWith('http') 
+                        ? fileUrl 
+                        : `${BACKEND_URL}${fileUrl}`
+                      
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => setSelectedDocument(doc)}
+                          className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <img
+                            src={imageUrl}
+                            alt={doc.title || 'Dental image'}
+                            className="w-full h-32 object-cover rounded"
+                            onError={(e) => {
+                              console.error('Image failed to load:', imageUrl)
+                              // Hide the entire card if image fails to load
+                              const card = e.currentTarget.closest('div.border')
+                              if (card) (card as HTMLElement).style.display = 'none'
+                            }}
+                          />
+                          <p className="text-xs text-gray-600 mt-2">
+                            {doc.document_type_display || "Dental Image"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(doc.uploaded_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )
+                    })}
                 </div>
               )}
             </div>
@@ -696,13 +693,22 @@ export default function PatientDetailPage() {
             {/* Other Documents */}
             <div>
               <h3 className="font-medium text-gray-900 mb-3">Other Documents</h3>
-              {documents.filter((doc) => doc.document_type !== "medical_certificate")
-                .length === 0 ? (
+              {documents.filter((doc) => 
+                doc.document_type !== "medical_certificate" && 
+                doc.document_type !== "xray" && 
+                doc.document_type !== "dental_image" && 
+                doc.document_type !== "scan"
+              ).length === 0 ? (
                 <p className="text-gray-500 text-sm">No other documents</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {documents
-                    .filter((doc) => doc.document_type !== "medical_certificate")
+                    .filter((doc) => 
+                      doc.document_type !== "medical_certificate" && 
+                      doc.document_type !== "xray" && 
+                      doc.document_type !== "dental_image" && 
+                      doc.document_type !== "scan"
+                    )
                     .map((doc) => (
                       <div
                         key={doc.id}
@@ -763,84 +769,6 @@ export default function PatientDetailPage() {
             fetchPatientData()
           }}
         />
-      )}
-
-      {/* Image Preview Modal */}
-      {selectedImage && (
-        <div 
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div 
-            className="relative max-w-5xl w-full bg-white rounded-xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-4 right-4 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-6 h-6 text-gray-700" />
-            </button>
-
-            <div className="p-6">
-              <div className="mb-4">
-                <img 
-                  src={selectedImage.image.startsWith('http') ? selectedImage.image : `${BACKEND_URL}${selectedImage.image}`}
-                  alt={selectedImage.image_type || 'Dental image'}
-                  className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-500">
-                      <strong>Uploaded:</strong> {new Date(selectedImage.uploaded_at).toLocaleDateString()}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      <strong>Type:</strong> {selectedImage.image_type_display || "Dental Image"}
-                    </p>
-                    {selectedImage.appointment_date && (
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <p className="text-sm font-medium text-gray-700 mb-1">Linked Appointment:</p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Date:</strong> {new Date(selectedImage.appointment_date).toLocaleDateString()} at {selectedImage.appointment_time}
-                        </p>
-                        {selectedImage.service_name && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Service:</strong> {selectedImage.service_name}
-                          </p>
-                        )}
-                        {selectedImage.dentist_name && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Dentist:</strong> {selectedImage.dentist_name}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleDownloadImage(
-                      selectedImage.image.startsWith('http') ? selectedImage.image : `${BACKEND_URL}${selectedImage.image}`,
-                      `dental-image-${selectedImage.uploaded_at}.jpg`
-                    )}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download
-                  </button>
-                </div>
-
-                {selectedImage.notes && (
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm font-medium text-gray-700 mb-1">Notes:</p>
-                    <p className="text-sm text-gray-600">{selectedImage.notes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Document Preview Modal */}
