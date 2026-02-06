@@ -354,10 +354,18 @@ class UserViewSet(viewsets.ModelViewSet):
         Optimized patient list endpoint with N+1 fix.
         Uses select_related and prefetch_related to minimize queries.
         """
+        # Get clinic filter from query params
+        clinic_id = request.query_params.get('clinic')
+        
+        # Build base query
+        queryset = User.objects.filter(user_type='patient')
+        
+        # Apply clinic filter if provided and user is owner
+        if clinic_id and request.user.user_type == 'owner':
+            queryset = queryset.filter(assigned_clinic_id=clinic_id)
+        
         # Build optimized query with JOINs and prefetching
-        patients = User.objects.filter(
-            user_type='patient'
-        ).select_related(
+        patients = queryset.select_related(
             'assigned_clinic'  # JOIN for clinic data (1 query)
         ).prefetch_related(
             Prefetch(
