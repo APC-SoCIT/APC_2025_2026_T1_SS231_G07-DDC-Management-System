@@ -193,6 +193,25 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       errors.push('Passwords do not match')
     }
 
+    // Validate birthday (must be more than 6 months old and younger than 100 years)
+    if (formData.birthday) {
+      const birthDate = new Date(formData.birthday)
+      const today = new Date()
+      const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate())
+      const hundredYearsAgo = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate())
+      
+      if (birthDate > today) {
+        invalid.push('birthday')
+        errors.push('Birthday cannot be in the future')
+      } else if (birthDate > sixMonthsAgo) {
+        invalid.push('birthday')
+        errors.push('Patient must be at least 6 months old to register')
+      } else if (birthDate <= hundredYearsAgo) {
+        invalid.push('birthday')
+        errors.push('Patient must be younger than 100 years old')
+      }
+    }
+
     // If there are any missing or invalid fields, show error
     if (missing.length > 0 || invalid.length > 0) {
       setMissingFields(missing)
@@ -219,31 +238,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       return
     }
 
-    // Validate birthday (must be more than 6 months old and younger than 100 years)
-    if (formData.birthday) {
-      const birthDate = new Date(formData.birthday)
-      const today = new Date()
-      const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, today.getDate())
-      const hundredYearsAgo = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate())
-      
-      if (birthDate > today) {
-        setError("Birthday cannot be in the future")
-        setIsLoading(false)
-        return
-      }
-      if (birthDate > sixMonthsAgo) {
-        setError("Patient must be at least 6 months old to register")
-        setIsLoading(false)
-        return
-      }
-      if (birthDate <= hundredYearsAgo) {
-        setError("Patient must be younger than 100 years old")
-        setIsLoading(false)
-        return
-      }
-    }
-
-    // Validate password length
+    // Validate password length (should be caught above, but double-check)
     if (formData.password.length < 8) {
       setError("Password must be at least 8 characters long")
       setIsLoading(false)
@@ -399,7 +394,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             <div>
               <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Birthday</label>
               <div className={`grid grid-cols-3 gap-2 p-2 rounded-lg ${
-                missingFields.includes('birthday') ? 'border-2 border-red-500 bg-red-50' : ''
+                missingFields.includes('birthday') || invalidFields.includes('birthday') ? 'border-2 border-red-500 bg-red-50' : ''
               }`}>
                 <select
                   required
