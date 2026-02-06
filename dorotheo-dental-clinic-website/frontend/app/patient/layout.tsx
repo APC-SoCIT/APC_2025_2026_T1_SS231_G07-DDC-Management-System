@@ -20,7 +20,6 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
   const [isDentalRecordsOpen, setIsDentalRecordsOpen] = useState(false)
   const [hasDocuments, setHasDocuments] = useState(false)
   const [hasImages, setHasImages] = useState(false)
-  const [hasTreatmentHistory, setHasTreatmentHistory] = useState(false)
 
   // Check if user has data in each section
   useEffect(() => {
@@ -35,10 +34,6 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
         // Check for images
         const images = await api.getPatientTeethImages(user.id, token)
         setHasImages(images && images.length > 0)
-
-        // Check for treatment history (dental records)
-        const records = await api.getDentalRecords(user.id, token)
-        setHasTreatmentHistory(records && records.length > 0)
       } catch (error) {
         console.error("Error checking data availability:", error)
       }
@@ -53,7 +48,6 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
   ]
 
   const dentalRecordsSubItems = [
-    { name: "Treatment History", href: "/patient/records/treatment", icon: Activity, hasData: hasTreatmentHistory },
     { name: "Documents", href: "/patient/records/documents", icon: FolderOpen, hasData: hasDocuments },
     { name: "Teeth & X-Ray Images", href: "/patient/records/images", icon: Camera, hasData: hasImages },
   ]
