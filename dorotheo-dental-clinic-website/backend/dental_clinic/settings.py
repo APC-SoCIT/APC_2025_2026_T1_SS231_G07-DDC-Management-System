@@ -108,15 +108,31 @@ REST_FRAMEWORK = {
     ],
 }
 
+# CORS Configuration - Allow all origins with credentials
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # Allow media files to be embedded in iframes
 X_FRAME_OPTIONS = 'SAMEORIGIN'
-
-# If you want to specify allowed origins in production, use:
-# CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-# For now, allowing all origins for easier setup
 
 # CSRF Settings for Railway deployment
 CSRF_TRUSTED_ORIGINS = [
