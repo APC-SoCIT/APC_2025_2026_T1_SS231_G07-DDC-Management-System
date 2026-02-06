@@ -39,12 +39,20 @@ try {
     Write-Host "[OK] Found pnpm $pnpmVersion" -ForegroundColor Green
 } catch {
     Write-Host "[WARNING] pnpm is not installed! Installing pnpm..." -ForegroundColor Yellow
-    npm install -g pnpm
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[OK] pnpm installed successfully!" -ForegroundColor Green
-    } else {
+    # Use the official pnpm installation method
+    iwr https://get.pnpm.io/install.ps1 -useb | iex
+    
+    # Refresh environment variables
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    
+    # Check if pnpm is now available
+    try {
+        $pnpmVersion = pnpm --version 2>&1
+        Write-Host "[OK] pnpm $pnpmVersion installed successfully!" -ForegroundColor Green
+    } catch {
         Write-Host "[ERROR] Failed to install pnpm!" -ForegroundColor Red
-        Write-Host "You can install it manually: npm install -g pnpm" -ForegroundColor Yellow
+        Write-Host "Please install it manually using: iwr https://get.pnpm.io/install.ps1 -useb | iex" -ForegroundColor Yellow
+        Write-Host "Then restart PowerShell and run this script again." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         exit 1
     }
