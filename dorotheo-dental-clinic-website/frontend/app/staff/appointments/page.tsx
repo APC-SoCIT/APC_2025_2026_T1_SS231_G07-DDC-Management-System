@@ -27,6 +27,7 @@ import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
 import BlockTimeSuccessModal from "@/components/block-time-success-modal"
+import ErrorModal from "@/components/error-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 
 interface Appointment {
@@ -151,6 +152,8 @@ export default function StaffAppointments() {
   }>>([])
   const [sortColumn, setSortColumn] = useState<'patient' | 'treatment' | 'date' | 'time' | 'dentist' | 'status' | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
 
   // Generate time slots based on service duration from 10:00 AM to 8:00 PM
   const parseDateOnly = (dateStr?: string) => {
@@ -529,13 +532,16 @@ export default function StaffAppointments() {
       setBookedSlots([])
       setAvailableDates(new Set())
     } catch (error: any) {
-      console.error("Error creating appointment:", error)
-      // Check if it's a double booking error from backend
+      // Handle specific error types from backend
       if (error.response?.data?.error === 'Time slot conflict') {
-        alert(error.response.data.message || "This time slot is already booked. Please select a different time.")
+        setErrorMessage(error.response.data.message || "This time slot is already booked. Please select a different time.")
+      } else if (error.response?.data?.error || error.message) {
+        // Display the specific error message from the backend (e.g., weekly booking limit, validation errors, etc.)
+        setErrorMessage(error.response?.data?.message || error.message)
       } else {
-        alert("Failed to create appointment. Please try again.")
+        setErrorMessage("Failed to create appointment. Please try again.")
       }
+      setShowErrorModal(true)
     } finally {
       setIsBookingAppointment(false)
     }
@@ -1743,7 +1749,7 @@ export default function StaffAppointments() {
       {/* Add Appointment Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
               <h2 className="text-2xl font-bold text-[var(--color-primary)]">Book Appointment</h2>
               <button
@@ -1761,19 +1767,24 @@ export default function StaffAppointments() {
               </button>
             </div>
 
-            <form onSubmit={handleAddAppointment} className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <form onSubmit={handleAddAppointment} className="p-6 space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
                   <strong>Note:</strong> The appointment will be confirmed immediately.
                 </p>
               </div>
 
               {/* Step 1: Clinic Selection */}
-              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
-                  <h3 className="font-semibold text-teal-900">Select Clinic Location</h3>
+                  <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-sm">
+                    1
+                  </div>
+                  <h3 className="text-lg font-semibold text-teal-900">Select Clinic Location</h3>
                 </div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                  Choose Clinic <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={newAppointment.clinic}
                   onChange={(e) => {
@@ -1788,25 +1799,27 @@ export default function StaffAppointments() {
                     setSelectedDate(undefined)
                     setAvailableDates(new Set())
                   }}
-                  className="w-full px-4 py-2.5 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white"
                   required
                 >
-                  <option value="">Select a clinic location...</option>
+                  <option value="">Select clinic location first...</option>
                   {allClinics.map((clinic: ClinicLocation) => (
                     <option key={clinic.id} value={clinic.id.toString()}>
                       {clinic.name} - {clinic.address}
                     </option>
                   ))}
                 </select>
-                {!newAppointment.clinic && (
-                  <p className="text-xs text-teal-700 mt-2">
-                    ⓘ Please select a clinic to see available dentists and services
-                  </p>
-                )}
+                <p className="text-xs text-teal-700 mt-2">
+                  📍 Choose the clinic location where you want the appointment
+                </p>
               </div>
 
-              {/* Patient Search/Select */}
-              <div>
+              {/* Two-column grid for better layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  {/* Patient Search/Select */}
+                  <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Patient <span className="text-red-500">*</span>
                 </label>
@@ -1898,34 +1911,37 @@ export default function StaffAppointments() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-                  Preferred Dentist <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newAppointment.dentist}
-                  onChange={(e) => {
-                    setNewAppointment({ ...newAppointment, dentist: e.target.value, date: "", time: "" })
-                    setSelectedDate(undefined)
-                  }}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  required
-                  disabled={!newAppointment.clinic}
-                >
-                  <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select a clinic first..."}</option>
-                  {staff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {formatDentistName(s)}
-                    </option>
-                  ))}
-                </select>
-                {newAppointment.dentist && (
-                  <p className="text-xs text-green-600 mt-1">
-                    ✓ Available dates are highlighted in the calendar below
-                  </p>
-                )}
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                      Preferred Dentist <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newAppointment.dentist}
+                      onChange={(e) => {
+                        setNewAppointment({ ...newAppointment, dentist: e.target.value, date: "", time: "" })
+                        setSelectedDate(undefined)
+                      }}
+                      className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      required
+                      disabled={!newAppointment.clinic}
+                    >
+                      <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select a clinic first..."}</option>
+                      {staff.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {formatDentistName(s)}
+                        </option>
+                      ))}
+                    </select>
+                    {newAppointment.dentist && (
+                      <p className="text-xs text-green-600 mt-1">
+                        ✓ Available dates are highlighted in the calendar below
+                      </p>
+                    )}
+                  </div>
+                </div>
 
+                {/* Right Column - Calendar and Time */}
+                <div className="space-y-4">
               {/* Calendar for date selection */}
               {newAppointment.dentist && (
                 <div>
@@ -2019,7 +2035,10 @@ export default function StaffAppointments() {
                   )}
                 </div>
               )}
+                </div>
+              </div>
 
+              {/* Full Width Fields - Service and Notes */}
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Treatment/Service <span className="text-red-500">*</span>
@@ -2129,6 +2148,16 @@ export default function StaffAppointments() {
           variant={confirmModalConfig.variant}
         />
       )}
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => {
+          setShowErrorModal(false)
+          setErrorMessage("")
+        }}
+        message={errorMessage}
+      />
     </div>
   )
 }

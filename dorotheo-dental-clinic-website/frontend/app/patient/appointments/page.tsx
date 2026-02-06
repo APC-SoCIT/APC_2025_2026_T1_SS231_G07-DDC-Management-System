@@ -1092,7 +1092,7 @@ export default function PatientAppointments() {
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            Past
+            Treatment History
           </button>
         </div>
       </div>
@@ -1113,7 +1113,7 @@ export default function PatientAppointments() {
               {statusFilter === "upcoming" && "No Confirmed Appointments"}
               {statusFilter === "waiting" && "No Waiting Appointments"}
               {statusFilter === "pending" && "No Pending Appointments"}
-              {statusFilter === "past" && "No Past Appointments"}
+              {statusFilter === "past" && "No Treatment History"}
             </p>
             <p className="text-sm text-[var(--color-text-muted)]">
               {statusFilter === "all" && "You don't have any appointments yet"}

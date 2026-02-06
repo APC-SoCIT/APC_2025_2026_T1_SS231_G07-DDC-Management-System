@@ -25,6 +25,7 @@ import ConfirmationModal from "@/components/confirmation-modal"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import BlockTimeModal from "@/components/block-time-modal"
 import BlockTimeSuccessModal from "@/components/block-time-success-modal"
+import ErrorModal from "@/components/error-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 
 interface Appointment {
@@ -146,6 +147,9 @@ export default function OwnerAppointments() {
   }>>([])
   const [sortColumn, setSortColumn] = useState<'patient' | 'treatment' | 'date' | 'time' | 'dentist' | 'status' | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+  
   const parseDateOnly = (dateStr?: string) => {
     if (!dateStr) return null
     const [year, month, day] = dateStr.split('-').map(Number)
@@ -520,13 +524,16 @@ export default function OwnerAppointments() {
       setBookedSlots([])
       setAvailableDates(new Set())
     } catch (error: any) {
-      console.error("Error creating appointment:", error)
-      // Check if it's a double booking error from backend
+      // Handle specific error types from backend
       if (error.response?.data?.error === 'Time slot conflict') {
-        alert(error.response.data.message || "This time slot is already booked. Please select a different time.")
+        setErrorMessage(error.response.data.message || "This time slot is already booked. Please select a different time.")
+      } else if (error.response?.data?.error || error.message) {
+        // Display the specific error message from the backend (e.g., weekly booking limit, validation errors, etc.)
+        setErrorMessage(error.response?.data?.message || error.message)
       } else {
-        alert("Failed to create appointment. Please try again.")
+        setErrorMessage("Failed to create appointment. Please try again.")
       }
+      setShowErrorModal(true)
     } finally {
       setIsBookingAppointment(false)
     }
@@ -2135,6 +2142,16 @@ export default function OwnerAppointments() {
           blockDetails={blockTimeSuccessDetails}
         />
       )}
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => {
+          setShowErrorModal(false)
+          setErrorMessage("")
+        }}
+        message={errorMessage}
+      />
     </div>
   )
 }

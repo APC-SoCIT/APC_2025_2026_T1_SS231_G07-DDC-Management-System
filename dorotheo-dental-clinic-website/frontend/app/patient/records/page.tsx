@@ -7,8 +7,8 @@ export default function DentalRecordsRedirect() {
   const router = useRouter()
 
   useEffect(() => {
-    // Redirect to treatment history as the default dental records page
-    router.replace("/patient/records/treatment")
+    // Redirect to documents as the default dental records page
+    router.replace("/patient/records/documents")
   }, [router])
 
   return (

@@ -789,12 +789,12 @@ export default function PatientAppointmentsPage() {
         </div>
       </div>
 
-      {/* Past Appointments */}
+      {/* Treatment History */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
         <div className="px-6 py-4 bg-[var(--color-background)] border-b border-[var(--color-border)]">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-gray-600" />
-            Past Appointments
+            Treatment History
           </h2>
         </div>
         <div className="overflow-x-auto">
@@ -813,7 +813,7 @@ export default function PatientAppointmentsPage() {
               {pastAppointments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    No past appointments
+                    No treatment history
                   </td>
                 </tr>
               ) : (
