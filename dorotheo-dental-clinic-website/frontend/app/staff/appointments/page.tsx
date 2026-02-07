@@ -218,7 +218,8 @@ export default function StaffAppointments() {
       // If we don't have service info, assume 30 minutes
       let bookedDuration = 30
       if (slot.service_id) {
-        const bookedService = services.find(s => s.id === slot.service_id)
+        const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
+        const bookedService = servicesArray.find(s => s.id === slot.service_id)
         if (bookedService && bookedService.duration) {
           bookedDuration = bookedService.duration
         }
@@ -311,7 +312,9 @@ export default function StaffAppointments() {
       try {
         setIsLoading(true)
         // Fetch all appointments once (without clinic filter)
-        const allResponse = await api.getAppointments(token, undefined)
+        const allResponseRaw = await api.getAppointments(token, undefined)
+        // Handle paginated response
+        const allResponse = Array.isArray(allResponseRaw) ? allResponseRaw : (allResponseRaw.results || [])
         setAllAppointments(allResponse)
         
         // Filter appointments locally based on selected clinic
@@ -360,8 +363,10 @@ export default function StaffAppointments() {
         
         if (response.ok) {
           const data = await response.json()
-          setBlockedTimeSlots(data)
-          console.log("Fetched blocked time slots:", data)
+          // Handle paginated response
+          const blockedSlotsArray = Array.isArray(data) ? data : (data.results || [])
+          setBlockedTimeSlots(blockedSlotsArray)
+          console.log("Fetched blocked time slots:", blockedSlotsArray)
         }
       } catch (error) {
         console.error("Error fetching blocked time slots:", error)
@@ -396,7 +401,8 @@ export default function StaffAppointments() {
         
         // Create set of available dates directly from the calendar availability
         const dates = new Set<string>()
-        availability.forEach((item: any) => {
+        const availabilityArray = Array.isArray(availability) ? availability : ((availability as any).results || [])
+        availabilityArray.forEach((item: any) => {
           if (item.is_available) {
             dates.add(item.date)
           }
@@ -426,10 +432,16 @@ export default function StaffAppointments() {
   useEffect(() => {
     const fetchBookedSlots = async () => {
       if (!token) return
+      if (!newAppointment.date) {
+        setBookedSlots([])
+        setIsLoadingBookedSlots(false)
+        return
+      }
 
       try {
+        setIsLoadingBookedSlots(true)
         // Fetch ALL booked slots (no dentist filter) to prevent double booking across all dentists
-        const date = newAppointment.date || undefined
+        const date = newAppointment.date
         
         console.log('[STAFF] Fetching booked slots for date:', date)
         const slots = await api.getBookedSlots(undefined, date, token)
@@ -437,6 +449,9 @@ export default function StaffAppointments() {
         setBookedSlots(slots)
       } catch (error) {
         console.error("Error fetching booked slots:", error)
+        setBookedSlots([])
+      } finally {
+        setIsLoadingBookedSlots(false)
       }
     }
 
@@ -458,14 +473,17 @@ export default function StaffAppointments() {
     setIsBookingAppointment(true)
 
     // Get the selected service duration
-    const selectedService = services.find(s => s.id === Number(newAppointment.service))
+    const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
+    const selectedService = servicesArray.find(s => s.id === Number(newAppointment.service))
     const duration = selectedService?.duration || 30
 
     // Check for time slot conflicts using booked slots with overlap detection
     const hasConflict = isTimeSlotBooked(newAppointment.date, newAppointment.time, duration)
 
     if (hasConflict) {
-      alert("This time slot conflicts with an existing appointment. Please select a different time.")
+      setIsBookingAppointment(false)
+      setErrorMessage("This time slot conflicts with an existing appointment or blocked time. Please select a different time.")
+      setShowErrorModal(true)
       return
     }
 
@@ -479,7 +497,9 @@ export default function StaffAppointments() {
     )
 
     if (hasDuplicate) {
-      alert("This patient already has this appointment booked for this time. Please select a different time or service.")
+      setIsBookingAppointment(false)
+      setErrorMessage("This patient already has this appointment booked for this time. Please select a different time or service.")
+      setShowErrorModal(true)
       return
     }
 
@@ -1890,7 +1910,7 @@ export default function StaffAppointments() {
                             <div className="text-sm text-gray-500">{patient.email}</div>
                           </div>
                         ))}
-                      {patients.filter((patient) => {
+                      {(Array.isArray(patients) ? patients : (patients.results || [])).filter((patient) => {
                         if (!patientSearchQuery) return true
                         const query = patientSearchQuery.toLowerCase()
                         return (
@@ -1998,16 +2018,25 @@ export default function StaffAppointments() {
                   </label>
                   <p className="text-xs text-gray-600 mb-2">
                     {(() => {
-                      const selectedService = services.find(s => s.id === Number(newAppointment.service))
+                      const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
+                      const selectedService = servicesArray.find(s => s.id === Number(newAppointment.service))
                       const duration = selectedService?.duration || 30
                       return `Select a ${duration}-minute time slot (10:00 AM - 8:00 PM). Grayed out times conflict with existing appointments.`
                     })()}
                   </p>
                   <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 border border-[var(--color-border)] rounded-lg">
-                    {(() => {
-                      const selectedService = services.find(s => s.id === Number(newAppointment.service))
+                    {isLoadingBookedSlots ? (
+                      <div className="col-span-3 flex flex-col items-center justify-center py-8 text-gray-500">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)] mb-2"></div>
+                        <p className="text-sm">Loading available time slots...</p>
+                      </div>
+                    ) : (() => {
+                      const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
+                      const selectedService = servicesArray.find(s => s.id === Number(newAppointment.service))
                       const duration = selectedService?.duration || 30
-                      return generateTimeSlots(duration, newAppointment.date).map((slot) => {
+                      const timeSlots = generateTimeSlots(duration, newAppointment.date)
+                      
+                      return timeSlots.map((slot) => {
                         const isBooked = isTimeSlotBooked(newAppointment.date, slot.value, duration)
                         const isSelected = newAppointment.time === slot.value
                         return (

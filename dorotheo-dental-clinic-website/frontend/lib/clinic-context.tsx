@@ -47,7 +47,9 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         console.log('[ClinicContext] Loaded clinics:', data);
-        setAllClinics(data);
+        // Handle both paginated response {results: [...]} and direct array
+        const clinics = Array.isArray(data) ? data : (data.results || []);
+        setAllClinics(clinics);
         
         // Load selected clinic from localStorage
         const savedClinicId = localStorage.getItem('selectedClinicId');

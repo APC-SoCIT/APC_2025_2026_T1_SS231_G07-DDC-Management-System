@@ -49,8 +49,10 @@ export default function OwnerDashboard() {
         
         // Fetch appointments - filter by clinic if not "all"
         const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
-        const appointments = await api.getAppointments(token, clinicId)
-        console.log('[Owner Dashboard] Fetched appointments:', appointments)
+        const appointmentsResponse = await api.getAppointments(token, clinicId)
+        console.log('[Owner Dashboard] Fetched appointments:', appointmentsResponse)
+        // Handle both paginated response {results: [...]} and direct array
+        const appointments = Array.isArray(appointmentsResponse) ? appointmentsResponse : (appointmentsResponse.results || [])
         console.log('[Owner Dashboard] Sample appointment dates:', appointments.slice(0, 3).map((a: any) => a.date))
         setAllAppointments(appointments)
 

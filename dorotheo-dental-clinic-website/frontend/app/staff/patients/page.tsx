@@ -100,8 +100,11 @@ export default function StaffPatients() {
         console.log("Fetched patients:", patientResults)
         console.log("Fetched appointments:", appointmentsResponse)
         
+        // Handle paginated appointments response
+        const appointmentsArray = Array.isArray(appointmentsResponse) ? appointmentsResponse : (appointmentsResponse.results || [])
+        
         // Store appointments for later use
-        setAppointments(appointmentsResponse)
+        setAppointments(appointmentsArray)
         
         // Get current date for comparison
         const today = new Date()
@@ -112,7 +115,7 @@ export default function StaffPatients() {
           .filter((user: any) => !user.is_archived)
           .map((user: any) => {
           // Filter appointments for this patient
-          const patientAppointments = appointmentsResponse.filter(
+          const patientAppointments = appointmentsArray.filter(
             (apt: any) => apt.patient === user.id
           )
           
@@ -386,11 +389,12 @@ export default function StaffPatients() {
       
       // Handle paginated response
       const patientResults = (patientsResponse as any).results || patientsResponse
+      const appointmentsArray = Array.isArray(appointmentsResponse) ? appointmentsResponse : (appointmentsResponse.results || [])
 
       const transformedPatients = patientResults
         .filter((user: any) => !user.is_archived)
         .map((user: any) => {
-          const patientAppointments = appointmentsResponse.filter(
+          const patientAppointments = appointmentsArray.filter(
             (apt: any) => apt.patient === user.id
           )
           
