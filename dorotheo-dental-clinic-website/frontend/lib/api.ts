@@ -94,7 +94,12 @@ export const api = {
   getServices: async (clinicId?: number) => {
     const params = clinicId ? `?clinic_id=${clinicId}` : '';
     const response = await fetch(`${API_BASE_URL}/services/${params}`)
-    return response.json()
+    if (!response.ok) {
+      throw new Error(`Failed to fetch services: ${response.statusText}`)
+    }
+    const data = await response.json()
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : []
   },
 
   createService: async (data: FormData, token: string) => {

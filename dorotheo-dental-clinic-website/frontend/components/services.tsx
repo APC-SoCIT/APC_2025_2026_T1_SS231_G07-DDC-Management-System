@@ -48,9 +48,12 @@ export default function Services() {
       try {
         setIsLoading(true)
         const data = await api.getServices()
-        setServices(data)
+        // Ensure data is an array
+        setServices(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error("Failed to fetch services:", error)
+        // Keep services as empty array on error
+        setServices([])
       } finally {
         setIsLoading(false)
       }
@@ -59,10 +62,11 @@ export default function Services() {
     fetchServices()
   }, [])
 
-  // Filter services by category
+  // Filter services by category - ensure services is always an array
+  const safeServices = Array.isArray(services) ? services : []
   const filteredServices = selectedCategory === "all" 
-    ? services 
-    : services.filter(service => service.category === selectedCategory)
+    ? safeServices 
+    : safeServices.filter(service => service.category === selectedCategory)
 
   const displayedServices = showAll ? filteredServices : filteredServices.slice(0, 3)
 
