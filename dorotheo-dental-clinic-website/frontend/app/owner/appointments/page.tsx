@@ -307,8 +307,10 @@ export default function OwnerAppointments() {
         setIsLoading(true)
         // Fetch all appointments once (without clinic filter)
         const allResponseRaw = await api.getAppointments(token, undefined)
+        console.log("Raw appointments response:", allResponseRaw)
         // Handle paginated response
         const allResponse = Array.isArray(allResponseRaw) ? allResponseRaw : (allResponseRaw.results || [])
+        console.log("Processed appointments:", allResponse.length, "appointments")
         setAllAppointments(allResponse)
         
         // Filter appointments locally based on selected clinic
@@ -319,10 +321,12 @@ export default function OwnerAppointments() {
           const filtered = allResponse.filter((apt: Appointment) => 
             apt.clinic === clinicId || apt.clinic_data?.id === clinicId
           )
+          console.log("Filtered appointments for clinic:", filtered.length)
           setAppointments(filtered)
         }
       } catch (error) {
         console.error("Error fetching appointments:", error)
+        setAppointments([])
       } finally {
         setIsLoading(false)
       }

@@ -91,16 +91,18 @@ export default function OwnerPatients() {
           results: any[]
         }
         
-        // Set pagination metadata
-        const patientResults = paginatedData.results || patientsResponse
+        // Set pagination metadata with defensive checks
+        const patientResults = Array.isArray(paginatedData.results) ? paginatedData.results : (Array.isArray(patientsResponse) ? patientsResponse : [])
         setTotalCount(paginatedData.count || patientResults.length)
         setTotalPages(Math.ceil((paginatedData.count || patientResults.length) / pageSize))
         
         console.log("Fetched patients:", patientResults)
         console.log("Fetched appointments:", appointmentsResponse)
+        console.log("Patient count:", patientResults.length)
+        console.log("Appointments count:", Array.isArray(appointmentsResponse) ? appointmentsResponse.length : 'not an array')
         
-        // Handle paginated appointments response
-        const appointmentsArray = Array.isArray(appointmentsResponse) ? appointmentsResponse : (appointmentsResponse.results || [])
+        // Handle paginated appointments response with defensive array check
+        const appointmentsArray = Array.isArray(appointmentsResponse) ? appointmentsResponse : (appointmentsResponse?.results || [])
         
         // Store appointments for later use
         setAppointments(appointmentsArray)

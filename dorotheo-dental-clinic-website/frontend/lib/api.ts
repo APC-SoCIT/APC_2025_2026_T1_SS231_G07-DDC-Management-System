@@ -136,7 +136,12 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${params}`, {
       headers: { Authorization: `Token ${token}` },
     })
-    return response.json()
+    if (!response.ok) {
+      throw new Error(`Failed to fetch appointments: ${response.statusText}`)
+    }
+    const data = await response.json()
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : (data.results || [])
   },
 
   createAppointment: async (data: any, token: string) => {
@@ -310,7 +315,12 @@ export const api = {
     )
     if (!response.ok) throw new Error('Failed to fetch patients')
     // Response format: { count: number, next: string|null, previous: string|null, results: Patient[] }
-    return response.json()
+    const data = await response.json()
+    // Ensure results array exists
+    if (data.results && !Array.isArray(data.results)) {
+      data.results = []
+    }
+    return data
   },
 
   // Get all patients without pagination (for backward compatibility)
