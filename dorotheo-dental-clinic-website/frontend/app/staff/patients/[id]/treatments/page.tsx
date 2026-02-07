@@ -77,7 +77,9 @@ export default function StaffPatientTreatments() {
     
     try {
       const response = await api.getPatients(token)
-      const patient = response.find((p: any) => p.id === patientId)
+      // Handle paginated response - extract results array
+      const patients = Array.isArray(response) ? response : (response.results || [])
+      const patient = patients.find((p: any) => p.id === patientId)
       if (patient) {
         setPatientName(`${patient.first_name} ${patient.last_name}`)
       }

@@ -32,7 +32,8 @@ from .models import (
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification,
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
-    FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot
+    FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot,
+    Invoice, InvoiceItem, PatientBalance
 )
 from .serializers import (
     UserSerializer, ServiceSerializer, AppointmentSerializer,
@@ -41,7 +42,8 @@ from .serializers import (
     TreatmentPlanSerializer, TeethImageSerializer, StaffAvailabilitySerializer,
     DentistAvailabilitySerializer, DentistNotificationSerializer, AppointmentNotificationSerializer, 
     PasswordResetTokenSerializer, PatientIntakeFormSerializer,
-    FileAttachmentSerializer, ClinicalNoteSerializer, TreatmentAssignmentSerializer, BlockedTimeSlotSerializer
+    FileAttachmentSerializer, ClinicalNoteSerializer, TreatmentAssignmentSerializer, BlockedTimeSlotSerializer,
+    InvoiceSerializer, InvoiceItemSerializer, InvoiceCreateSerializer, PatientBalanceSerializer
 )
 
 
@@ -1997,6 +1999,7 @@ class AppointmentNotificationViewSet(viewsets.ModelViewSet):
     queryset = AppointmentNotification.objects.all()
     serializer_class = AppointmentNotificationSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Disable pagination for notifications
 
     def get_queryset(self):
         """Return notifications for the current user (staff, owner, or patient)"""
@@ -2233,3 +2236,261 @@ def chatbot_query(request):
             {'error': f'Server error: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ============================================================================
+# INVOICE VIEWSET
+# ============================================================================
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing invoices
+    
+    Endpoints:
+    - GET /api/invoices/ - List all invoices (filterable by patient, status, clinic)
+    - POST /api/invoices/create/ - Create new invoice
+    - GET /api/invoices/{id}/ - Get invoice details
+    - GET /api/invoices/patient_balance/{patient_id}/ - Get patient balance
+    """
+    queryset = Invoice.objects.all()
+    serializer_class = InvoiceSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter invoices based on user role and query parameters"""
+        queryset = Invoice.objects.select_related(
+            'patient', 'clinic', 'created_by', 'appointment',
+            'appointment__service', 'appointment__dentist'
+        ).prefetch_related('items', 'items__inventory_item')
+        
+        user = self.request.user
+        
+        # Patients can only see their own invoices
+        if user.user_type == 'patient':
+            queryset = queryset.filter(patient=user)
+        
+        # Filter by query parameters
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        clinic_id = self.request.query_params.get('clinic_id')
+        if clinic_id:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        
+        return queryset.order_by('-created_at')
+    
+    @action(detail=False, methods=['post'])
+    def create_invoice(self, request):
+        """
+        Create a new invoice for a completed appointment
+        
+        POST /api/invoices/create_invoice/
+        Body:
+        {
+            "appointment_id": 123,
+            "service_charge": 1500.00,
+            "items": [
+                {
+                    "inventory_item_id": 45,
+                    "quantity": 1,
+                    "unit_price": 500.00,
+                    "description": "Optional description"
+                }
+            ],
+            "due_days": 7,
+            "notes": "Optional notes",
+            "send_email": true
+        }
+        """
+        from .invoice_utils import (
+            generate_invoice_number,
+            generate_reference_number,
+            calculate_invoice_totals,
+            update_patient_balance,
+            deduct_inventory_items,
+            calculate_due_date
+        )
+        from django.db import transaction
+        
+        # Validate input data
+        serializer = InvoiceCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
+        
+        try:
+            with transaction.atomic():
+                # Get appointment
+                appointment = Appointment.objects.select_related(
+                    'patient', 'service', 'dentist', 'clinic'
+                ).get(id=data['appointment_id'])
+                
+                # Generate invoice and reference numbers
+                invoice_number = generate_invoice_number()
+                reference_number = generate_reference_number()
+                
+                # Calculate totals
+                totals = calculate_invoice_totals(
+                    service_charge=data['service_charge'],
+                    items=data.get('items', [])
+                )
+                
+                # Calculate dates
+                invoice_date = date.today()
+                due_date = calculate_due_date(invoice_date, data.get('due_days', 7))
+                
+                # Create invoice
+                invoice = Invoice.objects.create(
+                    invoice_number=invoice_number,
+                    reference_number=reference_number,
+                    appointment=appointment,
+                    patient=appointment.patient,
+                    clinic=appointment.clinic,
+                    created_by=request.user,
+                    service_charge=data['service_charge'],
+                    items_subtotal=totals['items_subtotal'],
+                    subtotal=totals['subtotal'],
+                    interest_amount=0,  # No interest on initial invoice
+                    total_due=totals['total_due'],
+                    balance=totals['balance'],
+                    status='sent',  # Automatically sent
+                    invoice_date=invoice_date,
+                    due_date=due_date,
+                    notes=data.get('notes', ''),
+                    sent_at=timezone.now()
+                )
+                
+                # Create invoice items
+                for item_data in data.get('items', []):
+                    inventory_item = InventoryItem.objects.get(id=item_data['inventory_item_id'])
+                    InvoiceItem.objects.create(
+                        invoice=invoice,
+                        inventory_item=inventory_item,
+                        item_name=item_data['item_name'],
+                        description=item_data.get('description', ''),
+                        quantity=item_data['quantity'],
+                        unit_price=item_data['unit_price']
+                    )
+                
+                # Deduct inventory stock
+                if data.get('items'):
+                    deduct_inventory_items(data['items'])
+                
+                # Update patient balance
+                update_patient_balance(
+                    patient_id=appointment.patient.id,
+                    invoice_amount=invoice.total_due,
+                    operation='add'
+                )
+                
+                # Update last_invoice_date
+                patient_balance = PatientBalance.objects.get(patient=appointment.patient)
+                patient_balance.last_invoice_date = invoice_date
+                patient_balance.save()
+                
+                # Send email notification with PDF attachment
+                email_sent = False
+                if data.get('send_email', True):
+                    from .email_service import send_invoice_emails
+                    try:
+                        # Send emails to both patient and staff
+                        staff_emails = data.get('staff_emails', None)
+                        email_results = send_invoice_emails(invoice, staff_emails)
+                        email_sent = email_results.get('patient', False) or email_results.get('staff', False)
+                    except Exception as e:
+                        logger.error(f"Error sending invoice emails: {str(e)}")
+                        # Don't fail the entire request if email fails
+                        pass
+                
+                # Return response
+                invoice_serializer = InvoiceSerializer(invoice, context={'request': request})
+                return Response({
+                    'invoice': invoice_serializer.data,
+                    'message': 'Invoice created successfully',
+                    'email_sent': email_sent
+                }, status=status.HTTP_201_CREATED)
+                
+        except Appointment.DoesNotExist:
+            return Response(
+                {'error': 'Appointment not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except InventoryItem.DoesNotExist as e:
+            return Response(
+                {'error': f'Inventory item not found: {str(e)}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error creating invoice: {str(e)}")
+            return Response(
+                {'error': f'Failed to create invoice: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='patient_balance/(?P<patient_id>[^/.]+)')
+    def patient_balance(self, request, patient_id=None):
+        """
+        Get patient balance and invoice history
+        
+        GET /api/invoices/patient_balance/{patient_id}/
+        """
+        try:
+            patient = User.objects.get(id=patient_id, user_type='patient')
+            
+            # Get or create patient balance
+            balance, created = PatientBalance.objects.get_or_create(
+                patient=patient,
+                defaults={
+                    'total_invoiced': 0,
+                    'total_paid': 0,
+                    'current_balance': 0
+                }
+            )
+            
+            # Get all invoices for this patient
+            invoices = Invoice.objects.filter(patient=patient).select_related(
+                'clinic', 'appointment', 'appointment__service'
+            ).prefetch_related('items').order_by('-created_at')
+            
+            # Calculate overdue amount
+            overdue_amount = invoices.filter(
+                status='overdue'
+            ).aggregate(total=Sum('balance'))['total'] or 0
+            
+            # Serialize data
+            balance_serializer = PatientBalanceSerializer(balance)
+            invoices_serializer = InvoiceSerializer(
+                invoices, many=True, context={'request': request}
+            )
+            
+            return Response({
+                'patient_id': patient.id,
+                'patient_name': patient.get_full_name(),
+                'patient_email': patient.email,
+                'balance': balance_serializer.data,
+                'overdue_amount': float(overdue_amount),
+                'invoices': invoices_serializer.data
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching patient balance: {str(e)}")
+            return Response(
+                {'error': f'Failed to fetch patient balance: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

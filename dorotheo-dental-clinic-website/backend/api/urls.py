@@ -6,7 +6,7 @@ from .views import (
     ClinicLocationViewSet, TreatmentPlanViewSet, TeethImageViewSet,
     StaffAvailabilityViewSet, DentistAvailabilityViewSet, DentistNotificationViewSet, AppointmentNotificationViewSet,
     PatientIntakeFormViewSet, FileAttachmentViewSet, ClinicalNoteViewSet, TreatmentAssignmentViewSet,
-    BlockedTimeSlotViewSet,
+    BlockedTimeSlotViewSet, InvoiceViewSet,
     register, login, logout, current_user, analytics, 
     request_password_reset, reset_password, chatbot_query
 )
@@ -31,6 +31,7 @@ router.register('intake-forms', PatientIntakeFormViewSet)
 router.register('file-attachments', FileAttachmentViewSet)
 router.register('clinical-notes', ClinicalNoteViewSet)
 router.register('treatment-assignments', TreatmentAssignmentViewSet)
+router.register('invoices', InvoiceViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

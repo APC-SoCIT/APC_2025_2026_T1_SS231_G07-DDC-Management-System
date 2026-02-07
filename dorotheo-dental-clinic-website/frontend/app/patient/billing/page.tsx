@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Download, CreditCard, CheckCircle, Clock } from "lucide-react"
+import { Download, CreditCard, CheckCircle, Clock, FileText } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ClinicBadge } from "@/components/clinic-badge"
@@ -17,46 +17,58 @@ interface ClinicLocation {
   email: string
 }
 
-interface Billing {
+interface Invoice {
   id: number
+  invoice_number: string
+  reference_number: string
+  appointment: number
   patient: number
-  patient_name?: string
-  amount: number
-  status: string
-  description: string
-  date?: string
+  clinic: number
+  clinic_data?: ClinicLocation
+  created_by: number
+  service_charge: string
+  items_subtotal: string
+  subtotal: string
+  interest_rate: string
+  interest_amount: string
+  total_due: string
+  amount_paid: string
+  balance: string
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  invoice_date: string
+  due_date: string
   created_at: string
-  created_by?: number
-  created_by_name?: string
-  clinic?: number | null
-  clinic_data?: ClinicLocation | null
+  updated_at: string
+  sent_at?: string
+  paid_at?: string
+  notes: string
 }
 
 export default function PatientBilling() {
-  const { token } = useAuth()
-  const [billings, setBillings] = useState<Billing[]>([])
+  const { token, user } = useAuth()
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchBillings = async () => {
-      if (!token) return
+    const fetchInvoices = async () => {
+      if (!token || !user) return
 
       try {
         setIsLoading(true)
-        const data = await api.getBillingByStatus("all", token)
-        setBillings(data)
+        const data = await api.getInvoices(token, user.id)
+        setInvoices(data)
       } catch (error) {
-        console.error("Error fetching billings:", error)
+        console.error("Error fetching invoices:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchBillings()
-  }, [token])
+    fetchInvoices()
+  }, [token, user])
 
-  const totalPending = billings.filter((b) => b.status === 'pending').reduce((sum, b) => sum + b.amount, 0)
-  const totalPaid = billings.filter((b) => b.status === 'paid').reduce((sum, b) => sum + b.amount, 0)
+  const totalBalance = invoices.reduce((sum, inv) => sum + parseFloat(inv.balance || '0'), 0)
+  const totalPaid = invoices.reduce((sum, inv) => sum + parseFloat(inv.amount_paid || '0'), 0)
 
   return (
     <div className="space-y-6">
@@ -73,8 +85,8 @@ export default function PatientBilling() {
               <Clock className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-sm text-[var(--color-text-muted)]">Pending Balance</p>
-              <p className="text-2xl font-bold text-[var(--color-text)]">PHP {totalPending.toLocaleString()}</p>
+              <p className="text-sm text-[var(--color-text-muted)]">Outstanding Balance</p>
+              <p className="text-2xl font-bold text-[var(--color-text)]">₱{totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
           </div>
         </div>
@@ -86,57 +98,68 @@ export default function PatientBilling() {
             </div>
             <div>
               <p className="text-sm text-[var(--color-text-muted)]">Total Paid</p>
-              <p className="text-2xl font-bold text-[var(--color-text)]">PHP {totalPaid.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-[var(--color-text)]">₱{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Billing List */}
+      {/* Invoices List */}
       <div className="bg-white rounded-xl border border-[var(--color-border)]">
         <div className="p-6 border-b border-[var(--color-border)]">
-          <h2 className="text-xl font-semibold text-[var(--color-primary)]">Statement of Accounts</h2>
+          <h2 className="text-xl font-semibold text-[var(--color-primary)]">Invoices</h2>
         </div>
 
         {isLoading ? (
           <div className="p-12 text-center text-[var(--color-text-muted)]">
-            <p>Loading billing information...</p>
+            <p>Loading invoices...</p>
           </div>
-        ) : billings.length === 0 ? (
+        ) : invoices.length === 0 ? (
           <div className="p-12 text-center">
-            <CreditCard className="w-16 h-16 mx-auto mb-4 text-[var(--color-text-muted)] opacity-30" />
-            <p className="text-lg font-medium text-[var(--color-text)] mb-2">No Billing Records</p>
-            <p className="text-sm text-[var(--color-text-muted)]">Your billing statements will appear here</p>
+            <FileText className="w-16 h-16 mx-auto mb-4 text-[var(--color-text-muted)] opacity-30" />
+            <p className="text-lg font-medium text-[var(--color-text)] mb-2">No Invoices Yet</p>
+            <p className="text-sm text-[var(--color-text-muted)]">Your invoices will appear here after appointments</p>
           </div>
         ) : (
           <div className="divide-y divide-[var(--color-border)]">
-            {billings.map((billing) => (
-              <div key={billing.id} className="p-6">
+            {invoices.map((invoice) => (
+              <div key={invoice.id} className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-[var(--color-primary)] rounded-lg flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="w-6 h-6 text-[var(--color-accent)]" />
+                      <FileText className="w-6 h-6 text-[var(--color-accent)]" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-[var(--color-text)] mb-1">{billing.description || "Treatment"}</h3>
-                      <p className="text-sm text-[var(--color-text-muted)] mb-2">{billing.date || new Date(billing.created_at).toLocaleDateString()}</p>
-                      {billing.clinic_data && <ClinicBadge clinic={billing.clinic_data} size="sm" />}
+                      <h3 className="font-semibold text-[var(--color-text)] mb-1">{invoice.invoice_number}</h3>
+                      <p className="text-xs text-[var(--color-text-muted)] mb-1">Ref: {invoice.reference_number}</p>
+                      <p className="text-sm text-[var(--color-text-muted)] mb-2">
+                        Issued: {new Date(invoice.invoice_date).toLocaleDateString()} | 
+                        Due: {new Date(invoice.due_date).toLocaleDateString()}
+                      </p>
+                      {invoice.clinic_data && <ClinicBadge clinic={invoice.clinic_data} size="sm" />}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-xl font-bold text-[var(--color-text)]">PHP {billing.amount?.toLocaleString() || 0}</p>
+                      <p className="text-sm text-[var(--color-text-muted)]">Balance</p>
+                      <p className="text-xl font-bold text-[var(--color-text)]">₱{parseFloat(invoice.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">Total: ₱{parseFloat(invoice.total_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                       <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          billing.status === 'paid' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                        className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${
+                          invoice.status === 'paid' ? "bg-green-100 text-green-700" : 
+                          invoice.status === 'overdue' ? "bg-red-100 text-red-700" :
+                          "bg-blue-100 text-blue-700"
                         }`}
                       >
-                        {billing.status === 'paid' ? "Paid" : "Pending"}
+                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                       </span>
                     </div>
 
-                    <button className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors">
+                    <button 
+                      className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                      title="Download Invoice PDF"
+                    >
                       <Download className="w-5 h-5 text-[var(--color-primary)]" />
                     </button>
                   </div>

@@ -1235,6 +1235,258 @@ class EmailService:
             html_content=html_content,
             send_to_admin=False  # Don't BCC admin for password resets (privacy)
         )
+    
+    @staticmethod
+    def send_invoice_email_to_patient(invoice):
+        """
+        Send invoice email with PDF attachment to the patient.
+        
+        Args:
+            invoice: Invoice model instance
+            
+        Returns:
+            bool: True if email was sent successfully, False otherwise
+        """
+        try:
+            from .invoice_generator import generate_invoice_pdf
+            from django.core.mail import EmailMessage
+            
+            # Get patient balance
+            patient_balance = 0
+            if hasattr(invoice.patient, 'balance'):
+                patient_balance = invoice.patient.balance.total_balance
+            
+            # Prepare context for email template
+            context = {
+                'patient_name': invoice.patient.first_name,
+                'invoice_number': invoice.invoice_number,
+                'reference_number': invoice.reference_number,
+                'invoice_date': invoice.invoice_date.strftime('%B %d, %Y'),
+                'due_date': invoice.due_date.strftime('%B %d, %Y'),
+                'service_name': invoice.appointment.service.name,
+                'total_due': f"{invoice.total_due:,.2f}",
+                'patient_balance': f"{patient_balance:,.2f}",
+                'clinic_name': invoice.clinic.name,
+                'clinic_address': invoice.clinic.address,
+                'clinic_email': getattr(invoice.clinic, 'email', 'contact@clinic.com'),
+                'clinic_phone': invoice.clinic.phone,
+                'portal_url': f"{settings.FRONTEND_URL}/patient/billing" if hasattr(settings, 'FRONTEND_URL') else "#",
+            }
+            
+            # Render email HTML
+            html_message = render_to_string('emails/invoice_patient.html', context)
+            
+            # Create email
+            subject = f"Invoice {invoice.invoice_number} - {invoice.clinic.name}"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            recipient_list = [invoice.patient.email]
+            
+            email = EmailMessage(
+                subject=subject,
+                body=html_message,
+                from_email=from_email,
+                to=recipient_list,
+            )
+            
+            # Set content type to HTML
+            email.content_subtype = 'html'
+            
+            # Try to generate and attach PDF (optional - don't fail if it doesn't work)
+            try:
+                pdf_content, pdf_filename = generate_invoice_pdf(invoice)
+                email.attach(pdf_filename, pdf_content, 'application/pdf')
+                logger.info(f"PDF attached to patient invoice email for {invoice.invoice_number}")
+            except Exception as pdf_error:
+                logger.warning(f"Could not generate PDF for invoice {invoice.invoice_number}: {str(pdf_error)}. Email will be sent without PDF.")
+            
+            # Send email
+            email.send()
+            
+            logger.info(f"Invoice email sent to patient {invoice.patient.email} for invoice {invoice.invoice_number}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending invoice email to patient: {str(e)}")
+            logger.exception("Full traceback:")  # This logs the full traceback
+            return False
+    
+    @staticmethod
+    def send_invoice_email_to_staff(invoice, staff_emails=None):
+        """
+        Send invoice notification email with PDF attachment to clinic staff.
+        
+        Args:
+            invoice: Invoice model instance
+            staff_emails: Optional list of staff email addresses. If None, sends to clinic default emails.
+            
+        Returns:
+            bool: True if email was sent successfully, False otherwise
+        """
+        try:
+            from .invoice_generator import generate_invoice_pdf
+            from django.core.mail import EmailMessage
+            
+            # Get patient balance
+            patient_balance = 0
+            if hasattr(invoice.patient, 'balance'):
+                patient_balance = invoice.patient.balance.total_balance
+            
+            # Prepare invoice items for email
+            invoice_items = []
+            for item in invoice.items.all():
+                invoice_items.append({
+                    'item_name': item.item_name,
+                    'quantity': item.quantity,
+                    'total_price': f"{item.total_price:,.2f}"
+                })
+            
+            # Prepare context for email template
+            context = {
+                'created_by_name': f"{invoice.created_by.first_name} {invoice.created_by.last_name}",
+                'invoice_number': invoice.invoice_number,
+                'reference_number': invoice.reference_number,
+                'patient_name': f"{invoice.patient.first_name} {invoice.patient.last_name}",
+                'patient_email': invoice.patient.email,
+                'appointment_date': invoice.appointment.date.strftime('%B %d, %Y'),
+                'service_name': invoice.appointment.service.name,
+                'dentist_name': f"{invoice.appointment.dentist.first_name} {invoice.appointment.dentist.last_name}",
+                'service_charge': f"{invoice.service_charge:,.2f}",
+                'total_due': f"{invoice.total_due:,.2f}",
+                'due_date': invoice.due_date.strftime('%B %d, %Y'),
+                'patient_balance': f"{patient_balance:,.2f}",
+                'invoice_items': invoice_items,
+                'clinic_name': invoice.clinic.name,
+                'clinic_address': invoice.clinic.address,
+                'staff_portal_url': f"{settings.FRONTEND_URL}/staff/billing" if hasattr(settings, 'FRONTEND_URL') else None,
+            }
+            
+            # Render email HTML
+            html_message = render_to_string('emails/invoice_staff.html', context)
+            
+            # Determine recipient list
+            if staff_emails is None:
+                # Default: send to billing email if configured, otherwise skip
+                staff_emails = []
+                if hasattr(settings, 'BILLING_EMAIL') and settings.BILLING_EMAIL:
+                    staff_emails.append(settings.BILLING_EMAIL)
+                # If no staff emails configured, don't send
+                if not staff_emails:
+                    logger.warning(f"No staff emails configured for invoice {invoice.invoice_number}. Skipping staff email.")
+                    return False
+            
+            # Create email
+            subject = f"New Invoice Created: {invoice.invoice_number}"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            
+            email = EmailMessage(
+                subject=subject,
+                body=html_message,
+                from_email=from_email,
+                to=staff_emails,
+            )
+            
+            # Set content type to HTML
+            email.content_subtype = 'html'
+            
+            # Try to generate and attach PDF (optional - don't fail if it doesn't work)
+            try:
+                pdf_content, pdf_filename = generate_invoice_pdf(invoice)
+                email.attach(pdf_filename, pdf_content, 'application/pdf')
+                logger.info(f"PDF attached to staff invoice email for {invoice.invoice_number}")
+            except Exception as pdf_error:
+                logger.warning(f"Could not generate PDF for invoice {invoice.invoice_number}: {str(pdf_error)}. Email will be sent without PDF.")
+            
+            # Send email
+            email.send()
+            
+            logger.info(f"Invoice email sent to staff for invoice {invoice.invoice_number}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending invoice email to staff: {str(e)}")
+            logger.exception("Full traceback:")  # This logs the full traceback
+            return False
+    
+    @staticmethod
+    def send_invoice_emails(invoice, staff_emails=None):
+        """
+        Send invoice emails to both patient and staff.
+        
+        Args:
+            invoice: Invoice model instance
+            staff_emails: Optional list of staff email addresses for staff notification
+            
+        Returns:
+            dict: Status of email sending with keys 'patient' and 'staff' (both bool)
+        """
+        results = {
+            'patient': EmailService.send_invoice_email_to_patient(invoice),
+            'staff': EmailService.send_invoice_email_to_staff(invoice, staff_emails)
+        }
+        
+        return results
+    
+    @staticmethod
+    def send_payment_receipt_email(invoice, payment_amount):
+        """
+        Send payment receipt email to patient after a payment is made.
+        
+        Args:
+            invoice: Invoice model instance
+            payment_amount: Amount that was paid
+            
+        Returns:
+            bool: True if email was sent successfully, False otherwise
+        """
+        try:
+            # Get patient balance
+            patient_balance = 0
+            if hasattr(invoice.patient, 'balance'):
+                patient_balance = invoice.patient.balance.total_balance
+            
+            # Prepare context for plain text email (can be enhanced with HTML template later)
+            subject = f"Payment Receipt for Invoice {invoice.invoice_number}"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            recipient_list = [invoice.patient.email]
+            
+            message = f"""
+Dear {invoice.patient.first_name},
+
+Thank you for your payment of ₱{payment_amount:,.2f} for Invoice {invoice.invoice_number}.
+
+Invoice Details:
+- Invoice Number: {invoice.invoice_number}
+- Original Amount: ₱{invoice.total_due:,.2f}
+- Amount Paid: ₱{payment_amount:,.2f}
+- Remaining Balance: ₱{invoice.balance:,.2f}
+
+Your Current Patient Balance: ₱{patient_balance:,.2f}
+
+If you have any questions, please contact us at {invoice.clinic.email} or {invoice.clinic.contact_number}.
+
+Thank you for choosing {invoice.clinic.name}.
+
+Best regards,
+{invoice.clinic.name}
+{invoice.clinic.address}
+            """
+            
+            from django.core.mail import EmailMessage
+            email = EmailMessage(
+                subject=subject,
+                body=message,
+                from_email=from_email,
+                to=recipient_list,
+            )
+            
+            email.send()
+            
+            logger.info(f"Payment receipt email sent for invoice {invoice.invoice_number}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending payment receipt email: {str(e)}")
+            return False
 
 
 # Convenience functions for easy import
@@ -1273,3 +1525,15 @@ def send_password_reset_email(user, reset_link, token, expires_in_hours=1):
 
 def send_password_reset_confirmation(user):
     return EmailService.send_password_reset_confirmation(user)
+
+def send_invoice_emails(invoice, staff_emails=None):
+    return EmailService.send_invoice_emails(invoice, staff_emails)
+
+def send_invoice_email_to_patient(invoice):
+    return EmailService.send_invoice_email_to_patient(invoice)
+
+def send_invoice_email_to_staff(invoice, staff_emails=None):
+    return EmailService.send_invoice_email_to_staff(invoice, staff_emails)
+
+def send_payment_receipt_email(invoice, payment_amount):
+    return EmailService.send_payment_receipt_email(invoice, payment_amount)

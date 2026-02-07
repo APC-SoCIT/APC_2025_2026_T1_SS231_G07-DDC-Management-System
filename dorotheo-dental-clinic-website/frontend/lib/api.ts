@@ -755,6 +755,9 @@ export const api = {
   },
 
   getAppointmentNotificationUnreadCount: async (token: string) => {
+    if (!token || token.trim() === '') {
+      throw new Error('No authentication token provided')
+    }
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/unread_count/`, {
       headers: { Authorization: `Token ${token}` },
     })
@@ -1018,6 +1021,57 @@ export const api = {
     if (!response.ok) throw new Error('Failed to query chatbot')
     return response.json()
   },
+
+  // Invoice endpoints
+  createInvoice: async (data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/invoices/create_invoice/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('Invoice creation failed:', error)
+      // Get detailed error message(s)
+      const errorMessage = error.error || error.detail || error.message || 
+        (error.appointment_id ? `Appointment: ${error.appointment_id}` : null) ||
+        (error.service_charge ? `Service charge: ${error.service_charge}` : null) ||
+        (error.items ? `Items: ${JSON.stringify(error.items)}` : null) ||
+        JSON.stringify(error) ||
+        'Failed to create invoice'
+      throw new Error(errorMessage)
+    }
+    return response.json()
+  },
+
+  getInvoices: async (token: string, patientId?: number) => {
+    const params = patientId ? `?patient_id=${patientId}` : ''
+    const response = await fetch(`${API_BASE_URL}/invoices/${params}`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch invoices')
+    const data = await response.json()
+    return Array.isArray(data) ? data : (data?.results || [])
+  },
+
+  getInvoice: async (invoiceId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch invoice')
+    return response.json()
+  },
+
+  getPatientBalance: async (patientId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/invoices/patient_balance/${patientId}/`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch patient balance')
+    return response.json()
+  },
 }
 
 // Export all API functions
@@ -1108,4 +1162,8 @@ export const {
   getArchivedPatients,
   exportPatientRecords,
   chatbotQuery,
+  createInvoice,
+  getInvoices,
+  getInvoice,
+  getPatientBalance,
 } = api

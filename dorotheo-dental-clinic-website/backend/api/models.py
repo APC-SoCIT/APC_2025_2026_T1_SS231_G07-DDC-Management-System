@@ -647,3 +647,142 @@ class TreatmentAssignment(models.Model):
 
     def __str__(self):
         return f"{self.treatment_name} - {self.patient.get_full_name()} - {self.status}"
+
+
+class Invoice(models.Model):
+    """Invoice model for patient billing with itemized services and inventory items"""
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('sent', 'Sent'),
+        ('paid', 'Paid'),
+        ('overdue', 'Overdue'),
+        ('cancelled', 'Cancelled'),
+    )
+    
+    # Core Fields
+    invoice_number = models.CharField(max_length=20, unique=True, db_index=True, help_text="Format: INV-YYYY-MM-NNNN")
+    reference_number = models.CharField(max_length=20, unique=True, db_index=True, help_text="Format: REF-NNNN")
+    
+    # Relationships
+    appointment = models.OneToOneField(Appointment, on_delete=models.CASCADE, related_name='invoice')
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invoices', db_index=True)
+    clinic = models.ForeignKey(ClinicLocation, on_delete=models.SET_NULL, null=True, related_name='invoices')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_invoices')
+    
+    # Financial Details
+    service_charge = models.DecimalField(max_digits=10, decimal_places=2, help_text="Charge for the service performed")
+    items_subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Total cost of inventory items used")
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, help_text="Service charge + items subtotal")
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=10.00, help_text="Interest rate for late payments (per annum, e.g., 10.00 for 10%)")
+    interest_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Interest charged for late payments (0 on initial invoice)")
+    total_due = models.DecimalField(max_digits=10, decimal_places=2, help_text="Total amount due (subtotal + interest if overdue)")
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Amount paid by patient")
+    balance = models.DecimalField(max_digits=10, decimal_places=2, help_text="Remaining balance (total_due - amount_paid)")
+    
+    # Status
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    
+    # Dates
+    invoice_date = models.DateField()
+    due_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    
+    # Notes and Payment Info
+    notes = models.TextField(blank=True)
+    payment_instructions = models.TextField(default="Please pay your overdue amount within 7 days")
+    bank_account = models.CharField(max_length=50, default="12345678910")
+    
+    # PDF File
+    pdf_file = models.FileField(upload_to='invoices/', null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Invoice'
+        verbose_name_plural = 'Invoices'
+        indexes = [
+            models.Index(fields=['patient', '-created_at'], name='inv_patient_created_idx'),
+            models.Index(fields=['status', '-due_date'], name='inv_status_due_idx'),
+            models.Index(fields=['clinic', '-created_at'], name='inv_clinic_created_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.invoice_number} - {self.patient.get_full_name()} - PHP {self.total_due}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate subtotal (service + items)
+        self.subtotal = self.service_charge + self.items_subtotal
+        
+        # Interest is NOT charged on initial invoice creation
+        # It may be added later for overdue payments
+        # For new invoices, total_due = subtotal
+        if not self.pk:  # New invoice
+            self.interest_amount = 0
+            self.total_due = self.subtotal
+        
+        # Auto-calculate balance
+        self.balance = self.total_due - self.amount_paid
+        
+        # Auto-update status based on payment
+        if self.amount_paid >= self.total_due and self.status != 'cancelled':
+            self.status = 'paid'
+            if not self.paid_at:
+                self.paid_at = timezone.now()
+        elif self.status == 'paid' and self.amount_paid < self.total_due:
+            # If amount_paid decreases and no longer covers total, revert from paid
+            self.status = 'sent'
+            self.paid_at = None
+        super().save(*args, **kwargs)
+
+
+class InvoiceItem(models.Model):
+    """Line items for an invoice (inventory items used in treatment)"""
+    
+    # Relationships
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.SET_NULL, null=True, blank=True, help_text="Reference to original inventory item")
+    
+    # Item Details (copied from inventory for historical record)
+    item_name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Price per unit at time of invoice")
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="quantity × unit_price")
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Invoice Item'
+        verbose_name_plural = 'Invoice Items'
+
+    def __str__(self):
+        return f"{self.item_name} (x{self.quantity}) - {self.invoice.invoice_number}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate total_price
+        self.total_price = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
+
+
+class PatientBalance(models.Model):
+    """Track cumulative balance for each patient across all invoices"""
+    
+    patient = models.OneToOneField(User, on_delete=models.CASCADE, related_name='balance_record')
+    total_invoiced = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Total amount from all invoices")
+    total_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Total amount paid by patient")
+    current_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Outstanding balance (invoiced - paid)")
+    last_invoice_date = models.DateField(null=True, blank=True)
+    last_payment_date = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Patient Balance'
+        verbose_name_plural = 'Patient Balances'
+
+    def __str__(self):
+        return f"{self.patient.get_full_name()} - Balance: PHP {self.current_balance}"

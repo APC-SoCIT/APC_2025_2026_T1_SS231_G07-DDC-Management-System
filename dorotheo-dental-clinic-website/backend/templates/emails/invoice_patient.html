@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice for Your Recent Appointment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #2d5a3f;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px 20px;
+            background-color: #f9f9f9;
+        }
+        .content h2 {
+            color: #2d5a3f;
+            margin-top: 0;
+        }
+        .content p {
+            margin: 15px 0;
+        }
+        .invoice-summary {
+            background-color: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #2d5a3f;
+            border-radius: 4px;
+        }
+        .invoice-summary h3 {
+            color: #2d5a3f;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .invoice-summary p {
+            margin: 10px 0;
+        }
+        .invoice-summary strong {
+            color: #2d5a3f;
+        }
+        .amount-due {
+            font-size: 20px;
+            color: #2d5a3f;
+            font-weight: bold;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #2d5a3f;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .button:hover {
+            background-color: #234a32;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .payment-instructions {
+            background-color: #fff9e6;
+            border: 1px solid #ffd966;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .payment-instructions h3 {
+            color: #996600;
+            margin-top: 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 12px;
+            background-color: #f4f4f4;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .note {
+            font-style: italic;
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Invoice for Your Recent Appointment</h1>
+        </div>
+        
+        <div class="content">
+            <h2>Dear {{ patient_name }},</h2>
+            
+            <p>Thank you for choosing <strong>{{ clinic_name }}</strong> for your dental care. Please find attached your invoice for your recent appointment.</p>
+            
+            <div class="invoice-summary">
+                <h3>Invoice Summary</h3>
+                <p><strong>Invoice Number:</strong> {{ invoice_number }}</p>
+                <p><strong>Reference:</strong> {{ reference_number }}</p>
+                <p><strong>Date:</strong> {{ invoice_date }}</p>
+                <p><strong>Service:</strong> {{ service_name }}</p>
+                <p><strong>Dentist:</strong> Dr. {{ dentist_name }}</p>
+                <p class="amount-due"><strong>Amount Due:</strong> ₱{{ total_due }}</p>
+                <p><strong>Due Date:</strong> {{ due_date }}</p>
+            </div>
+            
+            <div class="payment-instructions">
+                <h3>Payment Instructions</h3>
+                <p>{{ payment_instructions }}</p>
+                <p><strong>Bank Account:</strong> {{ bank_account }}</p>
+            </div>
+            
+            <p class="note">
+                <em>Please note: A 10% per annum interest rate may be applied to late payments. We appreciate your prompt payment.</em>
+            </p>
+            
+            {% if portal_url %}
+            <div class="button-container">
+                <a href="{{ portal_url }}" class="button">View in Patient Portal</a>
+            </div>
+            {% endif %}
+            
+            <p>If you have any questions about this invoice, please don't hesitate to contact us at <strong>{{ clinic_phone }}</strong> or <strong>{{ clinic_email }}</strong>.</p>
+            
+            <p>Best regards,<br>
+            <strong>{{ clinic_name }}</strong><br>
+            {{ clinic_phone }}<br>
+            {{ clinic_email }}</p>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated email. Please do not reply to this message.</p>
+            <p><strong>{{ clinic_name }}</strong> | {{ clinic_address }}</p>
+        </div>
+    </div>
+</body>
+</html>

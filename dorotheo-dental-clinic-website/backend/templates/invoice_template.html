@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statement of Account - {{ invoice_number }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .title {
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #2d5a3f;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .header {
+            display: table;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        
+        .customer-info, .company-info {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .company-info {
+            text-align: right;
+        }
+        
+        .company-info strong {
+            font-size: 16px;
+            color: #2d5a3f;
+        }
+        
+        .info-section {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+            padding: 15px 0;
+            border-top: 2px solid #2d5a3f;
+            border-bottom: 2px solid #2d5a3f;
+        }
+        
+        .info-left, .info-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .info-right {
+            text-align: right;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th {
+            background-color: #2d5a3f;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .totals {
+            text-align: right;
+            margin-top: 20px;
+            padding-right: 10px;
+        }
+        
+        .totals div {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .totals .total-due {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2d5a3f;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px solid #2d5a3f;
+        }
+        
+        .payment-info {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f0f4f0;
+            border-left: 4px solid #2d5a3f;
+            border-radius: 4px;
+        }
+        
+        .payment-info p {
+            margin: 8px 0;
+        }
+        
+        .payment-info strong {
+            color: #2d5a3f;
+        }
+        
+        .thank-you {
+            font-weight: bold;
+            color: #2d5a3f;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .remittance {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 3px dashed #ccc;
+        }
+        
+        .remittance h3 {
+            color: #2d5a3f;
+            margin-bottom: 20px;
+        }
+        
+        .remittance-content {
+            display: table;
+            width: 100%;
+        }
+        
+        .remittance-left, .remittance-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .remittance-right {
+            text-align: right;
+        }
+        
+        .payment-line {
+            border-bottom: 1px solid #333;
+            display: inline-block;
+            min-width: 150px;
+            margin-left: 10px;
+        }
+        
+        .small-text {
+            font-size: 11px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Statement of Account</div>
+    
+    <div class="header">
+        <div class="customer-info">
+            <strong>To:</strong><br>
+            {{ patient_name }}<br>
+            {{ patient_address }}<br>
+            {{ patient_city }}<br>
+            {{ patient_area_code }}
+        </div>
+        <div class="company-info">
+            <strong>{{ clinic_name }}</strong><br>
+            {{ clinic_address }}<br>
+            {{ clinic_city }}<br>
+            {{ clinic_area_code }}
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <div class="info-left">
+            <strong>Date:</strong> {{ invoice_date }}<br>
+            <strong>Due Date:</strong> {{ due_date }}
+        </div>
+        <div class="info-right">
+            <strong>Reference:</strong> {{ reference_number }}<br>
+            <strong>Opening Balance:</strong> ₱0.00
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Ref.</th>
+                <th>Description</th>
+                <th style="text-align: right;">Amount</th>
+                <th style="text-align: right;">Payment</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ appointment_date }}</td>
+                <td>{{ invoice_number }}</td>
+                <td>{{ service_name }}</td>
+                <td style="text-align: right;">₱{{ service_charge }}</td>
+                <td></td>
+            </tr>
+            {% for item in invoice_items %}
+            <tr>
+                <td>{{ appointment_date }}</td>
+                <td>ITEM-{{ forloop.counter }}</td>
+                <td>{{ item.item_name }} (x{{ item.quantity }})</td>
+                <td style="text-align: right;">₱{{ item.total_price }}</td>
+                <td></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="totals">
+        <div><strong>Subtotal:</strong> ₱{{ subtotal }}</div>
+        {% if interest_amount and interest_amount != '0.00' %}
+        <div><strong>Interest:</strong> ₱{{ interest_amount }}</div>
+        {% endif %}
+        <div class="total-due"><strong>Total Due:</strong> ₱{{ total_due }}</div>
+    </div>
+    
+    <div class="payment-info">
+        <p class="thank-you">Thank you for your business!</p>
+        <p>{{ payment_instructions }}</p>
+        <p><strong>Payment due by:</strong> {{ due_date }}</p>
+        <p><strong>Bank Account No:</strong> {{ bank_account }}</p>
+        <p class="small-text">Interest of 10% per annum may be charged on late payments</p>
+    </div>
+    
+    <div class="remittance">
+        <h3>Remittance</h3>
+        <div class="remittance-content">
+            <div class="remittance-left">
+                <p><strong>My Customer:</strong> {{ patient_name }}</p>
+                <br>
+                <p>
+                    {{ clinic_name }}<br>
+                    {{ clinic_address }}<br>
+                    {{ clinic_city }}<br>
+                    {{ clinic_area_code }}
+                </p>
+            </div>
+            <div class="remittance-right">
+                <p><strong>Invoice No:</strong> {{ invoice_number }}</p>
+                <p><strong>Amount Paid:</strong> <span class="payment-line"></span></p>
+                <br>
+                <p><strong>Total Paid:</strong> <span class="payment-line"></span></p>
+                <br>
+                <p><strong>Reference:</strong> {{ reference_number }}</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

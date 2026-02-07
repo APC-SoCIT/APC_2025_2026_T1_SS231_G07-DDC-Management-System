@@ -6,7 +6,8 @@ from .models import (
     Document, InventoryItem, Billing, ClinicLocation, 
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification, 
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
-    FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot
+    FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot,
+    Invoice, InvoiceItem, PatientBalance
 )
 
 # Constants for repeated string literals
@@ -194,10 +195,20 @@ class AppointmentSerializer(serializers.ModelSerializer):
     reschedule_dentist_name = serializers.CharField(source='reschedule_dentist.get_full_name', read_only=True)
     clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
     clinic_name = serializers.CharField(source='clinic.name', read_only=True)
+    invoice_id = serializers.SerializerMethodField(read_only=True)
+    has_invoice = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Appointment
         fields = '__all__'
+    
+    def get_invoice_id(self, obj):
+        """Return the invoice ID if an invoice exists for this appointment"""
+        return obj.invoice.id if hasattr(obj, 'invoice') else None
+    
+    def get_has_invoice(self, obj):
+        """Return True if an invoice exists for this appointment"""
+        return hasattr(obj, 'invoice')
 
 
 class DentalRecordSerializer(serializers.ModelSerializer):
@@ -457,13 +468,13 @@ class AppointmentNotificationSerializer(serializers.ModelSerializer):
                 'date': str(obj.appointment.date),
                 'time': str(obj.appointment.time),
                 'status': obj.appointment.status,
-                'service': obj.appointment.service.name if obj.appointment.service else None,
+                'service_name': obj.appointment.service.name if obj.appointment.service else None,
             }
             
             # Add reschedule details if this is a reschedule request
             if obj.notification_type == 'reschedule_request' and obj.appointment.reschedule_date:
-                appointment_data['reschedule_date'] = str(obj.appointment.reschedule_date)
-                appointment_data['reschedule_time'] = str(obj.appointment.reschedule_time)
+                appointment_data['requested_date'] = str(obj.appointment.reschedule_date)
+                appointment_data['requested_time'] = str(obj.appointment.reschedule_time)
                 appointment_data['reschedule_service'] = obj.appointment.reschedule_service.name if obj.appointment.reschedule_service else None
                 appointment_data['reschedule_dentist'] = obj.appointment.reschedule_dentist.get_full_name() if obj.appointment.reschedule_dentist else None
             
@@ -541,3 +552,167 @@ class TreatmentAssignmentSerializer(serializers.ModelSerializer):
         model = TreatmentAssignment
         fields = '__all__'
         read_only_fields = ['date_assigned']
+
+
+# ============================================================================
+# INVOICE SERIALIZERS
+# ============================================================================
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    """Serializer for invoice line items"""
+    inventory_item_name = serializers.CharField(source='inventory_item.name', read_only=True)
+    
+    class Meta:
+        model = InvoiceItem
+        fields = [
+            'id', 'invoice', 'inventory_item', 'inventory_item_name',
+            'item_name', 'description', 'quantity', 'unit_price', 
+            'total_price', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['total_price', 'created_at', 'updated_at']
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    """Serializer for invoices with nested items"""
+    # Related object details
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+    patient_email = serializers.CharField(source='patient.email', read_only=True)
+    clinic_name = serializers.CharField(source='clinic.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    # Appointment details
+    appointment_date = serializers.DateField(source='appointment.date', read_only=True)
+    appointment_time = serializers.TimeField(source='appointment.time', read_only=True)
+    service_name = serializers.CharField(source='appointment.service.name', read_only=True)
+    dentist_name = serializers.CharField(source='appointment.dentist.get_full_name', read_only=True)
+    
+    # Nested invoice items
+    items = InvoiceItemSerializer(many=True, read_only=True)
+    
+    # PDF file URL
+    pdf_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'invoice_number', 'reference_number', 'appointment', 'patient', 
+            'patient_name', 'patient_email', 'clinic', 'clinic_name', 
+            'created_by', 'created_by_name', 'service_charge', 'items_subtotal', 
+            'subtotal', 'interest_rate', 'interest_amount', 'total_due', 
+            'amount_paid', 'balance', 'status', 'invoice_date', 'due_date', 
+            'created_at', 'updated_at', 'sent_at', 'paid_at', 'notes', 
+            'payment_instructions', 'bank_account', 'pdf_file', 'pdf_url',
+            'items', 'appointment_date', 'appointment_time', 'service_name', 
+            'dentist_name'
+        ]
+        read_only_fields = [
+            'invoice_number', 'reference_number', 'subtotal', 'balance', 
+            'created_at', 'updated_at', 'sent_at', 'paid_at'
+        ]
+    
+    def get_pdf_url(self, obj):
+        """Get the full URL for the PDF file"""
+        if obj.pdf_file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.pdf_file.url)
+            return obj.pdf_file.url
+        return None
+
+
+class InvoiceCreateSerializer(serializers.Serializer):
+    """Serializer for creating invoices with items"""
+    appointment_id = serializers.IntegerField()
+    service_charge = serializers.DecimalField(max_digits=10, decimal_places=2)
+    items = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_empty=True
+    )
+    due_days = serializers.IntegerField(default=7, min_value=1, max_value=365)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    send_email = serializers.BooleanField(default=True)
+    
+    def validate_appointment_id(self, value):
+        """Validate appointment exists and is completed"""
+        try:
+            appointment = Appointment.objects.get(id=value)
+        except Appointment.DoesNotExist:
+            raise serializers.ValidationError("Appointment not found")
+        
+        if appointment.status != 'completed':
+            raise serializers.ValidationError("Can only create invoice for completed appointments")
+        
+        if hasattr(appointment, 'invoice'):
+            raise serializers.ValidationError("Invoice already exists for this appointment")
+        
+        return value
+    
+    def validate_service_charge(self, value):
+        """Validate service charge is positive and reasonable"""
+        if value <= 0:
+            raise serializers.ValidationError("Service charge must be greater than 0")
+        if value > 100000:
+            raise serializers.ValidationError("Service charge cannot exceed ₱100,000")
+        return value
+    
+    def validate_items(self, value):
+        """Validate invoice items"""
+        if not value:
+            return []
+        
+        validated_items = []
+        for item in value:
+            # Validate required fields
+            if 'inventory_item_id' not in item:
+                raise serializers.ValidationError("Each item must have an inventory_item_id")
+            if 'quantity' not in item:
+                raise serializers.ValidationError("Each item must have a quantity")
+            if 'unit_price' not in item:
+                raise serializers.ValidationError("Each item must have a unit_price")
+            
+            # Validate inventory item exists
+            try:
+                inventory_item = InventoryItem.objects.get(id=item['inventory_item_id'])
+            except InventoryItem.DoesNotExist:
+                raise serializers.ValidationError(f"Inventory item {item['inventory_item_id']} not found")
+            
+            # Validate quantity
+            quantity = int(item['quantity'])
+            if quantity <= 0:
+                raise serializers.ValidationError("Quantity must be greater than 0")
+            if quantity > inventory_item.quantity:
+                raise serializers.ValidationError(
+                    f"Insufficient stock for {inventory_item.name}. "
+                    f"Available: {inventory_item.quantity}, Requested: {quantity}"
+                )
+            
+            # Validate unit price
+            unit_price = float(item['unit_price'])
+            if unit_price <= 0:
+                raise serializers.ValidationError("Unit price must be greater than 0")
+            
+            validated_items.append({
+                'inventory_item_id': item['inventory_item_id'],
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'item_name': inventory_item.name,
+                'description': item.get('description', '')
+            })
+        
+        return validated_items
+
+
+class PatientBalanceSerializer(serializers.ModelSerializer):
+    """Serializer for patient balance tracking"""
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+    patient_email = serializers.CharField(source='patient.email', read_only=True)
+    
+    class Meta:
+        model = PatientBalance
+        fields = [
+            'id', 'patient', 'patient_name', 'patient_email',
+            'total_invoiced', 'total_paid', 'current_balance',
+            'last_invoice_date', 'last_payment_date', 'updated_at'
+        ]
+        read_only_fields = ['updated_at']

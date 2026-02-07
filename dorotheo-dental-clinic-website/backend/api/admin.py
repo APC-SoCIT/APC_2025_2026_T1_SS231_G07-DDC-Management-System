@@ -4,7 +4,8 @@ from .models import (
     User, Service, Appointment, DentalRecord,
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability,
-    DentistNotification, AppointmentNotification, PasswordResetToken, BlockedTimeSlot
+    DentistNotification, AppointmentNotification, PasswordResetToken, BlockedTimeSlot,
+    Invoice, InvoiceItem, PatientBalance
 )
 
 
@@ -135,6 +136,65 @@ class BlockedTimeSlotAdmin(admin.ModelAdmin):
     search_fields = ('reason', 'created_by__username')
     ordering = ('-date', 'start_time')
     date_hierarchy = 'date'
+
+
+# Invoice Management
+class InvoiceItemInline(admin.TabularInline):
+    model = InvoiceItem
+    extra = 0
+    readonly_fields = ('total_price',)
+    fields = ('item_name', 'quantity', 'unit_price', 'total_price', 'description')
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ('invoice_number', 'reference_number', 'patient', 'clinic', 'total_due', 'balance', 'status', 'invoice_date', 'due_date')
+    list_filter = ('status', 'invoice_date', 'due_date', 'clinic', 'created_at')
+    search_fields = ('invoice_number', 'reference_number', 'patient__username', 'patient__email', 'patient__first_name', 'patient__last_name')
+    ordering = ('-created_at',)
+    date_hierarchy = 'invoice_date'
+    readonly_fields = ('invoice_number', 'reference_number', 'subtotal', 'balance', 'created_at', 'updated_at', 'sent_at', 'paid_at')
+    inlines = [InvoiceItemInline]
+    
+    fieldsets = (
+        ('Invoice Information', {
+            'fields': ('invoice_number', 'reference_number', 'status')
+        }),
+        ('Related Records', {
+            'fields': ('appointment', 'patient', 'clinic', 'created_by')
+        }),
+        ('Financial Details', {
+            'fields': ('service_charge', 'items_subtotal', 'subtotal', 'interest_rate', 'interest_amount', 'total_due', 'amount_paid', 'balance')
+        }),
+        ('Dates', {
+            'fields': ('invoice_date', 'due_date', 'sent_at', 'paid_at', 'created_at', 'updated_at')
+        }),
+        ('Payment Information', {
+            'fields': ('payment_instructions', 'bank_account', 'notes')
+        }),
+        ('PDF File', {
+            'fields': ('pdf_file',)
+        }),
+    )
+
+
+@admin.register(InvoiceItem)
+class InvoiceItemAdmin(admin.ModelAdmin):
+    list_display = ('invoice', 'item_name', 'quantity', 'unit_price', 'total_price', 'created_at')
+    list_filter = ('created_at', 'invoice__status')
+    search_fields = ('item_name', 'invoice__invoice_number', 'description')
+    ordering = ('-created_at',)
+    readonly_fields = ('total_price', 'created_at', 'updated_at')
+
+
+@admin.register(PatientBalance)
+class PatientBalanceAdmin(admin.ModelAdmin):
+    list_display = ('patient', 'total_invoiced', 'total_paid', 'current_balance', 'last_invoice_date', 'last_payment_date', 'updated_at')
+    list_filter = ('last_invoice_date', 'last_payment_date', 'updated_at')
+    search_fields = ('patient__username', 'patient__email', 'patient__first_name', 'patient__last_name')
+    ordering = ('-current_balance',)
+    readonly_fields = ('updated_at',)
+
 
 admin.site.site_header = "Dental Clinic Administration"
 admin.site.site_title = "Dental Clinic Admin"

@@ -119,7 +119,9 @@ pip install --quiet \
     dj-database-url==2.1.0 \
     python-dotenv==1.0.0 \
     google-generativeai==0.3.2 \
-    resend==0.8.0
+    resend==0.8.0 \
+    weasyprint==60.2 \
+    requests==2.31.0
 
 echo "[OK] All dependencies installed successfully!"
 echo ""

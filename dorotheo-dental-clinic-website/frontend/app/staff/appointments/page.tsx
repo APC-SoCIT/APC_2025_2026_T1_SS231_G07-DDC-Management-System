@@ -29,6 +29,7 @@ import BlockTimeModal from "@/components/block-time-modal"
 import BlockTimeSuccessModal from "@/components/block-time-success-modal"
 import ErrorModal from "@/components/error-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
+import { CreateInvoiceModal } from "@/components/create-invoice-modal"
 
 interface Appointment {
   id: number
@@ -63,6 +64,8 @@ interface Appointment {
   created_at: string
   updated_at: string
   completed_at?: string | null
+  invoice_id: number | null
+  has_invoice: boolean
 }
 
 interface Patient {
@@ -154,6 +157,8 @@ export default function StaffAppointments() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [selectedAppointmentForInvoice, setSelectedAppointmentForInvoice] = useState<Appointment | null>(null)
 
   // Generate time slots based on service duration from 10:00 AM to 8:00 PM
   const parseDateOnly = (dateStr?: string) => {
@@ -287,7 +292,9 @@ export default function StaffAppointments() {
           api.getServices(),
           api.getStaff(token)
         ])
-        setPatients(patientsData)
+        // Handle paginated response - extract results array
+        const patients = Array.isArray(patientsData) ? patientsData : (patientsData.results || [])
+        setPatients(patients)
         setServices(servicesData)
         // Show all dentists and owners - check both user_type and role fields
         setStaff(staffData.filter((s: Staff) => 
@@ -304,36 +311,36 @@ export default function StaffAppointments() {
     fetchData()
   }, [token])
 
-  // Fetch appointments from API
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      if (!token) return
+  // Fetch appointments from API - defined outside useEffect so it can be called from modal callbacks
+  const fetchAppointments = async () => {
+    if (!token) return
+    
+    try {
+      setIsLoading(true)
+      // Fetch all appointments once (without clinic filter)
+      const allResponseRaw = await api.getAppointments(token, undefined)
+      // Handle paginated response
+      const allResponse = Array.isArray(allResponseRaw) ? allResponseRaw : (allResponseRaw.results || [])
+      setAllAppointments(allResponse)
       
-      try {
-        setIsLoading(true)
-        // Fetch all appointments once (without clinic filter)
-        const allResponseRaw = await api.getAppointments(token, undefined)
-        // Handle paginated response
-        const allResponse = Array.isArray(allResponseRaw) ? allResponseRaw : (allResponseRaw.results || [])
-        setAllAppointments(allResponse)
-        
-        // Filter appointments locally based on selected clinic
-        if (selectedClinic === "all") {
-          setAppointments(allResponse)
-        } else {
-          const clinicId = selectedClinic?.id
-          const filtered = allResponse.filter((apt: Appointment) => 
-            apt.clinic === clinicId || apt.clinic_data?.id === clinicId
-          )
-          setAppointments(filtered)
-        }
-      } catch (error) {
-        console.error("Error fetching appointments:", error)
-      } finally {
-        setIsLoading(false)
+      // Filter appointments locally based on selected clinic
+      if (selectedClinic === "all") {
+        setAppointments(allResponse)
+      } else {
+        const clinicId = selectedClinic?.id
+        const filtered = allResponse.filter((apt: Appointment) => 
+          apt.clinic === clinicId || apt.clinic_data?.id === clinicId
+        )
+        setAppointments(filtered)
       }
+    } catch (error) {
+      console.error("Error fetching appointments:", error)
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchAppointments()
   }, [token, selectedClinic])
 
@@ -349,30 +356,30 @@ export default function StaffAppointments() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch blocked time slots
-  useEffect(() => {
-    const fetchBlockedTimeSlots = async () => {
-      if (!token) return
+  // Fetch blocked time slots - defined outside useEffect so it can be called from modal callbacks
+  const fetchBlockedTimeSlots = async () => {
+    if (!token) return
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+        headers: {
+          'Authorization': `Token ${token}`,
+        },
+      })
       
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
-          headers: {
-            'Authorization': `Token ${token}`,
-          },
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          // Handle paginated response
-          const blockedSlotsArray = Array.isArray(data) ? data : (data.results || [])
-          setBlockedTimeSlots(blockedSlotsArray)
-          console.log("Fetched blocked time slots:", blockedSlotsArray)
-        }
-      } catch (error) {
-        console.error("Error fetching blocked time slots:", error)
+      if (response.ok) {
+        const data = await response.json()
+        // Handle paginated response
+        const blockedSlotsArray = Array.isArray(data) ? data : (data.results || [])
+        setBlockedTimeSlots(blockedSlotsArray)
+        console.log("Fetched blocked time slots:", blockedSlotsArray)
       }
+    } catch (error) {
+      console.error("Error fetching blocked time slots:", error)
     }
+  }
 
+  useEffect(() => {
     fetchBlockedTimeSlots()
   }, [token])
 
@@ -1738,16 +1745,23 @@ export default function StaffAppointments() {
                                     </div>
                                     {apt.status === "completed" && (
                                       <div className="pt-3 border-t border-[var(--color-border)]">
-                                        <button
-                                          onClick={() => {
-                                            // Placeholder - functionality to be implemented
-                                            alert("Invoice creation feature coming soon!")
-                                          }}
-                                          className="w-full px-4 py-2.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium flex items-center justify-center gap-2"
-                                        >
-                                          <FileText className="w-4 h-4" />
-                                          Create Invoice
-                                        </button>
+                                        {apt.has_invoice ? (
+                                          <div className="w-full px-4 py-2.5 bg-green-50 border border-green-200 text-green-700 rounded-lg font-medium flex items-center justify-center gap-2">
+                                            <FileText className="w-4 h-4" />
+                                            Invoice Already Created
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => {
+                                              setSelectedAppointmentForInvoice(apt)
+                                              setShowInvoiceModal(true)
+                                            }}
+                                            className="w-full px-4 py-2.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium flex items-center justify-center gap-2"
+                                          >
+                                            <FileText className="w-4 h-4" />
+                                            Create Invoice
+                                          </button>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -2187,6 +2201,22 @@ export default function StaffAppointments() {
         }}
         message={errorMessage}
       />
+
+      {/* Create Invoice Modal */}
+      {selectedAppointmentForInvoice && (
+        <CreateInvoiceModal
+          appointment={selectedAppointmentForInvoice}
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false)
+            setSelectedAppointmentForInvoice(null)
+          }}
+          onSuccess={() => {
+            fetchAppointments()
+            fetchBlockedTimeSlots()
+          }}
+        />
+      )}
     </div>
   )
 }

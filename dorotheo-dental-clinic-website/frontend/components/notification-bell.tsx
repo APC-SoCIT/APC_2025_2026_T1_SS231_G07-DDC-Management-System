@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Bell, Check, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
@@ -25,7 +25,7 @@ interface Notification {
 }
 
 export default function NotificationBell() {
-  const { user } = useAuth()
+  const { user, isLoading: authLoading, token: authToken } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [birthdayNotifications, setBirthdayNotifications] = useState<Array<{name: string, role: string}>>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -33,28 +33,63 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false)
   const [processingId, setProcessingId] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const canFetchUnreadRef = useRef(false)
 
   useEffect(() => {
-    // Only fetch notifications for owner and staff users
-    if (!user || user.role === 'patient') {
+    // Wait for auth to finish loading
+    if (authLoading) {
+      console.log('[NotificationBell] Waiting for auth to load...')
       return
     }
     
-    fetchNotifications()
-    fetchUnreadCount()
+    // Only fetch notifications for owner and staff users
+    if (!user || user.user_type === 'patient') {
+      console.log('[NotificationBell] User check:', { user, userType: user?.user_type })
+      return
+    }
+    
+    // Double-check both localStorage token AND auth context token exist
+    const token = localStorage.getItem('token')
+    if (!token || token.trim() === '' || !authToken) {
+      console.log('[NotificationBell] No valid token available yet', { hasLocalStorage: !!token, hasAuthToken: !!authToken })
+      return
+    }
+    
+    console.log('[NotificationBell] Initializing notifications for user:', user.user_type, user.email)
+    
+    // Fetch notifications first to verify token works
+    fetchNotifications().then(() => {
+      console.log('[NotificationBell] Notifications loaded successfully, can now poll unread count')
+      // Mark that we can now safely fetch unread count (use ref to avoid closure issues)
+      canFetchUnreadRef.current = true
+    }).catch(err => {
+      console.log('[NotificationBell] Failed to load notifications:', err)
+    })
+    
     fetchBirthdays()
     
-    // Poll for new notifications every 30 seconds only for owner/staff
+    // Poll for unread count every 30 seconds (only after initial load succeeds)
     const interval = setInterval(() => {
-      fetchUnreadCount()
-      if (isOpen) {
-        fetchNotifications()
-        fetchBirthdays()
+      if (canFetchUnreadRef.current) {
+        fetchUnreadCount()
       }
     }, 30000)
     
     return () => clearInterval(interval)
-  }, [isOpen, user])
+  }, [user, authLoading, authToken])
+
+  // Separate effect to refresh when dropdown opens
+  useEffect(() => {
+    if (isOpen && user && !authLoading && user.user_type !== 'patient' && canFetchUnreadRef.current) {
+      const token = localStorage.getItem('token')
+      if (token && token.trim() !== '') {
+        console.log('[NotificationBell] Dropdown opened, refreshing...')
+        fetchNotifications()
+        fetchBirthdays()
+        fetchUnreadCount()
+      }
+    }
+  }, [isOpen])
 
   const fetchBirthdays = async () => {
     try {
@@ -103,30 +138,75 @@ export default function NotificationBell() {
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('token')
-      if (!token) return
+      if (!token) {
+        console.log('[NotificationBell] No token found')
+        setNotifications([])
+        return
+      }
       
+      console.log('[NotificationBell] Fetching notifications from API...')
       // Use the new AppointmentNotification API
       const data = await api.getAppointmentNotifications(token)
-      setNotifications(data)
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
+      console.log('[NotificationBell] Received notifications:', data)
+      
+      // Handle both paginated response and plain array
+      let notificationsArray: Notification[]
+      if (data && typeof data === 'object' && 'results' in data) {
+        // Paginated response
+        console.log('[NotificationBell] Handling paginated response')
+        notificationsArray = Array.isArray(data.results) ? data.results : []
+      } else {
+        // Plain array response
+        notificationsArray = Array.isArray(data) ? data : []
+      }
+      
+      console.log('[NotificationBell] Setting notifications:', notificationsArray.length, 'items')
+      setNotifications(notificationsArray)
+      
+      // Calculate unread count from notifications to avoid extra API call
+      const unread = notificationsArray.filter(n => !n.is_read).length
+      console.log('[NotificationBell] Calculated unread count:', unread)
+      setUnreadCount(unread)
+    } catch (error: any) {
+      // Silently fail for 401 errors (user not authenticated or token expired)
+      if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+        console.log('[NotificationBell] Authentication error:', error)
+        setNotifications([])
+        return
+      }
+      console.error('[NotificationBell] Failed to fetch notifications:', error)
+      // Ensure notifications is always an array even on error
+      setNotifications([])
     }
   }
 
   const fetchUnreadCount = async () => {
+    // Only fetch if we've confirmed tokens work via successful notification fetch
+    if (!canFetchUnreadRef.current) {
+      console.log('[NotificationBell] Skipping unread count - not ready yet')
+      return
+    }
+    
     try {
       const token = localStorage.getItem('token')
-      if (!token) return
+      if (!token || token.trim() === '') {
+        console.log('[NotificationBell] No valid token for unread count')
+        setUnreadCount(0)
+        return
+      }
       
+      console.log('[NotificationBell] Fetching unread count...')
       const data = await api.getAppointmentNotificationUnreadCount(token)
+      console.log('[NotificationBell] Unread count:', data.unread_count)
       setUnreadCount(data.unread_count || 0)
     } catch (error: any) {
       // Silently fail for 401 errors (user not authenticated or token expired)
       if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+        console.log('[NotificationBell] Auth error on unread count')
         setUnreadCount(0)
         return
       }
-      console.error('Failed to fetch unread count:', error)
+      console.error('[NotificationBell] Failed to fetch unread count:', error)
     }
   }
 
@@ -401,7 +481,7 @@ export default function NotificationBell() {
                   </button>
                 )}
               </div>
-              {notifications.length > 0 && (
+              {Array.isArray(notifications) && notifications.length > 0 && (
                 showClearConfirm ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600">Clear all?</span>
@@ -434,7 +514,7 @@ export default function NotificationBell() {
 
             {/* Notifications List */}
             <div className="overflow-y-auto flex-1">
-              {notifications.length === 0 && birthdayNotifications.length === 0 ? (
+              {(!Array.isArray(notifications) || notifications.length === 0) && birthdayNotifications.length === 0 ? (
                 <div className="px-4 py-8 text-center text-gray-500">
                   <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                   <p>No notifications yet</p>
@@ -462,7 +542,7 @@ export default function NotificationBell() {
                   ))}
 
                   {/* Appointment Notifications */}
-                  {notifications.map((notif) => (
+                  {Array.isArray(notifications) && notifications.map((notif) => (
                   <div
                     key={notif.id}
                     className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
@@ -559,7 +639,7 @@ export default function NotificationBell() {
             </div>
 
             {/* Footer */}
-            {notifications.length > 0 && (
+            {Array.isArray(notifications) && notifications.length > 0 && (
               <div className="px-4 py-3 border-t border-gray-200 text-center">
                 <button
                   onClick={() => setIsOpen(false)}
