@@ -78,6 +78,7 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-playfair);
+  --font-display: var(--font-geist-sans);
 
   /* Added custom dental clinic color tokens */
   --color-primary: #0f4c3a;

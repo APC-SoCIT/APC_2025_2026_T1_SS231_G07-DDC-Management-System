@@ -49,7 +49,7 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
 
   const dentalRecordsSubItems = [
     { name: "Documents", href: "/patient/records/documents", icon: FolderOpen, hasData: hasDocuments },
-    { name: "Teeth & X-Ray Images", href: "/patient/records/images", icon: Camera, hasData: hasImages },
+    { name: "Teeth and X-Ray Images", href: "/patient/records/images", icon: Camera, hasData: hasImages },
   ]
 
   const handleLogout = () => {

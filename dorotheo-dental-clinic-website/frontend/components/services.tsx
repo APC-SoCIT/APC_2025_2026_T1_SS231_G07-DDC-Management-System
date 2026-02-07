@@ -74,7 +74,7 @@ export default function Services() {
     <section id="services" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-serif font-bold text-[var(--color-primary)] mb-4">Our Services</h2>
+          <h2 className="text-4xl font-display font-bold text-[var(--color-primary)] mb-4">Our Services</h2>
           <p className="text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto">
             Comprehensive dental care tailored to your needs
           </p>

@@ -351,7 +351,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       ) : (
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Register as Patient</h2>
+          <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Register as Patient</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors">
             <X className="w-5 h-5" />
           </button>

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState } from "react"
 import { TrendingUp, DollarSign, ShoppingCart, Calendar } from "lucide-react"
@@ -74,7 +74,7 @@ export default function OwnerAnalytics() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Analytics Dashboard</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Analytics Dashboard</h1>
           <p className="text-[var(--color-text-muted)]">Revenue and expenses overview</p>
         </div>
 

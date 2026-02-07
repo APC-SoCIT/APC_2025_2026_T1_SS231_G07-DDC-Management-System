@@ -33,7 +33,7 @@ export default function Sitemap() {
     <section id="sitemap" className="py-20 px-4 sm:px-6 lg:px-8 bg-[var(--color-background)]">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-serif font-bold text-[var(--color-primary)] mb-4">Our Locations</h2>
+          <h2 className="text-4xl font-display font-bold text-[var(--color-primary)] mb-4">Our Locations</h2>
           <p className="text-lg text-[var(--color-text-muted)]">Visit us at any of our three convenient locations</p>
         </div>
 

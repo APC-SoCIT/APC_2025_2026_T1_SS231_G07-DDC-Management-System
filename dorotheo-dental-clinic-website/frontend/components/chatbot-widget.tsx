@@ -214,11 +214,11 @@ export default function ChatbotWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-yellow-600 text-white rounded-full p-4 shadow-2xl hover:scale-110 transition-transform duration-300 group"
+          className="fixed bottom-6 right-6 z-50 bg-[var(--color-primary)] text-white rounded-full p-4 shadow-2xl hover:scale-110 transition-transform duration-300 group"
           aria-label="Open chat"
         >
           <MessageCircle className="w-6 h-6" />
-          <span className="absolute -top-1 -right-1 bg-gradient-to-r from-green-500 to-yellow-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold border-2 border-white">
+          <span className="absolute -top-1 -right-1 bg-[var(--color-primary-dark)] text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold border-2 border-white">
             S
           </span>
         </button>
@@ -228,7 +228,7 @@ export default function ChatbotWidget() {
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-[480px] h-[700px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-600 to-yellow-600 text-white p-4 flex items-center justify-between">
+          <div className="bg-[var(--color-primary)] text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border-2 border-white/30">
                 <MessageCircle className="w-6 h-6" />
@@ -291,7 +291,7 @@ export default function ChatbotWidget() {
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                       message.sender === "user"
-                        ? "bg-gradient-to-r from-emerald-600 to-yellow-600 text-white"
+                        ? "bg-[var(--color-primary)] text-white"
                         : "bg-white text-gray-800 border border-gray-200"
                     }`}
                   >
@@ -324,7 +324,7 @@ export default function ChatbotWidget() {
                           key={index}
                           onClick={() => handleQuickReply(reply)}
                           disabled={isTyping}
-                          className="text-xs bg-gradient-to-r from-emerald-600 to-yellow-600 text-white px-3 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
+                          className="text-xs bg-[var(--color-primary)] text-white px-3 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
                         >
                           {reply}
                         </button>
@@ -357,7 +357,7 @@ export default function ChatbotWidget() {
                     key={index}
                     onClick={() => handleQuickReply(action.message)}
                     disabled={isTyping}
-                    className="flex items-center justify-center gap-2 text-xs bg-gradient-to-r from-emerald-600 to-yellow-600 text-white px-3 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
+                    className="flex items-center justify-center gap-2 text-xs bg-[var(--color-primary)] text-white px-3 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
                   >
                     <span>{action.text}</span>
                   </button>
@@ -384,7 +384,7 @@ export default function ChatbotWidget() {
             <div className="flex gap-2 items-center">
               <button
                 onClick={toggleLanguage}
-                className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-yellow-600 text-white rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
+                className="px-3 py-2.5 bg-[var(--color-primary)] text-white rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
                 disabled={isTyping || isListening}
                 title={`Switch to ${voiceLanguage === 'en-US' ? 'Filipino' : 'English'}`}
               >
@@ -397,7 +397,7 @@ export default function ChatbotWidget() {
                 onKeyPress={(e) => e.key === "Enter" && !isTyping && !isListening && handleSendMessage()}
                 placeholder={isListening ? `Listening (${voiceLanguage === 'en-US' ? 'English' : 'Filipino'})...` : "Ask Sage about dental care..."}
                 disabled={isTyping || isListening}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm disabled:opacity-50"
               />
               <button
                 onClick={toggleVoiceInput}
@@ -414,7 +414,7 @@ export default function ChatbotWidget() {
               </button>
               <button
                 onClick={() => handleSendMessage()}
-                className="bg-gradient-to-r from-emerald-600 to-yellow-600 text-white rounded-full p-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="bg-[var(--color-primary)] text-white rounded-full p-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
                 disabled={!inputMessage.trim() || isTyping || isListening}
                 aria-label="Send message"
               >

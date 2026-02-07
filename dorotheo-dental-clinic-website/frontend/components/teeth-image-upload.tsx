@@ -69,7 +69,7 @@ export default function TeethImageUpload({ patientId, patientName, onClose, onSu
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white">
-          <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">
+          <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">
             Upload Teeth Image - {patientName}
           </h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors">

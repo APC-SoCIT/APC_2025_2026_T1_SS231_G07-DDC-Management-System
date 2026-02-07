@@ -72,7 +72,7 @@ function LoginForm() {
               <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-16 w-auto object-contain" />
             </div>
           </Link>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Welcome Back</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Welcome Back</h1>
           <p className="text-[var(--color-text-muted)]">Sign in to access your account</p>
         </div>
 

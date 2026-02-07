@@ -5,7 +5,7 @@ export default function About() {
     <section id="about" className="py-20 px-4 sm:px-6 lg:px-8 bg-[var(--color-background)]">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-serif font-bold text-[var(--color-primary)] mb-4">About Us</h2>
+          <h2 className="text-4xl font-display font-bold text-[var(--color-primary)] mb-4">About Us</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
@@ -14,7 +14,7 @@ export default function About() {
           </div>
 
           <div>
-            <h3 className="text-2xl font-serif font-bold text-[var(--color-primary)] mb-4">Meet Our Lead Dentist</h3>
+            <h3 className="text-2xl font-display font-bold text-[var(--color-primary)] mb-4">Meet Our Lead Dentist</h3>
             <p className="text-[var(--color-text-muted)] leading-relaxed mb-6">
               Dr. Marvin F. Dorotheo founded the Dorotheo Dental and Diagnostic Center in 2001, a year after attaining the degree of Doctor of Dental Medicine from one of the leading and renowned Dentistry Schools in the Philippines, the Centro Escolar University.
             </p>

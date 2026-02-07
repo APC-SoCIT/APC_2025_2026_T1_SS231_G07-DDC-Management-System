@@ -193,7 +193,7 @@ export default function StaffInventory() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Inventory</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Inventory</h1>
           <p className="text-[var(--color-text-muted)]">Manage clinic supplies and equipment</p>
         </div>
         <button
@@ -302,7 +302,7 @@ export default function StaffInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
             <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Add Inventory Item</h2>
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Add Inventory Item</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
@@ -434,7 +434,7 @@ export default function StaffInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
             <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Edit Inventory Item</h2>
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Edit Inventory Item</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false)
@@ -590,7 +590,7 @@ export default function StaffInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
             <div className="border-b border-[var(--color-border)] px-6 py-4">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Confirm Delete</h2>
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Confirm Delete</h2>
             </div>
 
             <div className="p-6">

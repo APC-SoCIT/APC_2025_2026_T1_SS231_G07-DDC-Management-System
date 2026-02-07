@@ -464,7 +464,7 @@ export default function StaffPatients() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Patients</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Patients</h1>
           <p className="text-[var(--color-text-muted)]">Manage patient records and information</p>
         </div>
         <button
@@ -714,7 +714,7 @@ export default function StaffPatients() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
             <div className="bg-white border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Add New Patient</h2>
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Add New Patient</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"

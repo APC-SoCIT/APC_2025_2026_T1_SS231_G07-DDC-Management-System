@@ -233,7 +233,7 @@ export default function StaffDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Dashboard Overview</h1>
+        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Dashboard Overview</h1>
         <p className="text-[var(--color-text-muted)]">Welcome back, {user?.first_name || "Staff"}</p>
       </div>
 

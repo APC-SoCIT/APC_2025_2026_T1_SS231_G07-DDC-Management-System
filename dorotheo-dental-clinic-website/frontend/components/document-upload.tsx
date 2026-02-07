@@ -80,7 +80,7 @@ export default function DocumentUpload({ patientId, patientName, onClose, onUplo
         {/* Header */}
         <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">
+            <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">
               Upload Document
             </h2>
             <p className="text-sm text-[var(--color-text-muted)] mt-1">
