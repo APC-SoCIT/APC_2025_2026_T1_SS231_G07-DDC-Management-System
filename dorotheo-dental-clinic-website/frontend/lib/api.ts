@@ -296,11 +296,27 @@ export const api = {
   },
 
   // Patients endpoints
-  getPatients: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/users/patients/`, {
+  getPatients: async (token: string, page: number = 1, pageSize: number = 20) => {
+    const response = await fetch(
+      `${API_BASE_URL}/users/patients/?page=${page}&page_size=${pageSize}`,
+      {
+        headers: { Authorization: `Token ${token}` },
+      }
+    )
+    if (!response.ok) throw new Error('Failed to fetch patients')
+    // Response format: { count: number, next: string|null, previous: string|null, results: Patient[] }
+    return response.json()
+  },
+
+  // Get all patients without pagination (for backward compatibility)
+  getAllPatients: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/patients/?page_size=10000`, {
       headers: { Authorization: `Token ${token}` },
     })
-    return response.json()
+    if (!response.ok) throw new Error('Failed to fetch patients')
+    const data = await response.json()
+    // Return just the results array for backward compatibility
+    return data.results || data
   },
 
   getPatientById: async (patientId: number, token: string) => {

@@ -14,20 +14,30 @@ class User(AbstractUser):
         ('receptionist', 'Receptionist'),
         ('dentist', 'Dentist'),
     )
-    user_type = models.CharField(max_length=20, choices=USER_TYPES, default='patient')
+    user_type = models.CharField(max_length=20, choices=USER_TYPES, default='patient', db_index=True)
     role = models.CharField(max_length=20, choices=STAFF_ROLES, blank=True, default='')
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     birthday = models.DateField(null=True, blank=True)
     age = models.IntegerField(null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profiles/', null=True, blank=True)
-    is_active_patient = models.BooleanField(default=True)
-    is_archived = models.BooleanField(default=False)  # NEW: For archiving patients
+    is_active_patient = models.BooleanField(default=True, db_index=True)
+    is_archived = models.BooleanField(default=False, db_index=True)  # For archiving patients
     assigned_clinic = models.ForeignKey('ClinicLocation', on_delete=models.SET_NULL, null=True, blank=True, related_name='staff_members', help_text="Clinic where staff/dentist is currently assigned")
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Override email to make it unique and required
     email = models.EmailField(unique=True, blank=False)
+
+    class Meta:
+        indexes = [
+            # Composite index for filtering patients by archive status
+            models.Index(fields=['user_type', 'is_archived'], name='user_type_archived_idx'),
+            # Composite index for filtering active patients
+            models.Index(fields=['user_type', 'is_active_patient'], name='user_type_active_idx'),
+            # Index for sorting by creation date
+            models.Index(fields=['-created_at'], name='user_created_at_idx'),
+        ]
 
     def __str__(self):
         return f"{self.get_full_name()} ({self.user_type})"
@@ -117,13 +127,13 @@ class Appointment(models.Model):
         ('ongoing', 'Ongoing'),
         ('done', 'Done'),
     )
-    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments')
-    dentist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dentist_appointments')
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments', db_index=True)
+    dentist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dentist_appointments', db_index=True)
     service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True)
     clinic = models.ForeignKey('ClinicLocation', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True, help_text="Clinic where appointment occurs")
     date = models.DateField()
     time = models.TimeField()
-    status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='confirmed')
+    status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='confirmed', db_index=True)
     patient_status = models.CharField(max_length=20, choices=PATIENT_STATUS_CHOICES, default='pending', help_text="Patient's current status in clinic workflow")
     notes = models.TextField(blank=True)
     
@@ -150,6 +160,10 @@ class Appointment(models.Model):
             models.Index(fields=['clinic', 'date']),
             models.Index(fields=['clinic', 'status']),
             models.Index(fields=['date', 'time']),
+            # Additional indexes for performance optimization
+            models.Index(fields=['patient', 'status', '-date'], name='apt_patient_status_date_idx'),
+            models.Index(fields=['status', '-completed_at'], name='apt_completed_at_idx'),
+            models.Index(fields=['dentist', 'date'], name='apt_dentist_date_idx'),
         ]
 
     def __str__(self):

@@ -63,6 +63,12 @@ export default function StaffPatients() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [sortColumn, setSortColumn] = useState<'name' | 'email' | 'phone' | 'lastVisit' | 'status' | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [pageSize] = useState(20)
 
   // Fetch real patients and appointments from API
   useEffect(() => {
@@ -72,13 +78,26 @@ export default function StaffPatients() {
       try {
         setIsLoading(true)
         
-        // Fetch patients and appointments in parallel
+        // Fetch paginated patients and appointments in parallel
         const [patientsResponse, appointmentsResponse] = await Promise.all([
-          api.getPatients(token),
+          api.getPatients(token, currentPage, pageSize),
           api.getAppointments(token)
         ])
         
-        console.log("Fetched patients:", patientsResponse)
+        // Handle paginated response
+        const paginatedData = patientsResponse as {
+          count: number
+          next: string | null
+          previous: string | null
+          results: any[]
+        }
+        
+        // Set pagination metadata
+        const patientResults = paginatedData.results || patientsResponse
+        setTotalCount(paginatedData.count || patientResults.length)
+        setTotalPages(Math.ceil((paginatedData.count || patientResults.length) / pageSize))
+        
+        console.log("Fetched patients:", patientResults)
         console.log("Fetched appointments:", appointmentsResponse)
         
         // Store appointments for later use
@@ -89,7 +108,7 @@ export default function StaffPatients() {
         today.setHours(0, 0, 0, 0)
         
         // Transform API response to Patient interface - exclude archived patients
-        const transformedPatients = patientsResponse
+        const transformedPatients = patientResults
           .filter((user: any) => !user.is_archived)
           .map((user: any) => {
           // Filter appointments for this patient
@@ -172,7 +191,7 @@ export default function StaffPatients() {
     }
 
     fetchData()
-  }, [token, activeTab])
+  }, [token, activeTab, currentPage, pageSize])
 
   // Handle archive patient
   const handleArchive = async (patientId: number, e: React.MouseEvent) => {
@@ -358,14 +377,17 @@ export default function StaffPatients() {
 
       // Refresh the patient list with full data including appointments
       const [patientsResponse, appointmentsResponse] = await Promise.all([
-        api.getPatients(token!),
+        api.getPatients(token!, currentPage, pageSize),
         api.getAppointments(token!)
       ])
 
       const today = new Date()
       today.setHours(0, 0, 0, 0)
+      
+      // Handle paginated response
+      const patientResults = (patientsResponse as any).results || patientsResponse
 
-      const transformedPatients = patientsResponse
+      const transformedPatients = patientResults
         .filter((user: any) => !user.is_archived)
         .map((user: any) => {
           const patientAppointments = appointmentsResponse.filter(
@@ -611,6 +633,76 @@ export default function StaffPatients() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {!isLoading && totalCount > 0 && (
+          <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4 px-4">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+            
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{Math.min((currentPage - 1) * pageSize + 1, totalCount)}</span> to{' '}
+                  <span className="font-medium">{Math.min(currentPage * pageSize, totalCount)}</span> of{' '}
+                  <span className="font-medium">{totalCount}</span> patients
+                </p>
+              </div>
+              
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-[var(--color-primary)] text-sm font-medium text-white">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Last
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Patient Modal */}

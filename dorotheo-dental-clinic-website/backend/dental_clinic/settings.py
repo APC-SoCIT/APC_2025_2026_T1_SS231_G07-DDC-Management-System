@@ -106,6 +106,9 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    # Pagination settings for improved performance
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,  # Return 20 items per page by default
 }
 
 # CORS Configuration - Use specific allowed origins when credentials are needed

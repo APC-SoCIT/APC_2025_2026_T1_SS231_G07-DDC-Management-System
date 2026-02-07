@@ -3,6 +3,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
+from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -395,6 +396,16 @@ class UserViewSet(viewsets.ModelViewSet):
         if patients_to_update:
             User.objects.bulk_update(patients_to_update, ['is_active_patient'])
         
+        # Apply pagination
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.query_params.get('page_size', 20))
+        page = paginator.paginate_queryset(patients, request)
+        
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        
+        # Fallback for unpaginated requests
         serializer = self.get_serializer(patients, many=True)
         return Response(serializer.data)
 
