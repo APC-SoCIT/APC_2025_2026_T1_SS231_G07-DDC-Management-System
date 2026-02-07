@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth"
@@ -10,7 +10,8 @@ import RegisterModal from "@/components/register-modal"
 import PasswordResetModal from "@/components/password-reset-modal"
 import { Eye, EyeOff } from "lucide-react"
 
-export default function LoginPage() {
+// Separate component for handling search params to satisfy Next.js 15 Suspense requirement
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login } = useAuth()
@@ -152,5 +153,18 @@ export default function LoginPage() {
         initialToken={resetTokenFromLink}
       />
     </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--color-background)]">
+        <div className="text-[var(--color-text-muted)]">Loading...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
