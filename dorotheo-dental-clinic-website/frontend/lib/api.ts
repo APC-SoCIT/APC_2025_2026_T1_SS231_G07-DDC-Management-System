@@ -98,8 +98,8 @@ export const api = {
       throw new Error(`Failed to fetch services: ${response.statusText}`)
     }
     const data = await response.json()
-    // Ensure we always return an array
-    return Array.isArray(data) ? data : []
+    // Handle both paginated (object with results) and non-paginated (array) responses
+    return Array.isArray(data) ? data : (data?.results || [])
   },
 
   createService: async (data: FormData, token: string) => {
@@ -347,7 +347,10 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/inventory/`, {
       headers: { Authorization: `Token ${token}` },
     })
-    return response.json()
+    if (!response.ok) return []
+    const data = await response.json()
+    // Handle both paginated (object with results) and non-paginated (array) responses
+    return Array.isArray(data) ? data : (data?.results || [])
   },
 
   createInventoryItem: async (data: any, token: string) => {
@@ -405,7 +408,10 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/users/staff/`, {
       headers: { Authorization: `Token ${token}` },
     })
-    return response.json()
+    if (!response.ok) return []
+    const data = await response.json()
+    // Handle both paginated (object with results) and non-paginated (array) responses
+    return Array.isArray(data) ? data : (data?.results || [])
   },
 
   createStaff: async (data: any, token: string) => {
@@ -524,7 +530,9 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) return []
-    return response.json()
+    const data = await response.json()
+    // Handle both paginated (object with results) and non-paginated (array) responses
+    return Array.isArray(data) ? data : (data?.results || [])
   },
 
   // Dental Records endpoints
@@ -537,7 +545,9 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) return []
-    return response.json()
+    const data = await response.json()
+    // Handle both paginated (object with results) and non-paginated (array) responses
+    return Array.isArray(data) ? data : (data?.results || [])
   },
 
   getDentalRecord: async (id: number, token: string) => {

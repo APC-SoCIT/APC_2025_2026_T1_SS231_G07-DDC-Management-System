@@ -379,9 +379,11 @@ export default function PatientAppointments() {
         
         // Fetch services - filter to only show Cleaning and Consultation for patients
         const servicesData = await api.getServices()
+        console.log('[SERVICES] Raw services data:', servicesData)
         const patientAllowedServices = servicesData.filter(
           (service: Service) => service.name === 'Cleaning' || service.name === 'Consultation'
         )
+        console.log('[SERVICES] Filtered patient services:', patientAllowedServices)
         setServices(patientAllowedServices)
 
         // Fetch blocked time slots
@@ -392,8 +394,10 @@ export default function PatientAppointments() {
         })
         if (blockedResponse.ok) {
           const blockedData = await blockedResponse.json()
-          setBlockedTimeSlots(blockedData)
-          console.log("Fetched blocked time slots:", blockedData)
+          // Handle both paginated (object with results) and non-paginated (array) responses
+          const blockedSlotsArray = Array.isArray(blockedData) ? blockedData : (blockedData?.results || [])
+          setBlockedTimeSlots(blockedSlotsArray)
+          console.log("Fetched blocked time slots:", blockedSlotsArray)
         }
       } catch (error) {
         console.error("Error fetching data:", error)
@@ -431,11 +435,14 @@ export default function PatientAppointments() {
         )
         
         console.log('[BOOKING] Dentist availability received:', availability)
-        setDentistAvailability(availability)
+        
+        // Handle both paginated (object with results) and non-paginated (array) responses
+        const availabilityData = Array.isArray(availability) ? availability : (availability?.results || [])
+        setDentistAvailability(availabilityData)
         
         // Extract available dates from the date-specific availability
         const dates = new Set<string>()
-        availability.forEach((item: any) => {
+        availabilityData.forEach((item: any) => {
           if (item.is_available) {
             dates.add(item.date)
             console.log('[BOOKING] Adding available date:', item.date)
