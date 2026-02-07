@@ -247,8 +247,12 @@ export default function ServicesPage() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">
                     <span 
-                      className="px-3 py-1 rounded-lg"
-                      style={{ backgroundColor: service.color, color: '#ffffff' }}
+                      className="px-3 py-1 rounded-lg font-bold border"
+                      style={{ 
+                        backgroundColor: `${service.color}20`, 
+                        color: service.color,
+                        borderColor: `${service.color}50`
+                      }}
                     >
                       {service.name}
                     </span>
