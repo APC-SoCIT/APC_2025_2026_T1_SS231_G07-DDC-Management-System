@@ -571,7 +571,9 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) return []
-    return response.json()
+    const data = await response.json()
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : (data.results || [])
   },
 
   uploadDocument: async (patientId: number, file: File, documentType: string, title: string, description: string, token: string, appointmentId?: number) => {

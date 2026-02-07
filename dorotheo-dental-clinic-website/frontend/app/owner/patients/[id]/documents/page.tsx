@@ -117,13 +117,15 @@ export default function PatientDocumentsPage() {
       ])
 
       setPatient(patientData)
-      // Filter documents for this patient
-      const patientDocs = documentsData.filter(
+      // Filter documents for this patient - ensure documentsData is an array
+      const safeDocumentsData = Array.isArray(documentsData) ? documentsData : []
+      const patientDocs = safeDocumentsData.filter(
         (doc: any) => doc.patient === Number.parseInt(patientId)
       )
       setDocuments(patientDocs)
     } catch (error) {
       console.error("Failed to fetch data:", error)
+      setDocuments([])
     } finally {
       setIsLoading(false)
     }
@@ -131,24 +133,28 @@ export default function PatientDocumentsPage() {
 
   // Filter documents by active tab
   const getFilteredDocuments = () => {
+    // Ensure documents is always an array
+    const safeDocuments = Array.isArray(documents) ? documents : []
+    
     if (activeTab === 'all') {
       // Sort by upload date, newest first
-      return [...documents].sort((a, b) => 
+      return [...safeDocuments].sort((a, b) => 
         new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
       )
     }
-    return documents.filter(doc => doc.document_type === activeTab)
+    return safeDocuments.filter(doc => doc.document_type === activeTab)
   }
 
   const filteredDocuments = getFilteredDocuments()
 
-  // Count documents by type
-  const xrayCount = documents.filter(d => d.document_type === 'xray').length
-  const dentalImageCount = documents.filter(d => d.document_type === 'dental_image').length
-  const scanCount = documents.filter(d => d.document_type === 'scan').length
-  const medCertCount = documents.filter(d => d.document_type === 'medical_certificate').length
-  const noteCount = documents.filter(d => d.document_type === 'note').length
-  const reportCount = documents.filter(d => d.document_type === 'report').length
+  // Count documents by type - with defensive checks
+  const safeDocuments = Array.isArray(documents) ? documents : []
+  const xrayCount = safeDocuments.filter(d => d.document_type === 'xray').length
+  const dentalImageCount = safeDocuments.filter(d => d.document_type === 'dental_image').length
+  const scanCount = safeDocuments.filter(d => d.document_type === 'scan').length
+  const medCertCount = safeDocuments.filter(d => d.document_type === 'medical_certificate').length
+  const noteCount = safeDocuments.filter(d => d.document_type === 'note').length
+  const reportCount = safeDocuments.filter(d => d.document_type === 'report').length
 
   const handleDownloadImage = (fileUrl: string, filename: string) => {
     fetch(fileUrl)

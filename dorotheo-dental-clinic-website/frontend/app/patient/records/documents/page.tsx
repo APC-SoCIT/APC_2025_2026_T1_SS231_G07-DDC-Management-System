@@ -52,9 +52,11 @@ export default function Documents() {
       try {
         setIsLoading(true)
         const docs = await api.getDocuments(user.id, token)
-        setDocuments(docs)
+        // Ensure docs is always an array
+        setDocuments(Array.isArray(docs) ? docs : [])
       } catch (error) {
         console.error("Error fetching documents:", error)
+        setDocuments([])
       } finally {
         setIsLoading(false)
       }
@@ -177,10 +179,11 @@ export default function Documents() {
     }
   }
 
-  // Filter documents by type
-  const medicalCertificates = documents.filter(doc => doc.document_type === 'medical_certificate')
-  const reports = documents.filter(doc => doc.document_type === 'report')
-  const notes = documents.filter(doc => doc.document_type === 'note')
+  // Filter documents by type - ensure documents is an array
+  const safeDocuments = Array.isArray(documents) ? documents : []
+  const medicalCertificates = safeDocuments.filter(doc => doc.document_type === 'medical_certificate')
+  const reports = safeDocuments.filter(doc => doc.document_type === 'report')
+  const notes = safeDocuments.filter(doc => doc.document_type === 'note')
 
   const renderDocumentCard = (doc: Document) => (
     <div
