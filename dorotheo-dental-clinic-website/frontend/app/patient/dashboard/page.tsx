@@ -40,9 +40,9 @@ export default function PatientDashboard() {
         const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`
         const upcoming = data
           .filter((apt: Appointment) => {
-            // Only show confirmed appointments that are today or in the future
+            // Show confirmed, pending, and request-pending appointments that are today or in the future
             const isUpcoming = apt.date >= today
-            const isActiveStatus = apt.status === 'confirmed' || apt.status === 'pending'
+            const isActiveStatus = apt.status === 'confirmed' || apt.status === 'pending' || apt.status === 'reschedule_requested' || apt.status === 'cancel_requested'
             return isUpcoming && isActiveStatus
           })
           .sort((a: Appointment, b: Appointment) => {

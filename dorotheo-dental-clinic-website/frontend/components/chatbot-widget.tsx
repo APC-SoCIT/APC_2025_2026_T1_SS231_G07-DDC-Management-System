@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { MessageCircle, X, Send, Loader2, Trash2, Calendar, XCircle, Mic, MicOff } from "lucide-react"
+import { MessageCircle, X, Send, Loader2, Trash2, Calendar, RefreshCw, XCircle, Mic, MicOff } from "lucide-react"
 import { chatbotQuery } from "@/lib/api"
 import ReactMarkdown from 'react-markdown'
 
@@ -13,17 +13,16 @@ interface Message {
   quickReplies?: string[]
 }
 
-const initialQuickActions = [
+const quickActions = [
   { icon: Calendar, text: "📅 Book Appointment", message: "I want to book an appointment" },
-  { icon: Calendar, text: "🔄 Reschedule Appointment", message: "I need to reschedule my appointment" },
-  { icon: XCircle, text: "❌ Cancel Appointment", message: "I want to cancel my appointment" },
+  { icon: RefreshCw, text: "🔄 Reschedule", message: "I want to reschedule my appointment" },
+  { icon: XCircle, text: "❌ Cancel", message: "I want to cancel my appointment" },
 ]
 
-const quickReplies = [
+const defaultSuggestions = [
   "What dental services do you offer?",
-  "Who are the available dentists?",
+  "Who are the dentists?",
   "What are your clinic hours?",
-  "Show me available time slots",
 ]
 
 export default function ChatbotWidget() {
@@ -76,7 +75,7 @@ export default function ChatbotWidget() {
   const initializeChat = () => {
     const welcomeMessage: Message = {
       id: "1",
-      text: "Welcome to Dorotheo Dental Clinic! 🌿✨\n\nI'm **Sage**, your premium virtual concierge. I'm here to provide you with professional, calming, and efficient assistance.\n\nI can help you with:\n\n• **📅 Book, reschedule, or cancel appointments**\n• Information about our dental services and procedures\n• Available appointment slots and dentist schedules\n• Clinic hours, locations, and contact information\n• General dental health questions\n\nHow may I assist you today?",
+      text: "Welcome to Dorotheo Dental Clinic! \n\nI'm **Sage**, your AI scheduling concierge. I can help you with:\n\n• **Book, reschedule, or cancel** appointments\n• Information about our dental services\n• Our dentists, clinics, and hours\n• General dental health questions\n\nHow may I assist you today?",
       sender: "bot",
       timestamp: new Date(),
     }
@@ -297,7 +296,7 @@ export default function ChatbotWidget() {
                   >
                     {message.sender === "bot" ? (
                       <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
-                        <ReactMarkdown>{message.text}</ReactMarkdown>
+                        <ReactMarkdown>{message.text.replace(/<!--[\s\S]*?-->/g, '').trim()}</ReactMarkdown>
                       </div>
                     ) : (
                       <p className="text-sm whitespace-pre-wrap">{message.text}</p>
@@ -346,18 +345,18 @@ export default function ChatbotWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Action Buttons (always visible) */}
+          {/* Quick Actions & Suggestions */}
           <div className="p-3 bg-white border-t border-gray-200">
             <p className="text-xs text-gray-700 mb-2 font-semibold">Quick Actions:</p>
-            <div className="grid grid-cols-1 gap-1.5 mb-3">
-              {initialQuickActions.map((action, index) => {
+            <div className="grid grid-cols-3 gap-1.5 mb-3">
+              {quickActions.map((action, index) => {
                 const Icon = action.icon
                 return (
                   <button
                     key={index}
                     onClick={() => handleQuickReply(action.message)}
                     disabled={isTyping}
-                    className="flex items-center justify-center gap-2 text-xs bg-[var(--color-primary)] text-white px-3 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
+                    className="flex items-center justify-center gap-1 text-xs bg-[var(--color-primary)] text-white px-2 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
                   >
                     <span>{action.text}</span>
                   </button>
@@ -366,7 +365,7 @@ export default function ChatbotWidget() {
             </div>
             <p className="text-xs text-gray-500 mb-1.5 font-medium">Or ask me:</p>
             <div className="flex flex-wrap gap-1.5">
-              {quickReplies.map((reply, index) => (
+              {defaultSuggestions.map((reply, index) => (
                 <button
                   key={index}
                   onClick={() => handleQuickReply(reply)}

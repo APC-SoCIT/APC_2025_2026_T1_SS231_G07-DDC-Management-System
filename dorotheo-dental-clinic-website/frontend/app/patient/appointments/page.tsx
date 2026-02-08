@@ -916,10 +916,10 @@ export default function PatientAppointments() {
   console.log("Current time:", now)
   console.log("All appointments for filtering:", allAppointments)
   
-  // Upcoming: Only PENDING and CONFIRMED appointments in the future
+  // Upcoming: PENDING, CONFIRMED, and pending requests (reschedule/cancel) in the future
   const upcomingAppointments = allAppointments.filter((apt) => {
     const aptDate = new Date(apt.date + 'T' + apt.time)
-    const isUpcomingStatus = apt.status === 'pending' || apt.status === 'confirmed'
+    const isUpcomingStatus = apt.status === 'pending' || apt.status === 'confirmed' || apt.status === 'reschedule_requested' || apt.status === 'cancel_requested'
     return aptDate >= now && isUpcomingStatus
   })
 
