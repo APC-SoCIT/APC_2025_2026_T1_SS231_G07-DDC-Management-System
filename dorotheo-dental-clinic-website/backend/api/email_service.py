@@ -1249,7 +1249,7 @@ class EmailService:
         """
         try:
             from .invoice_generator import generate_invoice_pdf
-            from django.core.mail import EmailMessage
+            from django.core.mail import EmailMultiAlternatives
             
             # Get patient balance
             patient_balance = 0
@@ -1276,20 +1276,23 @@ class EmailService:
             # Render email HTML
             html_message = render_to_string('emails/invoice_patient.html', context)
             
+            # Create plain text version
+            text_message = strip_tags(html_message)
+            
             # Create email
             subject = f"Invoice {invoice.invoice_number} - {invoice.clinic.name}"
             from_email = settings.DEFAULT_FROM_EMAIL
             recipient_list = [invoice.patient.email]
             
-            email = EmailMessage(
+            email = EmailMultiAlternatives(
                 subject=subject,
-                body=html_message,
+                body=text_message,
                 from_email=from_email,
                 to=recipient_list,
             )
             
-            # Set content type to HTML
-            email.content_subtype = 'html'
+            # Attach HTML version
+            email.attach_alternative(html_message, "text/html")
             
             # Try to generate and attach PDF (optional - don't fail if it doesn't work)
             try:
@@ -1324,7 +1327,7 @@ class EmailService:
         """
         try:
             from .invoice_generator import generate_invoice_pdf
-            from django.core.mail import EmailMessage
+            from django.core.mail import EmailMultiAlternatives
             
             # Get patient balance
             patient_balance = 0
@@ -1363,6 +1366,9 @@ class EmailService:
             # Render email HTML
             html_message = render_to_string('emails/invoice_staff.html', context)
             
+            # Create plain text version
+            text_message = strip_tags(html_message)
+            
             # Determine recipient list
             if staff_emails is None:
                 # Default: send to billing email if configured, otherwise skip
@@ -1378,15 +1384,15 @@ class EmailService:
             subject = f"New Invoice Created: {invoice.invoice_number}"
             from_email = settings.DEFAULT_FROM_EMAIL
             
-            email = EmailMessage(
+            email = EmailMultiAlternatives(
                 subject=subject,
-                body=html_message,
+                body=text_message,
                 from_email=from_email,
                 to=staff_emails,
             )
             
-            # Set content type to HTML
-            email.content_subtype = 'html'
+            # Attach HTML version
+            email.attach_alternative(html_message, "text/html")
             
             # Try to generate and attach PDF (optional - don't fail if it doesn't work)
             try:
