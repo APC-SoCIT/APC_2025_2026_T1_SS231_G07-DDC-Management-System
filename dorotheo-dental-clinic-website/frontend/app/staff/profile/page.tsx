@@ -3,14 +3,28 @@
 import { useState, useEffect } from "react"
 import { Camera } from "lucide-react"
 import DentistCalendarAvailability from "@/components/dentist-calendar-availability"
+import QuickAvailabilityModal from "@/components/quick-availability-modal"
+import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
 
 export default function StaffProfile() {
   const { user, token, setUser } = useAuth()
-  const { selectedClinic } = useClinic()
+  const { allClinics, selectedClinic } = useClinic()
   const [isEditing, setIsEditing] = useState(false)
+  const [showQuickAvailability, setShowQuickAvailability] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successData, setSuccessData] = useState<{
+    mode: 'specific' | 'recurring';
+    dateCount?: number;
+    daysOfWeek?: string[];
+    monthYear?: string;
+    startTime?: string;
+    endTime?: string;
+    clinicName?: string;
+    dates?: string[];
+  }>({ mode: 'specific' })
   const [profile, setProfile] = useState({
     firstName: "",
     lastName: "",
@@ -191,13 +205,157 @@ export default function StaffProfile() {
       {/* Calendar-Based Availability Schedule - Only for Dentists and Owners */}
       {(user?.role === 'dentist' || user?.user_type === 'owner') && (
         <div className="mt-8">
-          <h2 className="text-2xl font-semibold text-[var(--color-text)] mb-4">My Schedule</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-semibold text-[var(--color-text)]">My Schedule</h2>
+            <button
+              onClick={() => setShowQuickAvailability(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Set Availability
+            </button>
+          </div>
           <DentistCalendarAvailability 
             dentistId={user?.id} 
             selectedClinicId={typeof selectedClinic === 'object' && selectedClinic !== null ? selectedClinic.id : null}
           />
         </div>
       )}
+
+      {/* Quick Availability Modal */}
+      <QuickAvailabilityModal
+        isOpen={showQuickAvailability}
+        onClose={() => setShowQuickAvailability(false)}
+        onSave={async (data) => {
+          if (!token || !user) return;
+
+          const clinicName = data.applyToAllClinics 
+            ? 'All Clinics' 
+            : allClinics.find(c => c.id === data.clinicId)?.name || 'Selected Clinic';
+
+          const formatTimeDisplay = (time: string) => {
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+          };
+
+          try {
+            if (data.mode === 'specific') {
+              const promises = data.dates!.map(date =>
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    dentist: user.id,
+                    date,
+                    start_time: data.startTime,
+                    end_time: data.endTime,
+                    apply_to_all_clinics: data.applyToAllClinics,
+                    clinic_id: data.applyToAllClinics ? null : data.clinicId,
+                  }),
+                })
+              );
+              const responses = await Promise.all(promises);
+              const failedResponses = responses.filter(r => !r.ok);
+              if (failedResponses.length > 0) {
+                throw new Error(`Failed to save ${failedResponses.length} availability slot(s)`);
+              }
+
+              const firstDate = new Date(data.dates![0]);
+              const monthYear = firstDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+              setSuccessData({
+                mode: 'specific',
+                dateCount: data.dates!.length,
+                monthYear,
+                startTime: formatTimeDisplay(data.startTime),
+                endTime: formatTimeDisplay(data.endTime),
+                clinicName,
+                dates: data.dates!.slice(0, 5)
+              });
+              setShowQuickAvailability(false);
+              setShowSuccessModal(true);
+            } else {
+              const dates: string[] = [];
+              const today = new Date();
+              const threeMonthsLater = new Date();
+              threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+
+              let currentDate = new Date(today);
+              while (currentDate <= threeMonthsLater) {
+                if (data.daysOfWeek!.includes(currentDate.getDay())) {
+                  dates.push(currentDate.toISOString().split('T')[0]);
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+
+              const promises = dates.map(date =>
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    dentist: user.id,
+                    date,
+                    start_time: data.startTime,
+                    end_time: data.endTime,
+                    apply_to_all_clinics: data.applyToAllClinics,
+                    clinic_id: data.applyToAllClinics ? null : data.clinicId,
+                  }),
+                })
+              );
+              const responses = await Promise.all(promises);
+              const failedResponses = responses.filter(r => !r.ok);
+              if (failedResponses.length > 0) {
+                throw new Error(`Failed to save ${failedResponses.length} availability slot(s)`);
+              }
+
+              const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const selectedDayNames = data.daysOfWeek!.map(d => dayNames[d]);
+
+              setSuccessData({
+                mode: 'recurring',
+                dateCount: dates.length,
+                daysOfWeek: selectedDayNames,
+                startTime: formatTimeDisplay(data.startTime),
+                endTime: formatTimeDisplay(data.endTime),
+                clinicName
+              });
+              setShowQuickAvailability(false);
+              setShowSuccessModal(true);
+            }
+          } catch (error) {
+            console.error('Error saving availability:', error);
+            alert('Failed to save availability. Please try again.');
+          }
+        }}
+      />
+
+      {/* Success Modal */}
+      <QuickAvailabilitySuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          window.location.reload();
+        }}
+        mode={successData.mode}
+        dateCount={successData.dateCount}
+        daysOfWeek={successData.daysOfWeek}
+        monthYear={successData.monthYear}
+        startTime={successData.startTime}
+        endTime={successData.endTime}
+        clinicName={successData.clinicName}
+        dates={successData.dates}
+      />
     </div>
   )
 }

@@ -1740,6 +1740,7 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
     """
     queryset = DentistAvailability.objects.all()
     serializer_class = DentistAvailabilitySerializer
+    pagination_class = None  # Disable pagination to show all availability dates
 
     def get_queryset(self):
         """Filter by dentist, clinic, and date range if specified"""

@@ -75,11 +75,14 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
   }, [endHour, endMinute, endPeriod])
 
   useEffect(() => {
-    if (dentistId) {
+    console.log('[CALENDAR] useEffect triggered with:', { dentistId, token: !!token, selectedClinicId, currentDate: currentDate.toISOString() })
+    if (dentistId && token) {
       console.log('[CALENDAR] Loading availability for dentist ID:', dentistId, 'clinic:', selectedClinicId)
       loadAvailability()
+    } else {
+      console.log('[CALENDAR] Not loading - missing dentistId or token:', { dentistId, hasToken: !!token })
     }
-  }, [dentistId, currentDate, selectedClinicId])
+  }, [dentistId, currentDate, selectedClinicId, token])
 
   const loadAvailability = async () => {
     if (!dentistId) return
@@ -111,15 +114,30 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
 
       if (response.ok) {
         const data = await response.json()
-        console.log('[CALENDAR] Loaded availability:', data)
+        console.log('[CALENDAR] Loaded availability:', url)
+        console.log('[CALENDAR] URL used:', url)
+        console.log('[CALENDAR] Response status:', response.status)
+        console.log('[CALENDAR] Raw API response:', data)
+        console.log('[CALENDAR] Data type:', typeof data)
+        console.log('[CALENDAR] Data length:', data?.length)
+        console.log('[CALENDAR] Is Array?:', Array.isArray(data))
+        console.log('[CALENDAR] Object keys:', data ? Object.keys(data) : 'no data')
+        
+        // Handle both direct array and paginated response formats
+        const availabilityData = Array.isArray(data) ? data : (data?.results || [])
+        console.log('[CALENDAR] Processed data array:', availabilityData)
+        console.log('[CALENDAR] Processed data length:', availabilityData.length)
+        
         const availabilityMap: Record<string, SelectedDate> = {}
         const allAvail: SelectedDate[] = []
         
         // Get today's date string for comparison (YYYY-MM-DD format)
         const today = new Date()
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        console.log('[CALENDAR] Today string for filtering:', todayStr)
         
-        data.forEach((item: any) => {
+        availabilityData.forEach((item: any, index: number) => {
+          console.log(`[CALENDAR] Processing item ${index}:`, item)
           // Compare date strings directly to avoid timezone issues
           // item.date is already in YYYY-MM-DD format
           if (item.date >= todayStr) {
@@ -134,6 +152,8 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
             const shouldInclude = selectedClinicId === null || selectedClinicId === undefined
               ? true // Show all when "All Clinics" is selected
               : (item.apply_to_all_clinics || item.clinic === selectedClinicId)
+            
+            console.log(`[CALENDAR] Item ${index} shouldInclude:`, shouldInclude, 'selectedClinicId:', selectedClinicId, 'item.apply_to_all_clinics:', item.apply_to_all_clinics, 'item.clinic:', item.clinic)
             
             if (shouldInclude) {
               // Determine clinic name with better fallback logic
@@ -157,23 +177,33 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
               }
               availabilityMap[item.date] = availItem
               allAvail.push(availItem)
+              console.log(`[CALENDAR] Added item to map:`, availItem)
             }
+          } else {
+            console.log(`[CALENDAR] Item ${index} filtered out - date ${item.date} is before today ${todayStr}`)
           }
         })
         
+        console.log('[CALENDAR] Final availabilityMap:', availabilityMap)
+        console.log('[CALENDAR] Final allAvail:', allAvail)
         setSelectedDates(availabilityMap)
         setAllAvailability(allAvail.sort((a, b) => a.date.localeCompare(b.date)))
         console.log('[CALENDAR] Selected dates updated (past dates filtered):', availabilityMap)
       } else if (response.status === 401) {
         // Silently ignore 401 errors (authentication issues)
+        console.log('[CALENDAR] 401 authentication error - clearing data')
         setSelectedDates({})
         setAllAvailability([])
       } else {
         // Only log non-auth errors
-        console.log('[CALENDAR] Failed to load availability:', response.status)
+        console.log('[CALENDAR] Failed to load availability - status:', response.status)
+        console.log('[CALENDAR] Response:', await response.text())
+        setSelectedDates({})
+        setAllAvailability([])
       }
     } catch (error) {
       // Silently handle errors to avoid annoying popups
+      console.log('[CALENDAR] Network/fetch error:', error)
       setSelectedDates({})
       setAllAvailability([])
     } finally {
@@ -247,13 +277,14 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
     setShowTimeModal(true)
   }
 
-  const handleSaveTime = () => {
-    if (!activeDate) return
+  const handleSaveTime = async () => {
+    if (!activeDate || !dentistId || !token) return
 
     console.log('[CALENDAR] Saving time for date:', activeDate)
 
     const datesToUpdate = repeatMode ? [activeDate, ...selectedRepeatDays] : [activeDate]
 
+    // Update local state
     setSelectedDates(prev => {
       const updated = { ...prev }
       
@@ -273,10 +304,47 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
     setActiveDate(null)
     setRepeatMode(false)
     setSelectedRepeatDays([])
+
+    // Persist to API immediately
+    try {
+      const dates = datesToUpdate.map(dateStr => ({
+        date: dateStr,
+        start_time: `${tempStartTime}:00`,
+        end_time: `${tempEndTime}:00`,
+        is_available: true,
+      }))
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/dentist-availability/bulk_create/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+          body: JSON.stringify({
+            dentist_id: dentistId,
+            dates: dates,
+          }),
+        }
+      )
+
+      if (response.ok) {
+        console.log('[CALENDAR] Successfully saved to API')
+        await loadAvailability()
+      } else {
+        const error = await response.json()
+        console.error('[CALENDAR] API save failed:', error)
+        alert(`Error saving availability: ${JSON.stringify(error)}`)
+      }
+    } catch (error) {
+      console.error('[CALENDAR] Error saving to API:', error)
+      alert('Failed to save availability. Please try again.')
+    }
   }
 
-  const handleRemoveDate = () => {
-    if (!activeDate) return
+  const handleRemoveDate = async () => {
+    if (!activeDate || !dentistId || !token) return
 
     console.log('[CALENDAR] Removing date:', activeDate)
 
@@ -291,6 +359,33 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
     setActiveDate(null)
     setRepeatMode(false)
     setSelectedRepeatDays([])
+
+    // Delete from API immediately
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/dentist-availability/bulk_delete/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+          body: JSON.stringify({
+            dentist_id: dentistId,
+            dates: [activeDate],
+          }),
+        }
+      )
+
+      if (response.ok) {
+        console.log('[CALENDAR] Successfully deleted from API')
+        await loadAvailability()
+      } else {
+        console.error('[CALENDAR] API delete failed')
+      }
+    } catch (error) {
+      console.error('[CALENDAR] Error deleting from API:', error)
+    }
   }
 
   // Get available dates in current month for repeat scheduling
