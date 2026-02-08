@@ -343,8 +343,11 @@ export const api = {
   },
 
   // Inventory endpoints
-  getInventory: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/`, {
+  getInventory: async (token: string, clinicId?: number) => {
+    const url = clinicId 
+      ? `${API_BASE_URL}/inventory/?clinic_id=${clinicId}`
+      : `${API_BASE_URL}/inventory/`
+    const response = await fetch(url, {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) return []

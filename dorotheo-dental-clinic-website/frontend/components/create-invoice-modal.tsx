@@ -225,6 +225,7 @@ export function CreateInvoiceModal({
 
               {step === 2 && (
                 <InvoiceStep2Items
+                  appointment={appointment}
                   items={invoiceData.items}
                   onItemsChange={(items) =>
                     setInvoiceData({ ...invoiceData, items })

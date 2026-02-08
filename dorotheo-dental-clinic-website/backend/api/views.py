@@ -1347,8 +1347,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
-    queryset = InventoryItem.objects.all()
+    queryset = InventoryItem.objects.all().order_by('name')
     serializer_class = InventoryItemSerializer
+
+    def get_queryset(self):
+        queryset = InventoryItem.objects.all().order_by('name')
+        
+        # Filter by clinic if provided
+        clinic_id = self.request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        
+        return queryset
 
     def create_low_stock_notification(self, inventory_item):
         """Create notification for low stock inventory item"""
