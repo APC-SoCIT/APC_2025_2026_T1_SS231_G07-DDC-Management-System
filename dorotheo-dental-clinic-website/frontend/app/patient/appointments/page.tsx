@@ -472,13 +472,13 @@ export default function PatientAppointments() {
   // Fetch dentist availability for reschedule modal
   useEffect(() => {
     const fetchRescheduleDentistAvailability = async () => {
-      if (!token || !rescheduleData.dentist || !showRescheduleModal) {
+      if (!token || !selectedAppointment?.dentist || !showRescheduleModal) {
         setRescheduleDentistAvailability([])
         setRescheduleAvailableDates(new Set())
         return
       }
 
-      console.log('[RESCHEDULE] Fetching availability for dentist:', rescheduleData.dentist)
+      console.log('[RESCHEDULE] Fetching availability for dentist:', selectedAppointment.dentist)
 
       try {
         // Get date-specific availability for the next 90 days
@@ -490,18 +490,21 @@ export default function PatientAppointments() {
         const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
         
         const availability = await api.getDentistAvailability(
-          Number(rescheduleData.dentist),
+          Number(selectedAppointment.dentist),
           todayStr,
           endDateStr,
           token
         )
         
         console.log('[RESCHEDULE] Availability received:', availability)
-        setRescheduleDentistAvailability(availability)
+        
+        // Handle both paginated (object with results) and non-paginated (array) responses
+        const availabilityData = Array.isArray(availability) ? availability : (availability?.results || [])
+        setRescheduleDentistAvailability(availabilityData)
         
         // Extract available dates from the date-specific availability
         const dates = new Set<string>()
-        availability.forEach((item: any) => {
+        availabilityData.forEach((item: any) => {
           if (item.is_available) {
             dates.add(item.date)
           }
@@ -515,7 +518,7 @@ export default function PatientAppointments() {
     }
 
     fetchRescheduleDentistAvailability()
-  }, [rescheduleData.dentist, showRescheduleModal, token])
+  }, [selectedAppointment?.dentist, showRescheduleModal, token])
 
   // Fetch booked slots when date changes (get ALL slots, not filtered by dentist)
   useEffect(() => {

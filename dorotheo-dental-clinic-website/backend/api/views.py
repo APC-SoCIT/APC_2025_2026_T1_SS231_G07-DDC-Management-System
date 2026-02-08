@@ -1022,11 +1022,19 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             appointment.status = 'reschedule_requested'
             appointment.save()
             
-            # Create notifications for staff and owner
-            create_appointment_notification(appointment, 'reschedule_request')
+            # Create notifications for staff and owner (only if not already pending)
+            # Check if there are existing unread notifications for this appointment to prevent duplicates
+            existing_notifications = AppointmentNotification.objects.filter(
+                appointment=appointment,
+                notification_type='reschedule_request',
+                is_read=False
+            ).count()
+            
+            if existing_notifications == 0:
+                create_appointment_notification(appointment, 'reschedule_request')
             
             serializer = self.get_serializer(appointment)
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error("[ERROR] Failed to process reschedule request: %s", str(e))
             import traceback
@@ -1071,7 +1079,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         create_patient_notification(appointment, 'reschedule_approved')
         
         serializer = self.get_serializer(appointment)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['post'])
     def reject_reschedule(self, request, pk=None):
@@ -1099,7 +1107,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         create_patient_notification(appointment, 'reschedule_rejected')
         
         serializer = self.get_serializer(appointment)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def request_cancel(self, request, pk=None):
@@ -1135,7 +1143,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         create_appointment_notification(appointment, 'cancel_request')
         
         serializer = self.get_serializer(appointment)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['post'])
     def approve_cancel(self, request, pk=None):
@@ -1182,7 +1190,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         create_patient_notification(appointment, 'cancel_rejected')
         
         serializer = self.get_serializer(appointment)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['get'])
     def booked_slots(self, request):

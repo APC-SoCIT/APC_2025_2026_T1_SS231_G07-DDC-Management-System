@@ -706,9 +706,10 @@ export default function OwnerAppointments() {
       const updatedAppointment = await api.approveReschedule(appointment.id, token!)
       setAppointments(appointments.map(apt => apt.id === appointment.id ? updatedAppointment : apt))
       alert("Reschedule request approved successfully!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error approving reschedule:", error)
-      alert("Failed to approve reschedule request.")
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to approve reschedule request."
+      alert(errorMessage)
     }
   }
 
@@ -720,9 +721,10 @@ export default function OwnerAppointments() {
       const updatedAppointment = await api.rejectReschedule(appointment.id, token!)
       setAppointments(appointments.map(apt => apt.id === appointment.id ? updatedAppointment : apt))
       alert("Reschedule request rejected.")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting reschedule:", error)
-      alert("Failed to reject reschedule request.")
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to reject reschedule request."
+      alert(errorMessage)
     }
   }
 
