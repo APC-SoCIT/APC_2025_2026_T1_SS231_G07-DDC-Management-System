@@ -253,6 +253,21 @@ export default function OwnerProfile() {
 
           try {
             if (data.mode === 'specific') {
+              // First, delete existing availability for the selected date range to avoid duplicates
+              const allDates = data.dates!;
+              if (allDates.length > 0) {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/bulk_delete/`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    dentist_id: user.id,
+                    dates: allDates,
+                  }),
+                });
+              }
               // Save specific dates
               const promises = data.dates!.map(date =>
                 fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
@@ -319,6 +334,21 @@ export default function OwnerProfile() {
                   dates.push(currentDate.toISOString().split('T')[0]);
                 }
                 currentDate.setDate(currentDate.getDate() + 1);
+              }
+
+              // First, delete existing availability for recurring dates to avoid duplicates
+              if (dates.length > 0) {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/bulk_delete/`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    dentist_id: user.id,
+                    dates: dates,
+                  }),
+                });
               }
 
               const promises = dates.map(date =>

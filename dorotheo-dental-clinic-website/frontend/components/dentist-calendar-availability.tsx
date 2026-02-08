@@ -314,6 +314,21 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
         is_available: true,
       }))
 
+      // Build request body with clinic awareness
+      const requestBody: any = {
+        dentist_id: dentistId,
+        dates: dates,
+      }
+      
+      if (selectedClinicId) {
+        // Saving for a specific clinic
+        requestBody.clinic_id = selectedClinicId
+        requestBody.apply_to_all_clinics = false
+      } else {
+        // Saving for "All Clinics"
+        requestBody.apply_to_all_clinics = true
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/api/dentist-availability/bulk_create/`,
         {
@@ -322,10 +337,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
             "Content-Type": "application/json",
             Authorization: `Token ${token}`,
           },
-          body: JSON.stringify({
-            dentist_id: dentistId,
-            dates: dates,
-          }),
+          body: JSON.stringify(requestBody),
         }
       )
 
@@ -362,6 +374,21 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
 
     // Delete from API immediately
     try {
+      // Build delete request - clinic-aware
+      const deleteBody: any = {
+        dentist_id: dentistId,
+        dates: [activeDate],
+      }
+      
+      // If viewing "All Clinics" (selectedClinicId is null/undefined), delete ALL records for this date
+      // If viewing a specific clinic, only delete records for that clinic
+      if (selectedClinicId) {
+        deleteBody.clinic_id = selectedClinicId
+      }
+      // When selectedClinicId is null (All Clinics), no clinic_id is sent = deletes ALL records for that date
+      
+      console.log('[CALENDAR] Delete request body:', deleteBody)
+
       const response = await fetch(
         `${API_BASE_URL}/api/dentist-availability/bulk_delete/`,
         {
@@ -370,10 +397,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
             "Content-Type": "application/json",
             Authorization: `Token ${token}`,
           },
-          body: JSON.stringify({
-            dentist_id: dentistId,
-            dates: [activeDate],
-          }),
+          body: JSON.stringify(deleteBody),
         }
       )
 
@@ -445,21 +469,33 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       const firstDayStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
       const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
       // Get all dates in the current month to delete
-      const deleteResponse = await fetch(
-        `${API_BASE_URL}/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`,
-        {
-          headers: { Authorization: `Token ${token}` },
-        }
-      )
+      let fetchUrl = `${API_BASE_URL}/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`
+      if (selectedClinicId) {
+        fetchUrl += `&clinic_id=${selectedClinicId}`
+      }
+      const deleteResponse = await fetch(fetchUrl, {
+        headers: { Authorization: `Token ${token}` },
+      })
 
       if (deleteResponse.ok) {
-        const existingDates = await deleteResponse.json()
+        const rawData = await deleteResponse.json()
+        // Handle both direct array and paginated response formats
+        const existingDates = Array.isArray(rawData) ? rawData : (rawData?.results || [])
         console.log('[CALENDAR] Existing dates to delete:', existingDates)
         
         if (existingDates.length > 0) {
-          // Delete existing dates for this month
-          const datesToDelete = existingDates.map((item: any) => item.date)
+          // Get unique dates to delete
+          const datesToDelete = [...new Set(existingDates.map((item: any) => item.date))]
           console.log('[CALENDAR] Deleting dates:', datesToDelete)
+          
+          // Build delete body - clinic aware
+          const deleteBody: any = {
+            dentist_id: dentistId,
+            dates: datesToDelete,
+          }
+          if (selectedClinicId) {
+            deleteBody.clinic_id = selectedClinicId
+          }
           
           const bulkDeleteResponse = await fetch(
             `${API_BASE_URL}/api/dentist-availability/bulk_delete/`,
@@ -469,10 +505,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
                 "Content-Type": "application/json",
                 Authorization: `Token ${token}`,
               },
-              body: JSON.stringify({
-                dentist_id: dentistId,
-                dates: datesToDelete,
-              }),
+              body: JSON.stringify(deleteBody),
             }
           )
           
@@ -497,6 +530,19 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       console.log('[CALENDAR] Creating new dates:', dates)
 
       if (dates.length > 0) {
+        // Build request body with clinic awareness
+        const saveBody: any = {
+          dentist_id: dentistId,
+          dates: dates,
+        }
+        
+        if (selectedClinicId) {
+          saveBody.clinic_id = selectedClinicId
+          saveBody.apply_to_all_clinics = false
+        } else {
+          saveBody.apply_to_all_clinics = true
+        }
+
         const response = await fetch(
           `${API_BASE_URL}/api/dentist-availability/bulk_create/`,
           {
@@ -505,10 +551,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
               "Content-Type": "application/json",
               Authorization: `Token ${token}`,
             },
-            body: JSON.stringify({
-              dentist_id: dentistId,
-              dates: dates,
-            }),
+            body: JSON.stringify(saveBody),
           }
         )
 

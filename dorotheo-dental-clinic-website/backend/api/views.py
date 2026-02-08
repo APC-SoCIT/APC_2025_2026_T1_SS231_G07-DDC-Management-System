@@ -1863,7 +1863,8 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         Delete availability for specific dates.
         Expected data: {
             "dentist_id": 1,
-            "clinic_id": 1,  // Optional - if provided, only deletes for that clinic
+            "clinic_id": 1,  // Optional - if provided, deletes records for that specific clinic only
+                             // If not provided, deletes ALL records for those dates (all clinics)
             "dates": ["2026-01-10", "2026-01-11", ...]
         }
         """
@@ -1883,7 +1884,9 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         )
         
         if clinic_id:
+            # When deleting from a specific clinic view, only delete that clinic's records
             queryset = queryset.filter(clinic_id=clinic_id)
+        # When no clinic_id is provided (All Clinics view), delete ALL records for these dates
         
         deleted_count = queryset.delete()[0]
         
