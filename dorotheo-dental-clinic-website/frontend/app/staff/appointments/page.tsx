@@ -225,7 +225,7 @@ export default function StaffAppointments() {
       let bookedDuration = 30
       if (slot.service_id) {
         const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
-        const bookedService = servicesArray.find(s => s.id === slot.service_id)
+        const bookedService = servicesArray.find((s: Service) => s.id === slot.service_id)
         if (bookedService && bookedService.duration) {
           bookedDuration = bookedService.duration
         }
@@ -482,7 +482,7 @@ export default function StaffAppointments() {
 
     // Get the selected service duration
     const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
-    const selectedService = servicesArray.find(s => s.id === Number(newAppointment.service))
+    const selectedService = servicesArray.find((s: Service) => s.id === Number(newAppointment.service))
     const duration = selectedService?.duration || 30
 
     // Check for time slot conflicts using booked slots with overlap detection
@@ -527,10 +527,8 @@ export default function StaffAppointments() {
       setAppointments([createdAppointment, ...appointments])
       
       // Prepare success modal details
-      const patientsArray = Array.isArray(patients) ? patients : ((patients as any).results || [] as Patient[])
-      const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
-      const patient = patientsArray.find(p => p.id === selectedPatientId)
-      const service = servicesArray.find(s => s.id === Number.parseInt(newAppointment.service))
+      const patient = patients.find(p => p.id === Number.parseInt(newAppointment.patient))
+      const service = services.find(s => s.id === Number.parseInt(newAppointment.service))
       const dentist = staff.find(s => s.id === Number.parseInt(newAppointment.dentist))
       const clinic = allClinics.find(c => c.id === Number.parseInt(newAppointment.clinic))
       
@@ -1043,7 +1041,7 @@ export default function StaffAppointments() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
+          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
           <p className="text-[var(--color-text-muted)]">Manage patient appointments and schedules</p>
         </div>
         <div className="flex gap-3">
@@ -1927,7 +1925,7 @@ export default function StaffAppointments() {
                             <div className="text-sm text-gray-500">{patient.email}</div>
                           </div>
                         ))}
-                      {(Array.isArray(patients) ? patients : (patients.results || [])).filter((patient) => {
+                      {(Array.isArray(patients) ? patients : ((patients as any).results || [] as Patient[])).filter((patient: Patient) => {
                         if (!patientSearchQuery) return true
                         const query = patientSearchQuery.toLowerCase()
                         return (
@@ -2036,7 +2034,7 @@ export default function StaffAppointments() {
                   <p className="text-xs text-gray-600 mb-2">
                     {(() => {
                       const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
-                      const selectedService = servicesArray.find(s => s.id === Number(newAppointment.service))
+                      const selectedService = servicesArray.find((s: Service) => s.id === Number(newAppointment.service))
                       const duration = selectedService?.duration || 30
                       return `Select a ${duration}-minute time slot (10:00 AM - 8:00 PM). Grayed out times conflict with existing appointments.`
                     })()}
@@ -2049,7 +2047,7 @@ export default function StaffAppointments() {
                       </div>
                     ) : (() => {
                       const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
-                      const selectedService = servicesArray.find(s => s.id === Number(newAppointment.service))
+                      const selectedService = servicesArray.find((s: Service) => s.id === Number(newAppointment.service))
                       const duration = selectedService?.duration || 30
                       const timeSlots = generateTimeSlots(duration, newAppointment.date)
                       

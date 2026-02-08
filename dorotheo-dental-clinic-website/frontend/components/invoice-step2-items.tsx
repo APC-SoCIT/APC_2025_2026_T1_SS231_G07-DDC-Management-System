@@ -14,7 +14,6 @@ import { InvoiceItem, InventoryItem, InvoiceTotals } from "@/lib/types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface InvoiceStep2ItemsProps {
-  appointment: any
   items: InvoiceItem[]
   onItemsChange: (items: InvoiceItem[]) => void
   totals: InvoiceTotals
@@ -23,7 +22,6 @@ interface InvoiceStep2ItemsProps {
 }
 
 export function InvoiceStep2Items({
-  appointment,
   items,
   onItemsChange,
   totals,
@@ -49,18 +47,14 @@ export function InvoiceStep2Items({
   const [dialogQuantity, setDialogQuantity] = useState(1)
   const [dialogUnitPrice, setDialogUnitPrice] = useState("0")
 
-  // Fetch inventory filtered by appointment's clinic
+  // Fetch inventory
   useEffect(() => {
     const fetchInventory = async () => {
       try {
         const token = localStorage.getItem("token")
         if (!token) return
         
-        // Get clinic ID from appointment
-        const clinicId = appointment?.clinic || appointment?.clinic_id
-        
-        // Fetch inventory filtered by clinic
-        const data = await getInventory(token, clinicId)
+        const data = await getInventory(token)
         setInventoryItems(data)
         setFilteredItems(data)
       } catch (error) {
@@ -71,7 +65,7 @@ export function InvoiceStep2Items({
     }
     
     fetchInventory()
-  }, [appointment])
+  }, [])
 
   // Search and filter
   useEffect(() => {

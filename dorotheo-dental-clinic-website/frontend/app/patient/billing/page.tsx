@@ -1,12 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Download, CreditCard, CheckCircle, Clock, FileText, Eye } from "lucide-react"
-import { api, getPayments } from "@/lib/api"
+import { Download, CreditCard, CheckCircle, Clock, FileText } from "lucide-react"
+import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ClinicBadge } from "@/components/clinic-badge"
-import InvoiceDetailsModal from "@/components/invoice-details-modal"
-import { Payment } from "@/lib/types"
 
 interface ClinicLocation {
   id: number
@@ -50,50 +48,24 @@ export default function PatientBilling() {
   const { token, user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
-  const [payments, setPayments] = useState<Payment[]>([])
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInvoices = async () => {
       if (!token || !user) return
 
       try {
         setIsLoading(true)
-        const [invoicesData, paymentsData] = await Promise.all([
-          api.getInvoices(token, user.id),
-          getPayments(token, { patient_id: user.id })
-        ])
-        setInvoices(invoicesData)
-        setPayments(paymentsData)
+        const data = await api.getInvoices(token, user.id)
+        setInvoices(data)
       } catch (error) {
-        console.error("Error fetching data:", error)
+        console.error("Error fetching invoices:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchData()
+    fetchInvoices()
   }, [token, user])
-
-  const handleViewDetails = (invoice: Invoice) => {
-    setSelectedInvoice(invoice)
-    setShowDetailsModal(true)
-  }
-
-  const handleInvoiceUpdate = async () => {
-    if (!token || !user) return
-    try {
-      const [invoicesData, paymentsData] = await Promise.all([
-        api.getInvoices(token, user.id),
-        getPayments(token, { patient_id: user.id })
-      ])
-      setInvoices(invoicesData)
-      setPayments(paymentsData)
-    } catch (error) {
-      console.error("Error refreshing data:", error)
-    }
-  }
 
   const totalBalance = invoices.reduce((sum, inv) => sum + parseFloat(inv.balance || '0'), 0)
   const totalPaid = invoices.reduce((sum, inv) => sum + parseFloat(inv.amount_paid || '0'), 0)
@@ -101,7 +73,7 @@ export default function PatientBilling() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Billing and Payments</h1>
+        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Billing & Payments</h1>
         <p className="text-[var(--color-text-muted)]">View your statement of accounts and payment history</p>
       </div>
 
@@ -184,21 +156,12 @@ export default function PatientBilling() {
                       </span>
                     </div>
 
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleViewDetails(invoice)}
-                        className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
-                        title="View Invoice Details"
-                      >
-                        <Eye className="w-5 h-5 text-[var(--color-primary)]" />
-                      </button>
-                      <button 
-                        className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
-                        title="Download Invoice PDF"
-                      >
-                        <Download className="w-5 h-5 text-[var(--color-primary)]" />
-                      </button>
-                    </div>
+                    <button 
+                      className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                      title="Download Invoice PDF"
+                    >
+                      <Download className="w-5 h-5 text-[var(--color-primary)]" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -206,20 +169,6 @@ export default function PatientBilling() {
           </div>
         )}
       </div>
-
-      {/* Invoice Details Modal */}
-      {showDetailsModal && selectedInvoice && token && (
-        <InvoiceDetailsModal
-          invoice={selectedInvoice}
-          token={token}
-          payments={payments}
-          onClose={() => {
-            setShowDetailsModal(false)
-            setSelectedInvoice(null)
-          }}
-          onUpdate={handleInvoiceUpdate}
-        />
-      )}
     </div>
   )
 }
