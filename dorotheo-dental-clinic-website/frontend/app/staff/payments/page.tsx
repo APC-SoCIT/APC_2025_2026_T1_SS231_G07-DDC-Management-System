@@ -1,0 +1,368 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { DollarSign, Search, CreditCard, FileText, AlertCircle, History } from "lucide-react"
+import { RecordPaymentModal } from "@/components/record-payment-modal"
+import { InvoiceWithPatient, Patient } from "@/lib/types"
+import { getInvoices, getPatients } from "@/lib/api"
+
+export default function StaffPaymentsPage() {
+  const [token, setToken] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+
+  // Data
+  const [invoices, setInvoices] = useState<InvoiceWithPatient[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
+
+  // Modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedPatientId, setSelectedPatientId] = useState<number>(0)
+  const [selectedPatientName, setSelectedPatientName] = useState("")
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "overdue">("all")
+  const [patientFilter, setPatientFilter] = useState<number | null>(null)
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token")
+    if (storedToken) {
+      setToken(storedToken)
+      fetchData(storedToken)
+    } else {
+      setLoading(false)
+      setError("Not authenticated")
+    }
+  }, [])
+
+  const fetchData = async (authToken: string) => {
+    try {
+      setLoading(true)
+      setError("")
+
+      const [invoicesData, patientsData] = await Promise.all([
+        getInvoices(authToken),
+        getPatients(authToken)
+      ])
+
+      // Only show unpaid invoices (with balance > 0)
+      const unpaidInvoices = invoicesData.filter((inv: InvoiceWithPatient) =>
+        parseFloat(inv.balance) > 0 && inv.status !== 'cancelled'
+      )
+
+      setInvoices(unpaidInvoices)
+      // getPatients returns paginated data, extract results array
+      setPatients(Array.isArray(patientsData) ? patientsData : (patientsData.results || []))
+    } catch (err: any) {
+      console.error("Error fetching data:", err)
+      setError(err.message || "Failed to load data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRecordPayment = (patientId: number, patientName: string) => {
+    setSelectedPatientId(patientId)
+    setSelectedPatientName(patientName)
+    setShowPaymentModal(true)
+  }
+
+  const handlePaymentSuccess = () => {
+    // Refresh invoices after payment is recorded
+    if (token) {
+      fetchData(token)
+    }
+  }
+
+  // Filter invoices
+  const filteredInvoices = invoices.filter((invoice) => {
+    // Status filter
+    if (statusFilter !== "all" && invoice.status !== statusFilter) {
+      return false
+    }
+
+    // Patient filter
+    if (patientFilter && invoice.patient !== patientFilter) {
+      return false
+    }
+
+    // Search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      return (
+        invoice.invoice_number.toLowerCase().includes(query) ||
+        invoice.patient_name?.toLowerCase().includes(query)
+      )
+    }
+
+    return true
+  })
+
+  // Calculate totals
+  const totalUnpaid = filteredInvoices.reduce(
+    (sum, inv) => sum + parseFloat(inv.balance),
+    0
+  )
+  const overdueCount = invoices.filter((inv) => inv.status === "overdue").length
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-700'
+      case 'overdue':
+        return 'bg-red-100 text-red-700'
+      case 'sent':
+        return 'bg-amber-100 text-amber-700'
+      default:
+        return 'bg-gray-100 text-gray-700'
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading payment data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">
+            Patient Payments
+          </h1>
+          <p className="text-[var(--color-text-muted)]">
+            Record payments and manage unpaid invoices
+          </p>
+        </div>
+        <Link
+          href="/staff/payments/history"
+          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+        >
+          <History className="w-5 h-5" />
+          View Payment History
+        </Link>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Unpaid</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ₱{totalUnpaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="p-3 bg-red-50 rounded-lg">
+              <DollarSign className="w-6 h-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Unpaid Invoices</p>
+              <p className="text-2xl font-bold text-gray-900">{filteredInvoices.length}</p>
+            </div>
+            <div className="p-3 bg-amber-50 rounded-lg">
+              <FileText className="w-6 h-6 text-amber-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Overdue</p>
+              <p className="text-2xl font-bold text-gray-900">{overdueCount}</p>
+            </div>
+            <div className="p-3 bg-red-50 rounded-lg">
+              <AlertCircle className="w-6 h-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Search */}
+          <div className="md:col-span-2 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search by invoice number or patient name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Patient Filter */}
+          <div>
+            <select
+              value={patientFilter || ""}
+              onChange={(e) => setPatientFilter(e.target.value ? parseInt(e.target.value) : null)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Patients</option>
+              {Array.isArray(patients) && patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.first_name} {patient.last_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Status Tabs */}
+        <div className="flex gap-2 border-b border-gray-200">
+          {[
+            { id: "all", label: "All Unpaid" },
+            { id: "sent", label: "Pending" },
+            { id: "overdue", label: "Overdue" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id as any)}
+              className={`px-4 py-2 font-medium transition-colors ${
+                statusFilter === tab.id
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Invoices Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {filteredInvoices.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">
+              {searchQuery || patientFilter
+                ? "No invoices found matching your filters."
+                : "No unpaid invoices at this time."}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Invoice #
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Patient
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Date
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Service
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Total
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Balance
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredInvoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-sm font-medium text-gray-900">
+                        {invoice.invoice_number}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-900">{invoice.patient_name}</p>
+                      <p className="text-sm text-gray-600">{invoice.patient_email}</p>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {new Date(invoice.invoice_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {invoice.service_name || "N/A"}
+                    </td>
+                    <td className="px-6 py-4 text-gray-900">
+                      ₱{parseFloat(invoice.total_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-bold text-red-600">
+                        ₱{parseFloat(invoice.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                          invoice.status
+                        )}`}
+                      >
+                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() =>
+                          handleRecordPayment(invoice.patient, invoice.patient_name || "Patient")
+                        }
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Record Payment
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Record Payment Modal */}
+      <RecordPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        patientId={selectedPatientId}
+        patientName={selectedPatientName}
+        token={token}
+        onSuccess={handlePaymentSuccess}
+      />
+    </div>
+  )
+}

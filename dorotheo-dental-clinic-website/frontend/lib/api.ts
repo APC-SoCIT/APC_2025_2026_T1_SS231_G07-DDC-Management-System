@@ -1075,6 +1075,86 @@ export const api = {
     if (!response.ok) throw new Error('Failed to fetch patient balance')
     return response.json()
   },
+
+  // Payment endpoints
+  recordPayment: async (data: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/payments/record_payment/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
+      body: JSON.stringify(data),
+    })
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to record payment' }))
+      console.error('Payment recording failed:', error)
+      throw new Error(error.error || error.detail || 'Failed to record payment')
+    }
+    
+    return response.json()
+  },
+
+  getPayments: async (token: string, filters?: {
+    patient_id?: number
+    clinic_id?: number
+    start_date?: string
+    end_date?: string
+    payment_method?: string
+    include_voided?: boolean
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.patient_id) params.append('patient_id', filters.patient_id.toString())
+    if (filters?.clinic_id) params.append('clinic_id', filters.clinic_id.toString())
+    if (filters?.start_date) params.append('start_date', filters.start_date)
+    if (filters?.end_date) params.append('end_date', filters.end_date)
+    if (filters?.payment_method) params.append('payment_method', filters.payment_method)
+    if (filters?.include_voided !== undefined) params.append('include_voided', filters.include_voided.toString())
+    
+    const queryString = params.toString()
+    const response = await fetch(`${API_BASE_URL}/payments/${queryString ? `?${queryString}` : ''}`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    
+    if (!response.ok) throw new Error('Failed to fetch payments')
+    const data = await response.json()
+    return Array.isArray(data) ? data : (data?.results || [])
+  },
+
+  getPayment: async (paymentId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch payment')
+    return response.json()
+  },
+
+  getPatientPayments: async (patientId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/payments/patient_payments/${patientId}/`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch patient payments')
+    return response.json()
+  },
+
+  voidPayment: async (paymentId: number, reason: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/void/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
+      body: JSON.stringify({ reason }),
+    })
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to void payment' }))
+      throw new Error(error.error || 'Failed to void payment')
+    }
+    
+    return response.json()
+  },
 }
 
 // Export all API functions
@@ -1169,4 +1249,9 @@ export const {
   getInvoices,
   getInvoice,
   getPatientBalance,
+  recordPayment,
+  getPayments,
+  getPayment,
+  getPatientPayments,
+  voidPayment,
 } = api

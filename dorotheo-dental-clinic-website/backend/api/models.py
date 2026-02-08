@@ -711,6 +711,33 @@ class Invoice(models.Model):
     def __str__(self):
         return f"{self.invoice_number} - {self.patient.get_full_name()} - PHP {self.total_due}"
     
+    def calculate_amount_paid_from_splits(self):
+        """Calculate total amount paid from payment splits"""
+        return self.payment_splits.filter(
+            is_voided=False,
+            payment__is_voided=False
+        ).aggregate(total=models.Sum('amount'))['total'] or 0
+    
+    def update_payment_status(self):
+        """Update invoice payment status based on payment splits"""
+        self.amount_paid = self.calculate_amount_paid_from_splits()
+        self.balance = self.total_due - self.amount_paid
+        
+        # Update status
+        if self.amount_paid >= self.total_due and self.status != 'cancelled':
+            self.status = 'paid'
+            if not self.paid_at:
+                self.paid_at = timezone.now()
+        elif self.amount_paid > 0 and self.amount_paid < self.total_due:
+            if self.status in ['draft', 'sent']:
+                self.status = 'sent'  # Keep as sent if partially paid
+        elif self.status == 'paid' and self.amount_paid < self.total_due:
+            # If amount_paid decreases and no longer covers total, revert from paid
+            self.status = 'sent'
+            self.paid_at = None
+        
+        self.save()
+    
     def save(self, *args, **kwargs):
         # Auto-calculate subtotal (service + items)
         self.subtotal = self.service_charge + self.items_subtotal
@@ -786,3 +813,117 @@ class PatientBalance(models.Model):
 
     def __str__(self):
         return f"{self.patient.get_full_name()} - Balance: PHP {self.current_balance}"
+
+
+class Payment(models.Model):
+    """Record of a payment made by a patient (cash, check, bank transfer, etc.)"""
+    PAYMENT_METHOD_CHOICES = (
+        ('cash', 'Cash'),
+        ('check', 'Check'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('credit_card', 'Credit Card (Manual)'),
+        ('debit_card', 'Debit Card (Manual)'),
+        ('gcash', 'GCash'),
+        ('paymaya', 'PayMaya'),
+        ('other', 'Other'),
+    )
+    
+    # Core Fields
+    payment_number = models.CharField(max_length=20, unique=True, db_index=True, help_text="Format: PAY-YYYY-MM-NNNN")
+    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments', db_index=True)
+    clinic = models.ForeignKey(ClinicLocation, on_delete=models.SET_NULL, null=True, related_name='payments')
+    
+    # Payment Details
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Total payment amount received")
+    payment_date = models.DateField(help_text="Date payment was received")
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')
+    
+    # Optional Payment Details
+    check_number = models.CharField(max_length=50, blank=True, help_text="Check number if payment method is check")
+    bank_name = models.CharField(max_length=100, blank=True, help_text="Bank name for checks or transfers")
+    reference_number = models.CharField(max_length=100, blank=True, help_text="Transaction/reference number for electronic payments")
+    notes = models.TextField(blank=True, help_text="Additional notes about the payment")
+    
+    # Tracking
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='recorded_payments')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Voiding/Cancellation
+    is_voided = models.BooleanField(default=False, help_text="Mark payment as voided (cancelled)")
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='voided_payments')
+    void_reason = models.TextField(blank=True, help_text="Reason for voiding the payment")
+
+    class Meta:
+        ordering = ['-payment_date', '-created_at']
+        verbose_name = 'Payment'
+        verbose_name_plural = 'Payments'
+        indexes = [
+            models.Index(fields=['patient', '-payment_date'], name='pay_patient_date_idx'),
+            models.Index(fields=['clinic', '-payment_date'], name='pay_clinic_date_idx'),
+            models.Index(fields=['-payment_date'], name='pay_date_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.payment_number} - {self.patient.get_full_name()} - PHP {self.amount}"
+    
+    def get_allocated_amount(self):
+        """Calculate total amount allocated to invoices"""
+        return self.splits.filter(is_voided=False).aggregate(
+            total=models.Sum('amount')
+        )['total'] or 0
+    
+    def get_unallocated_amount(self):
+        """Calculate amount not yet allocated to any invoice"""
+        if self.is_voided:
+            return 0
+        return self.amount - self.get_allocated_amount()
+
+
+class PaymentSplit(models.Model):
+    """Allocation of a payment to a specific invoice"""
+    
+    # Relationships
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='splits')
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payment_splits')
+    
+    # Allocation Details
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Amount of payment allocated to this invoice")
+    provider = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_splits', help_text="Dentist who performed the service (for revenue tracking)")
+    
+    # Tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Voiding
+    is_voided = models.BooleanField(default=False)
+    voided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Payment Split'
+        verbose_name_plural = 'Payment Splits'
+        indexes = [
+            models.Index(fields=['payment', 'invoice'], name='paysplit_pay_inv_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.payment.payment_number} → {self.invoice.invoice_number} - PHP {self.amount}"
+    
+    def save(self, *args, **kwargs):
+        # Validate split amount doesn't exceed payment amount
+        if not self.is_voided:
+            payment = self.payment
+            other_splits_total = payment.splits.exclude(id=self.id).filter(
+                is_voided=False
+            ).aggregate(total=models.Sum('amount'))['total'] or 0
+            
+            if other_splits_total + self.amount > payment.amount:
+                from django.core.exceptions import ValidationError
+                raise ValidationError(
+                    f"Total payment splits (PHP {other_splits_total + self.amount}) "
+                    f"cannot exceed payment amount (PHP {payment.amount})"
+                )
+        
+        super().save(*args, **kwargs)

@@ -7,7 +7,7 @@ from .models import (
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification, 
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
     FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot,
-    Invoice, InvoiceItem, PatientBalance
+    Invoice, InvoiceItem, PatientBalance, Payment, PaymentSplit
 )
 
 # Constants for repeated string literals
@@ -716,3 +716,153 @@ class PatientBalanceSerializer(serializers.ModelSerializer):
             'last_invoice_date', 'last_payment_date', 'updated_at'
         ]
         read_only_fields = ['updated_at']
+
+
+class PaymentSplitSerializer(serializers.ModelSerializer):
+    """Serializer for payment splits (allocation to invoices)"""
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
+    invoice_balance = serializers.DecimalField(source='invoice.balance', max_digits=10, decimal_places=2, read_only=True)
+    provider_name = serializers.CharField(source='provider.get_full_name', read_only=True)
+    
+    class Meta:
+        model = PaymentSplit
+        fields = [
+            'id', 'payment', 'invoice', 'invoice_number', 'invoice_balance',
+            'amount', 'provider', 'provider_name', 'is_voided', 'voided_at',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'voided_at']
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Serializer for payments with nested splits"""
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+    patient_email = serializers.CharField(source='patient.email', read_only=True)
+    clinic_name = serializers.CharField(source='clinic.name', read_only=True)
+    recorded_by_name = serializers.CharField(source='recorded_by.get_full_name', read_only=True)
+    voided_by_name = serializers.CharField(source='voided_by.get_full_name', read_only=True)
+    
+    # Nested splits
+    splits = PaymentSplitSerializer(many=True, read_only=True)
+    
+    # Calculated fields
+    allocated_amount = serializers.SerializerMethodField()
+    unallocated_amount = serializers.SerializerMethodField()
+    payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
+    
+    class Meta:
+        model = Payment
+        fields = [
+            'id', 'payment_number', 'patient', 'patient_name', 'patient_email',
+            'clinic', 'clinic_name', 'amount', 'payment_date', 'payment_method',
+            'payment_method_display', 'check_number', 'bank_name', 'reference_number',
+            'notes', 'recorded_by', 'recorded_by_name', 'created_at', 'updated_at',
+            'is_voided', 'voided_at', 'voided_by', 'voided_by_name', 'void_reason',
+            'splits', 'allocated_amount', 'unallocated_amount'
+        ]
+        read_only_fields = [
+            'payment_number', 'created_at', 'updated_at', 'voided_at'
+        ]
+    
+    def get_allocated_amount(self, obj):
+        return float(obj.get_allocated_amount())
+    
+    def get_unallocated_amount(self, obj):
+        return float(obj.get_unallocated_amount())
+
+
+class PaymentRecordSerializer(serializers.Serializer):
+    """Serializer for recording a new payment with allocations"""
+    patient_id = serializers.IntegerField()
+    clinic_id = serializers.IntegerField(required=False, allow_null=True)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)
+    payment_date = serializers.DateField()
+    payment_method = serializers.ChoiceField(choices=Payment.PAYMENT_METHOD_CHOICES)
+    check_number = serializers.CharField(required=False, allow_blank=True)
+    bank_name = serializers.CharField(required=False, allow_blank=True)
+    reference_number = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    
+    # Payment allocations to invoices
+    allocations = serializers.ListField(
+        child=serializers.DictField(),
+        required=True,
+        allow_empty=False,
+        help_text="List of {invoice_id: int, amount: decimal} objects"
+    )
+    
+    def validate_patient_id(self, value):
+        """Validate patient exists"""
+        try:
+            patient = User.objects.get(id=value, user_type='patient')
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Patient not found")
+        return value
+    
+    def validate_allocations(self, value):
+        """Validate payment allocations"""
+        if not value:
+            raise serializers.ValidationError("At least one invoice allocation is required")
+        
+        validated_allocations = []
+        total_allocated = 0
+        
+        for alloc in value:
+            # Validate required fields
+            if 'invoice_id' not in alloc:
+                raise serializers.ValidationError("Each allocation must have 'invoice_id'")
+            if 'amount' not in alloc:
+                raise serializers.ValidationError("Each allocation must have 'amount'")
+            
+            # Validate invoice exists
+            try:
+                invoice = Invoice.objects.select_related('patient').get(id=alloc['invoice_id'])
+            except Invoice.DoesNotExist:
+                raise serializers.ValidationError(f"Invoice {alloc['invoice_id']} not found")
+            
+            # Validate amount
+            try:
+                amount = float(alloc['amount'])
+            except (ValueError, TypeError):
+                raise serializers.ValidationError(f"Invalid amount for invoice {alloc['invoice_id']}")
+            
+            if amount <= 0:
+                raise serializers.ValidationError(f"Allocation amount must be greater than 0")
+            
+            if amount > float(invoice.balance):
+                raise serializers.ValidationError(
+                    f"Allocation amount (PHP {amount}) exceeds invoice {invoice.invoice_number} "
+                    f"balance (PHP {invoice.balance})"
+                )
+            
+            total_allocated += amount
+            validated_allocations.append({
+                'invoice_id': alloc['invoice_id'],
+                'amount': amount,
+                'provider_id': alloc.get('provider_id')
+            })
+        
+        return validated_allocations
+    
+    def validate(self, data):
+        """Cross-field validation"""
+        # Validate total allocations don't exceed payment amount
+        total_allocated = sum(alloc['amount'] for alloc in data['allocations'])
+        if total_allocated > float(data['amount']):
+            raise serializers.ValidationError(
+                f"Total allocations (PHP {total_allocated}) exceed payment amount (PHP {data['amount']})"
+            )
+        
+        # Validate all invoices belong to the same patient
+        invoice_ids = [alloc['invoice_id'] for alloc in data['allocations']]
+        invoices = Invoice.objects.filter(id__in=invoice_ids).values_list('patient_id', flat=True)
+        unique_patients = set(invoices)
+        
+        if len(unique_patients) > 1:
+            raise serializers.ValidationError("All invoices must belong to the same patient")
+        
+        if unique_patients and list(unique_patients)[0] != data['patient_id']:
+            raise serializers.ValidationError("Invoices do not belong to the specified patient")
+        
+        return data
+

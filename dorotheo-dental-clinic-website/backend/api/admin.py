@@ -5,7 +5,7 @@ from .models import (
     Document, InventoryItem, Billing, ClinicLocation,
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability,
     DentistNotification, AppointmentNotification, PasswordResetToken, BlockedTimeSlot,
-    Invoice, InvoiceItem, PatientBalance
+    Invoice, InvoiceItem, PatientBalance, Payment, PaymentSplit
 )
 
 
@@ -196,6 +196,49 @@ class PatientBalanceAdmin(admin.ModelAdmin):
     readonly_fields = ('updated_at',)
 
 
+class PaymentSplitInline(admin.TabularInline):
+    model = PaymentSplit
+    extra = 0
+    readonly_fields = ('created_at', 'updated_at', 'voided_at')
+    fields = ('invoice', 'amount', 'provider', 'is_voided', 'voided_at')
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('payment_number', 'patient', 'clinic', 'amount', 'payment_date', 'payment_method', 'recorded_by', 'is_voided')
+    list_filter = ('payment_method', 'payment_date', 'is_voided', 'clinic')
+    search_fields = ('payment_number', 'patient__username', 'patient__email', 'patient__first_name', 'patient__last_name', 'notes', 'check_number', 'reference_number')
+    ordering = ('-payment_date', '-created_at')
+    date_hierarchy = 'payment_date'
+    readonly_fields = ('payment_number', 'created_at', 'updated_at', 'voided_at')
+    inlines = [PaymentSplitInline]
+    
+    fieldsets = (
+        ('Payment Information', {
+            'fields': ('payment_number', 'patient', 'clinic', 'recorded_by')
+        }),
+        ('Payment Details', {
+            'fields': ('amount', 'payment_date', 'payment_method', 'check_number', 'bank_name', 'reference_number', 'notes')
+        }),
+        ('Void Information', {
+            'fields': ('is_voided', 'voided_at', 'voided_by', 'void_reason')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
+
+
+@admin.register(PaymentSplit)
+class PaymentSplitAdmin(admin.ModelAdmin):
+    list_display = ('payment', 'invoice', 'amount', 'provider', 'is_voided', 'created_at')
+    list_filter = ('is_voided', 'created_at')
+    search_fields = ('payment__payment_number', 'invoice__invoice_number', 'provider__username')
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at', 'updated_at', 'voided_at')
+
+
 admin.site.site_header = "Dental Clinic Administration"
 admin.site.site_title = "Dental Clinic Admin"
 admin.site.index_title = "Welcome to Dental Clinic Management System"
+

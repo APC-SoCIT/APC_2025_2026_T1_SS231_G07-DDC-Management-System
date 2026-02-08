@@ -33,7 +33,7 @@ from .models import (
     TreatmentPlan, TeethImage, StaffAvailability, DentistAvailability, DentistNotification,
     AppointmentNotification, PasswordResetToken, PatientIntakeForm,
     FileAttachment, ClinicalNote, TreatmentAssignment, BlockedTimeSlot,
-    Invoice, InvoiceItem, PatientBalance
+    Invoice, InvoiceItem, PatientBalance, Payment, PaymentSplit
 )
 from .serializers import (
     UserSerializer, ServiceSerializer, AppointmentSerializer,
@@ -43,7 +43,8 @@ from .serializers import (
     DentistAvailabilitySerializer, DentistNotificationSerializer, AppointmentNotificationSerializer, 
     PasswordResetTokenSerializer, PatientIntakeFormSerializer,
     FileAttachmentSerializer, ClinicalNoteSerializer, TreatmentAssignmentSerializer, BlockedTimeSlotSerializer,
-    InvoiceSerializer, InvoiceItemSerializer, InvoiceCreateSerializer, PatientBalanceSerializer
+    InvoiceSerializer, InvoiceItemSerializer, InvoiceCreateSerializer, PatientBalanceSerializer,
+    PaymentSerializer, PaymentSplitSerializer, PaymentRecordSerializer
 )
 
 
@@ -2504,3 +2505,337 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to fetch patient balance: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing payments
+    
+    Endpoints:
+    - GET /api/payments/ - List all payments (filterable by patient, clinic, date range)
+    - POST /api/payments/record_payment/ - Record a new payment with allocations
+    - GET /api/payments/{id}/ - Get payment details
+    - POST /api/payments/{id}/void/ - Void a payment
+    - GET /api/payments/patient_payments/{patient_id}/ - Get all payments for a patient
+    """
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter payments based on user role and query parameters"""
+        queryset = Payment.objects.select_related(
+            'patient', 'clinic', 'recorded_by', 'voided_by'
+        ).prefetch_related('splits', 'splits__invoice')
+        
+        user = self.request.user
+        
+        # Patients can only see their own payments
+        if user.user_type == 'patient':
+            queryset = queryset.filter(patient=user)
+        
+        # Filter by query parameters
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        
+        clinic_id = self.request.query_params.get('clinic_id')
+        if clinic_id:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        
+        # Date range filter
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(payment_date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(payment_date__lte=end_date)
+        
+        # Payment method filter
+        payment_method = self.request.query_params.get('payment_method')
+        if payment_method:
+            queryset = queryset.filter(payment_method=payment_method)
+        
+        # Include/exclude voided payments
+        include_voided = self.request.query_params.get('include_voided', 'false').lower() == 'true'
+        if not include_voided:
+            queryset = queryset.filter(is_voided=False)
+        
+        return queryset.order_by('-payment_date', '-created_at')
+    
+    @action(detail=False, methods=['post'])
+    def record_payment(self, request):
+        """
+        Record a new payment and allocate it to invoices
+        
+        POST /api/payments/record_payment/
+        Body:
+        {
+            "patient_id": 123,
+            "clinic_id": 1,
+            "amount": 1500.00,
+            "payment_date": "2026-02-08",
+            "payment_method": "cash",
+            "check_number": "",
+            "bank_name": "",
+            "reference_number": "",
+            "notes": "Payment for dental cleaning",
+            "allocations": [
+                {
+                    "invoice_id": 45,
+                    "amount": 1000.00,
+                    "provider_id": 5
+                },
+                {
+                    "invoice_id": 46,
+                    "amount": 500.00,
+                    "provider_id": 5
+                }
+            ]
+        }
+        """
+        from django.db import transaction
+        from datetime import date
+        
+        # Validate input data
+        serializer = PaymentRecordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
+        
+        try:
+            with transaction.atomic():
+                # Get patient
+                patient = User.objects.get(id=data['patient_id'], user_type='patient')
+                
+                # Get clinic (use request user's clinic if not specified)
+                clinic = None
+                if data.get('clinic_id'):
+                    clinic = ClinicLocation.objects.get(id=data['clinic_id'])
+                elif request.user.assigned_clinic:
+                    clinic = request.user.assigned_clinic
+                
+                # Generate payment number
+                payment_number = self._generate_payment_number()
+                
+                # Create payment
+                payment = Payment.objects.create(
+                    payment_number=payment_number,
+                    patient=patient,
+                    clinic=clinic,
+                    amount=data['amount'],
+                    payment_date=data['payment_date'],
+                    payment_method=data['payment_method'],
+                    check_number=data.get('check_number', ''),
+                    bank_name=data.get('bank_name', ''),
+                    reference_number=data.get('reference_number', ''),
+                    notes=data.get('notes', ''),
+                    recorded_by=request.user
+                )
+                
+                # Create payment splits and update invoices
+                for allocation in data['allocations']:
+                    invoice = Invoice.objects.get(id=allocation['invoice_id'])
+                    
+                    # Create payment split
+                    PaymentSplit.objects.create(
+                        payment=payment,
+                        invoice=invoice,
+                        amount=allocation['amount'],
+                        provider_id=allocation.get('provider_id')
+                    )
+                    
+                    # Update invoice payment status
+                    invoice.update_payment_status()
+                
+                # Update patient balance
+                patient_balance, created = PatientBalance.objects.get_or_create(
+                    patient=patient,
+                    defaults={
+                        'total_invoiced': 0,
+                        'total_paid': 0,
+                        'current_balance': 0
+                    }
+                )
+                
+                patient_balance.total_paid += data['amount']
+                patient_balance.current_balance = patient_balance.total_invoiced - patient_balance.total_paid
+                patient_balance.last_payment_date = data['payment_date']
+                patient_balance.save()
+                
+                # Return response
+                payment_serializer = PaymentSerializer(payment, context={'request': request})
+                return Response({
+                    'payment': payment_serializer.data,
+                    'message': 'Payment recorded successfully'
+                }, status=status.HTTP_201_CREATED)
+                
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ClinicLocation.DoesNotExist:
+            return Response(
+                {'error': 'Clinic not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Invoice.DoesNotExist:
+            return Response(
+                {'error': 'One or more invoices not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error recording payment: {str(e)}")
+            return Response(
+                {'error': f'Failed to record payment: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def void(self, request, pk=None):
+        """
+        Void a payment (cancel it and reverse its effects)
+        
+        POST /api/payments/{id}/void/
+        Body:
+        {
+            "reason": "Payment was entered in error"
+        }
+        """
+        from django.db import transaction
+        
+        try:
+            payment = self.get_object()
+            
+            if payment.is_voided:
+                return Response(
+                    {'error': 'Payment is already voided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            reason = request.data.get('reason', '')
+            if not reason:
+                return Response(
+                    {'error': 'Void reason is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            with transaction.atomic():
+                # Mark payment as voided
+                payment.is_voided = True
+                payment.voided_at = timezone.now()
+                payment.voided_by = request.user
+                payment.void_reason = reason
+                payment.save()
+                
+                # Mark all splits as voided and update invoices
+                for split in payment.splits.all():
+                    split.is_voided = True
+                    split.voided_at = timezone.now()
+                    split.save()
+                    
+                    # Update invoice payment status
+                    split.invoice.update_payment_status()
+                
+                # Update patient balance
+                patient_balance = PatientBalance.objects.get(patient=payment.patient)
+                patient_balance.total_paid -= payment.amount
+                patient_balance.current_balance = patient_balance.total_invoiced - patient_balance.total_paid
+                patient_balance.save()
+                
+                # Return response
+                payment_serializer = PaymentSerializer(payment, context={'request': request})
+                return Response({
+                    'payment': payment_serializer.data,
+                    'message': 'Payment voided successfully'
+                })
+                
+        except PatientBalance.DoesNotExist:
+            return Response(
+                {'error': 'Patient balance record not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error voiding payment: {str(e)}")
+            return Response(
+                {'error': f'Failed to void payment: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='patient_payments/(?P<patient_id>[^/.]+)')
+    def patient_payments(self, request, patient_id=None):
+        """
+        Get all payments for a specific patient with detailed information
+        
+        GET /api/payments/patient_payments/{patient_id}/
+        """
+        try:
+            patient = User.objects.get(id=patient_id, user_type='patient')
+            
+            # Get all payments for this patient
+            payments = Payment.objects.filter(
+                patient=patient
+            ).select_related(
+                'clinic', 'recorded_by', 'voided_by'
+            ).prefetch_related(
+                'splits', 'splits__invoice'
+            ).order_by('-payment_date', '-created_at')
+            
+            # Calculate summary statistics
+            active_payments = payments.filter(is_voided=False)
+            total_paid = active_payments.aggregate(
+                total=models.Sum('amount')
+            )['total'] or 0
+            
+            # Serialize data
+            payments_serializer = PaymentSerializer(
+                payments, many=True, context={'request': request}
+            )
+            
+            return Response({
+                'patient_id': patient.id,
+                'patient_name': patient.get_full_name(),
+                'patient_email': patient.email,
+                'total_paid': float(total_paid),
+                'payment_count': active_payments.count(),
+                'payments': payments_serializer.data
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Patient not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching patient payments: {str(e)}")
+            return Response(
+                {'error': f'Failed to fetch patient payments: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _generate_payment_number(self):
+        """Generate unique payment number in format PAY-YYYY-MM-NNNN"""
+        from datetime import date
+        
+        today = date.today()
+        prefix = f"PAY-{today.year}-{today.month:02d}"
+        
+        # Get last payment number for this month
+        last_payment = Payment.objects.filter(
+            payment_number__startswith=prefix
+        ).order_by('-payment_number').first()
+        
+        if last_payment:
+            # Extract sequence number and increment
+            try:
+                last_seq = int(last_payment.payment_number.split('-')[-1])
+                new_seq = last_seq + 1
+            except (ValueError, IndexError):
+                new_seq = 1
+        else:
+            new_seq = 1
+        
+        return f"{prefix}-{new_seq:04d}"
+

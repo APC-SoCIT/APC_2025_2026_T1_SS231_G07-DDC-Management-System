@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Users, Calendar, Package, CreditCard, LogOut, Menu, X, ChevronDown, User } from "lucide-react"
+import { LayoutDashboard, Users, Calendar, Package, CreditCard, DollarSign, LogOut, Menu, X, ChevronDown, User } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import NotificationBell from "@/components/notification-bell"
 import { ClinicSelector } from "@/components/clinic-selector"
@@ -28,6 +28,7 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
     { name: "Appointments", href: "/staff/appointments", icon: Calendar },
     { name: "Inventory", href: "/staff/inventory", icon: Package },
     { name: "Billing", href: "/staff/billing", icon: CreditCard },
+    { name: "Payments", href: "/staff/payments", icon: DollarSign },
   ]
 
   const handleLogout = () => {
