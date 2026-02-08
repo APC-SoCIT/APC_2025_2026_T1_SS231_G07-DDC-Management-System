@@ -197,7 +197,7 @@ export default function OwnerStaff() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Staff Accounts</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Staff Accounts</h1>
           <p className="text-[var(--color-text-muted)]">Manage staff members and their access</p>
         </div>
         <button
@@ -304,7 +304,7 @@ export default function OwnerStaff() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Add Staff Member</h2>
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Add Staff Member</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
@@ -501,7 +501,7 @@ export default function OwnerStaff() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Edit Staff Member</h2>
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Edit Staff Member</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false)
@@ -645,7 +645,7 @@ export default function OwnerStaff() {
               </div>
 
               {/* Title */}
-              <h2 className="text-2xl font-serif font-bold text-center text-[var(--color-primary)] mb-2">
+              <h2 className="text-2xl font-display font-bold text-center text-[var(--color-primary)] mb-2">
                 Staff Member Added Successfully!
               </h2>
               <p className="text-center text-[var(--color-text-muted)] mb-6">

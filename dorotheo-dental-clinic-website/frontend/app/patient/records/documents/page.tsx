@@ -277,7 +277,7 @@ export default function Documents() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Documents</h1>
+        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Documents</h1>
         <p className="text-[var(--color-text-muted)]">View your medical certificates, notes, and other documents</p>
       </div>
 

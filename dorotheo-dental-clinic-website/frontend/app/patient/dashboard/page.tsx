@@ -86,7 +86,7 @@ export default function PatientDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">
+        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">
           Welcome Back, {user?.first_name || "Patient"}
         </h1>
         <p className="text-[var(--color-text-muted)]">Here's an overview of your dental health</p>

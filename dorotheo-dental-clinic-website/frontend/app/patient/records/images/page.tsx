@@ -167,7 +167,7 @@ export default function TeethImages() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Teeth & X-Ray Images</h1>
+        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Teeth and X-Ray Images</h1>
         <p className="text-[var(--color-text-muted)]">View your dental photos and X-ray images</p>
       </div>
 

@@ -1022,7 +1022,7 @@ export default function PatientAppointments() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">My Appointments</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">My Appointments</h1>
           <p className="text-[var(--color-text-muted)]">View and manage your dental appointments</p>
         </div>
         <button

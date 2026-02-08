@@ -94,7 +94,7 @@ export default function OwnerProfile() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)]">My Profile</h1>
+        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)]">My Profile</h1>
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}

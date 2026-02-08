@@ -6,7 +6,7 @@ export default function Hero() {
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
-            <h1 className="text-5xl lg:text-6xl font-serif font-bold text-[var(--color-primary)] mb-6 text-balance">
+            <h1 className="text-5xl lg:text-6xl font-display font-bold text-[var(--color-primary)] mb-6 text-balance">
               Your Smile, Our Priority
             </h1>
             <p className="text-lg text-[var(--color-text-muted)] mb-8 leading-relaxed">

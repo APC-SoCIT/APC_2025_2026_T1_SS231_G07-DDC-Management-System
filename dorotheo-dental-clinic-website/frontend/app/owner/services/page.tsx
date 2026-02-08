@@ -213,7 +213,7 @@ export default function ServicesPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Services Management</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Services Management</h1>
           <p className="text-[var(--color-text-muted)]">Add, edit, or remove dental services</p>
         </div>
         <button
@@ -247,8 +247,12 @@ export default function ServicesPage() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">
                     <span 
-                      className="px-3 py-1 rounded-lg"
-                      style={{ backgroundColor: service.color, color: '#ffffff' }}
+                      className="px-3 py-1 rounded-lg font-bold border"
+                      style={{ 
+                        backgroundColor: `${service.color}20`, 
+                        color: service.color,
+                        borderColor: `${service.color}50`
+                      }}
                     >
                       {service.name}
                     </span>
@@ -307,7 +311,7 @@ export default function ServicesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-[var(--color-border)] p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">
                 {editingService ? "Edit Service" : "Add New Service"}
               </h2>
               <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">

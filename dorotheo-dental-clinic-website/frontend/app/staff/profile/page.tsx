@@ -54,9 +54,9 @@ export default function StaffProfile() {
         first_name: updatedUser.first_name,
         last_name: updatedUser.last_name,
         email: updatedUser.email,
-        phone: updatedUser.phone,
-        address: updatedUser.address,
-      })
+        ...(updatedUser as any).phone && { phone: (updatedUser as any).phone },
+        ...(updatedUser as any).address && { address: (updatedUser as any).address },
+      } as any)
       
       setIsEditing(false)
       alert("Profile updated successfully!")
@@ -69,7 +69,7 @@ export default function StaffProfile() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)]">My Profile</h1>
+        <h1 className="text-3xl font-display font-bold text-[var(--color-primary)]">My Profile</h1>
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
@@ -194,7 +194,7 @@ export default function StaffProfile() {
           <h2 className="text-2xl font-semibold text-[var(--color-text)] mb-4">My Schedule</h2>
           <DentistCalendarAvailability 
             dentistId={user?.id} 
-            selectedClinicId={selectedClinic?.id || null}
+            selectedClinicId={typeof selectedClinic === 'object' && selectedClinic !== null ? selectedClinic.id : null}
           />
         </div>
       )}
