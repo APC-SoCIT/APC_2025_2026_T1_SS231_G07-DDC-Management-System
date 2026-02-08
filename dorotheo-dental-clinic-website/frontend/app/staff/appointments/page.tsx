@@ -703,9 +703,10 @@ export default function StaffAppointments() {
         apt.id === appointment.id ? updatedAppointment : apt
       ))
       alert("Reschedule request approved successfully!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error approving reschedule:", error)
-      alert("Failed to approve reschedule request.")
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to approve reschedule request."
+      alert(errorMessage)
     }
   }
 

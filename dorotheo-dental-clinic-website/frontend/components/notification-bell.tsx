@@ -287,9 +287,10 @@ export default function NotificationBell() {
       await fetchNotifications()
       
       alert('Reschedule request approved successfully!')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve reschedule:', error)
-      alert('Failed to approve reschedule request. Please try again.')
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to approve reschedule request. Please try again.'
+      alert(errorMessage)
     } finally {
       setProcessingId(null)
     }
