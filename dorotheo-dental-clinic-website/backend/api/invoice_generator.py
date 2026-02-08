@@ -47,8 +47,8 @@ def generate_invoice_pdf(invoice):
     
     # Get patient balance
     patient_balance = 0
-    if hasattr(invoice.patient, 'balance'):
-        patient_balance = invoice.patient.balance.total_balance
+    if hasattr(invoice.patient, 'balance_record'):
+        patient_balance = invoice.patient.balance_record.current_balance
     
     # Prepare context for template
     context = {
@@ -60,7 +60,7 @@ def generate_invoice_pdf(invoice):
         # Patient information
         'patient_name': f"{invoice.patient.first_name} {invoice.patient.last_name}",
         'patient_email': invoice.patient.email,
-        'patient_phone': getattr(invoice.patient, 'phone_number', 'N/A'),
+        'patient_phone': getattr(invoice.patient, 'phone', 'N/A'),
         
         # Appointment information
         'appointment_date': invoice.appointment.date.strftime('%B %d, %Y'),
@@ -72,10 +72,10 @@ def generate_invoice_pdf(invoice):
         'service_charge': f"{invoice.service_charge:,.2f}",
         'items_subtotal': f"{invoice.items_subtotal:,.2f}",
         'subtotal': f"{invoice.subtotal:,.2f}",
-        'discount_amount': f"{invoice.discount_amount:,.2f}",
+        'discount_amount': "0.00",
         'interest_amount': f"{invoice.interest_amount:,.2f}",
         'total_due': f"{invoice.total_due:,.2f}",
-        'total_paid': f"{invoice.total_paid:,.2f}",
+        'total_paid': f"{invoice.amount_paid:,.2f}",
         'balance': f"{invoice.balance:,.2f}",
         'patient_balance': f"{patient_balance:,.2f}",
         
