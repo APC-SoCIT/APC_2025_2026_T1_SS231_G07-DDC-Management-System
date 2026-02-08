@@ -129,6 +129,7 @@ export default function StaffAppointments() {
   const [dentistAvailability, setDentistAvailability] = useState<any[]>([])
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
   const [bookedSlots, setBookedSlots] = useState<Array<{date: string, time: string, dentist_id: number, service_id?: number}>>([])
+  const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false)
   const [patientSearchQuery, setPatientSearchQuery] = useState("")
   const [showPatientDropdown, setShowPatientDropdown] = useState(false)
   const patientDropdownRef = useRef<HTMLDivElement>(null)
@@ -526,8 +527,10 @@ export default function StaffAppointments() {
       setAppointments([createdAppointment, ...appointments])
       
       // Prepare success modal details
-      const patient = patients.find(p => p.id === Number.parseInt(newAppointment.patient))
-      const service = services.find(s => s.id === Number.parseInt(newAppointment.service))
+      const patientsArray = Array.isArray(patients) ? patients : ((patients as any).results || [] as Patient[])
+      const servicesArray = Array.isArray(services) ? services : ((services as any).results || [] as Service[])
+      const patient = patientsArray.find(p => p.id === selectedPatientId)
+      const service = servicesArray.find(s => s.id === Number.parseInt(newAppointment.service))
       const dentist = staff.find(s => s.id === Number.parseInt(newAppointment.dentist))
       const clinic = allClinics.find(c => c.id === Number.parseInt(newAppointment.clinic))
       
