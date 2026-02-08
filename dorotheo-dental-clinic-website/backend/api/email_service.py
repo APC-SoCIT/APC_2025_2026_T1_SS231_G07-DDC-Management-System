@@ -1253,8 +1253,8 @@ class EmailService:
             
             # Get patient balance
             patient_balance = 0
-            if hasattr(invoice.patient, 'balance'):
-                patient_balance = invoice.patient.balance.total_balance
+            if hasattr(invoice.patient, 'balance_record'):
+                patient_balance = invoice.patient.balance_record.current_balance
             
             # Prepare context for email template
             context = {
@@ -1328,8 +1328,8 @@ class EmailService:
             
             # Get patient balance
             patient_balance = 0
-            if hasattr(invoice.patient, 'balance'):
-                patient_balance = invoice.patient.balance.total_balance
+            if hasattr(invoice.patient, 'balance_record'):
+                patient_balance = invoice.patient.balance_record.current_balance
             
             # Prepare invoice items for email
             invoice_items = []
