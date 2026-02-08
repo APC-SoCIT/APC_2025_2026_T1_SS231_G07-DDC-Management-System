@@ -64,7 +64,7 @@ def generate_invoice_pdf(invoice):
         
         # Appointment information
         'appointment_date': invoice.appointment.date.strftime('%B %d, %Y'),
-        'appointment_time': invoice.appointment.time_slot,
+        'appointment_time': invoice.appointment.time.strftime('%I:%M %p'),
         'service_name': invoice.appointment.service.name,
         'dentist_name': f"{invoice.appointment.dentist.first_name} {invoice.appointment.dentist.last_name}",
         
