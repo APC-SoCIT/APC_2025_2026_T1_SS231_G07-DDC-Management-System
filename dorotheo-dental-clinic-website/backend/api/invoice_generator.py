@@ -102,17 +102,9 @@ def generate_invoice_pdf(invoice):
     # Render HTML template
     html_string = render_to_string('invoice_template.html', context)
     
-    # Generate PDF with base_url to resolve any relative paths
-    try:
-        # Create HTML object with base_url pointing to MEDIA_ROOT for assets
-        base_url = settings.MEDIA_ROOT if hasattr(settings, 'MEDIA_ROOT') else None
-        html_obj = HTML(string=html_string, base_url=base_url)
-        pdf_file = html_obj.write_pdf()
-    except Exception as e:
-        # If base_url causes issues, try without it
-        logger.warning(f"Error generating PDF with base_url: {e}. Trying without base_url...")
-        html_obj = HTML(string=html_string)
-        pdf_file = html_obj.write_pdf()
+    # Generate PDF from HTML string
+    # Note: WeasyPrint will render the HTML without external resources
+    pdf_file = HTML(string=html_string).write_pdf()
     
     # Create filename
     filename = f"Invoice_{invoice.invoice_number.replace('/', '_')}.pdf"
