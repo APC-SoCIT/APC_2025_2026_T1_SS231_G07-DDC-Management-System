@@ -307,7 +307,7 @@ def current_user(request):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
 
     def perform_create(self, serializer):
@@ -361,7 +361,7 @@ class UserViewSet(viewsets.ModelViewSet):
         clinic_id = request.query_params.get('clinic')
         
         # Build base query
-        queryset = User.objects.filter(user_type='patient')
+        queryset = User.objects.filter(user_type='patient').order_by('date_joined', 'id')
         
         # Apply clinic filter if provided and user is owner
         if clinic_id and request.user.user_type == 'owner':
@@ -548,12 +548,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class ServiceViewSet(viewsets.ModelViewSet):
-    queryset = Service.objects.all()
+    queryset = Service.objects.all().order_by('name')
     serializer_class = ServiceSerializer
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        queryset = Service.objects.all()
+        queryset = Service.objects.all().order_by('name')
         
         # Filter by clinic_id if provided in query params
         clinic_id = self.request.query_params.get('clinic_id', None)
@@ -1476,7 +1476,7 @@ class BillingViewSet(viewsets.ModelViewSet):
 
 
 class ClinicLocationViewSet(viewsets.ModelViewSet):
-    queryset = ClinicLocation.objects.all()
+    queryset = ClinicLocation.objects.all().order_by('name')
     serializer_class = ClinicLocationSerializer
     permission_classes = [AllowAny]
 
