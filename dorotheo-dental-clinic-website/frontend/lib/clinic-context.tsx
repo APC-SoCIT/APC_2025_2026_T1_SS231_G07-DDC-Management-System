@@ -56,14 +56,14 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         if (savedClinicId === 'all') {
           setSelectedClinicState('all');
         } else if (savedClinicId) {
-          const clinic = data.find((c: ClinicLocation) => c.id === parseInt(savedClinicId));
+          const clinic = clinics.find((c: ClinicLocation) => c.id === parseInt(savedClinicId));
           if (clinic) {
             setSelectedClinicState(clinic);
-          } else if (data.length > 0) {
+          } else if (clinics.length > 0) {
             // If saved clinic not found, default to "all"
             setSelectedClinicState('all');
           }
-        } else if (data.length > 0) {
+        } else if (clinics.length > 0) {
           // No saved selection, default to "all"
           setSelectedClinicState('all');
         }
