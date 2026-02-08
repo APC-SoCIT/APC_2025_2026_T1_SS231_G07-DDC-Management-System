@@ -103,8 +103,16 @@ def generate_invoice_pdf(invoice):
     html_string = render_to_string('invoice_template.html', context)
     
     # Generate PDF from HTML string
-    # Note: WeasyPrint will render the HTML without external resources
-    pdf_file = HTML(string=html_string).write_pdf()
+    try:
+        # Create HTML object from string
+        html_document = HTML(string=html_string)
+        # Generate PDF bytes
+        pdf_file = html_document.write_pdf()
+    except Exception as e:
+        logger.error(f"WeasyPrint PDF generation failed: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise
     
     # Create filename
     filename = f"Invoice_{invoice.invoice_number.replace('/', '_')}.pdf"
