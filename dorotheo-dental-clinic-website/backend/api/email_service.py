@@ -298,6 +298,14 @@ class EmailService:
         else:
             clinic_name = "Dorotheo Dental Clinic - Bacoor (Main)"
         
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        appointment_url = f"{frontend_url}/patient/appointments"
+        
         content = f"""
             <div class="highlight-box">
                 <div class="icon">✅</div>
@@ -344,7 +352,7 @@ class EmailService:
             </div>
             
             <div style="text-align: center;">
-                <a href="#" class="button">View Appointment Details</a>
+                <a href="{appointment_url}" class="button">View Appointment Details</a>
             </div>
             
             <div class="divider"></div>
@@ -456,6 +464,14 @@ class EmailService:
         """Send email when appointment is cancelled"""
         subject = f"❌ Appointment Cancelled - {appointment.date.strftime('%B %d, %Y')}"
         
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        appointment_url = f"{frontend_url}/patient/appointments"
+        
         content = f"""
             <div class="highlight-box">
                 <div class="icon">❌</div>
@@ -493,7 +509,7 @@ class EmailService:
             <p>We understand that schedules can change. If you'd like to book a new appointment, we're here to help!</p>
             
             <div style="text-align: center;">
-                <a href="#" class="button">Book New Appointment</a>
+                <a href="{appointment_url}" class="button">Book New Appointment</a>
             </div>
             
             <div class="divider"></div>
@@ -598,6 +614,14 @@ class EmailService:
         """Send email when reschedule request is rejected"""
         subject = f"⚠️ Reschedule Request Could Not Be Approved"
         
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        contact_url = f"{frontend_url}/contact"
+        
         content = f"""
             <div class="highlight-box">
                 <div class="icon">⚠️</div>
@@ -636,7 +660,7 @@ class EmailService:
             <p>If you need to explore alternative scheduling options or discuss this further, please don't hesitate to contact us.</p>
             
             <div style="text-align: center;">
-                <a href="#" class="button">Contact Us</a>
+                <a href="{contact_url}" class="button">Contact Us</a>
             </div>
             
             <div class="divider"></div>
@@ -670,6 +694,14 @@ class EmailService:
     def send_invoice(billing):
         """Send invoice to patient"""
         subject = f"📝 Invoice #{billing.id} - Dorotheo Dental Clinic"
+        
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        billing_url = f"{frontend_url}/patient/billing"
         
         content = f"""
             <div class="highlight-box">
@@ -723,7 +755,7 @@ class EmailService:
             </div>
             
             <div style="text-align: center;">
-                <a href="#" class="button">Pay Now</a>
+                <a href="{billing_url}" class="button">Pay Now</a>
             </div>
             
             <div class="divider"></div>
@@ -833,6 +865,14 @@ class EmailService:
         """Send payment reminder for unpaid invoices"""
         subject = f"⏰ Payment Reminder - Invoice #{billing.id}"
         
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        billing_url = f"{frontend_url}/patient/billing"
+        
         content = f"""
             <div class="highlight-box">
                 <div class="icon">⏰</div>
@@ -881,7 +921,7 @@ class EmailService:
             </div>
             
             <div style="text-align: center;">
-                <a href="#" class="button">Pay Now</a>
+                <a href="{billing_url}" class="button">Pay Now</a>
             </div>
             
             <p>If you have already made this payment, please disregard this reminder or contact us to confirm receipt.</p>
@@ -917,6 +957,14 @@ class EmailService:
     def send_low_stock_alert(inventory_item, staff_emails):
         """Send low stock alert to staff/owner"""
         subject = f"⚠️ Low Stock Alert: {inventory_item.name}"
+        
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        inventory_url = f"{frontend_url}/staff/inventory"
         
         content = f"""
             <div class="highlight-box">
@@ -960,7 +1008,7 @@ class EmailService:
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="#" class="button">View Inventory Dashboard</a>
+                <a href="{inventory_url}" class="button">View Inventory Dashboard</a>
             </div>
             
             <div class="divider"></div>
@@ -994,6 +1042,14 @@ class EmailService:
     def notify_staff_new_appointment(appointment, staff_emails):
         """Notify staff about new appointment requests"""
         subject = f"📋 New Appointment Request - {appointment.patient.get_full_name()}"
+        
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        staff_appointments_url = f"{frontend_url}/staff/appointments"
         
         content = f"""
             <div class="highlight-box">
@@ -1055,7 +1111,7 @@ class EmailService:
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="#" class="button">Open Staff Portal</a>
+                <a href="{staff_appointments_url}" class="button">Open Staff Portal</a>
             </div>
             
             <div class="divider"></div>
@@ -1171,6 +1227,23 @@ class EmailService:
         """Send confirmation email after successful password reset"""
         subject = "✅ Password Successfully Changed - Dorotheo Dental Clinic"
         
+        # Get frontend URL - use production URL or fallback
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        # Don't use localhost in emails - use production URL
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        
+        # Determine login URL based on user type
+        if hasattr(user, 'user_type'):
+            if user.user_type == 'patient':
+                login_url = f"{frontend_url}/patient/login"
+            elif user.user_type in ['staff', 'owner']:
+                login_url = f"{frontend_url}/staff/login"
+            else:
+                login_url = f"{frontend_url}/login"
+        else:
+            login_url = f"{frontend_url}/login"
+        
         content = f"""
             <div class="highlight-box">
                 <div class="icon">✅</div>
@@ -1202,7 +1275,7 @@ class EmailService:
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="#" class="button">Log In Now</a>
+                <a href="{login_url}" class="button">Log In Now</a>
             </div>
             
             <div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 16px; margin: 20px 0; border-radius: 4px;">
@@ -1257,6 +1330,21 @@ class EmailService:
                 patient_balance = invoice.patient.balance_record.current_balance
             
             # Prepare context for email template
+            # Get dentist name
+            dentist_name = ""
+            if invoice.appointment and invoice.appointment.dentist:
+                dentist_name = f"{invoice.appointment.dentist.first_name} {invoice.appointment.dentist.last_name}"
+            
+            # Get payment instructions and bank account from clinic
+            payment_instructions = getattr(invoice.clinic, 'payment_instructions', 'Please pay via bank transfer or at the clinic reception.')
+            bank_account = getattr(invoice.clinic, 'bank_account', 'Please contact the clinic for bank account details.')
+            
+            # Get frontend URL - use production URL or fallback
+            frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+            # Don't use localhost in emails - use production URL
+            if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+                frontend_url = 'https://dorotheodentalclinic.com'
+            
             context = {
                 'patient_name': invoice.patient.first_name,
                 'invoice_number': invoice.invoice_number,
@@ -1264,13 +1352,16 @@ class EmailService:
                 'invoice_date': invoice.invoice_date.strftime('%B %d, %Y'),
                 'due_date': invoice.due_date.strftime('%B %d, %Y'),
                 'service_name': invoice.appointment.service.name,
+                'dentist_name': dentist_name,
                 'total_due': f"{invoice.total_due:,.2f}",
                 'patient_balance': f"{patient_balance:,.2f}",
                 'clinic_name': invoice.clinic.name,
                 'clinic_address': invoice.clinic.address,
                 'clinic_email': getattr(invoice.clinic, 'email', 'contact@clinic.com'),
                 'clinic_phone': invoice.clinic.phone,
-                'portal_url': f"{settings.FRONTEND_URL}/patient/billing" if hasattr(settings, 'FRONTEND_URL') else "#",
+                'payment_instructions': payment_instructions,
+                'bank_account': bank_account,
+                'portal_url': f"{frontend_url}/patient/billing",
             }
             
             # Render email HTML
