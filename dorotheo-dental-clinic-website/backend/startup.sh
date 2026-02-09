@@ -2,7 +2,6 @@
 # Azure Startup Script for Django Backend
 
 echo "Starting Django application..."
-cd /home/site/wwwroot
 
 # Run migrations
 echo "Running database migrations..."
