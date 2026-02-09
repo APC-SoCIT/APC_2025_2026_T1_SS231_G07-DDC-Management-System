@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Bell, Check, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import AlertModal from './alert-modal'
 
 interface Notification {
   id: number
@@ -34,6 +35,12 @@ export default function NotificationBell() {
   const [processingId, setProcessingId] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const canFetchUnreadRef = useRef(false)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
 
   useEffect(() => {
     // Wait for auth to finish loading
@@ -286,11 +293,21 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Reschedule request approved successfully!')
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Reschedule request approved successfully!"
+      })
     } catch (error: any) {
       console.error('Failed to approve reschedule:', error)
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to approve reschedule request. Please try again.'
-      alert(errorMessage)
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: errorMessage
+      })
     } finally {
       setProcessingId(null)
     }
@@ -308,10 +325,20 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Reschedule request rejected.')
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Reschedule request rejected."
+      })
     } catch (error) {
       console.error('Failed to reject reschedule:', error)
-      alert('Failed to reject reschedule request. Please try again.')
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to reject reschedule request. Please try again."
+      })
     } finally {
       setProcessingId(null)
     }
@@ -329,10 +356,20 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Cancellation request approved successfully!')
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Cancellation request approved successfully!"
+      })
     } catch (error) {
       console.error('Failed to approve cancellation:', error)
-      alert('Failed to approve cancellation request. Please try again.')
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to approve cancellation request. Please try again."
+      })
     } finally {
       setProcessingId(null)
     }
@@ -350,10 +387,20 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Cancellation request rejected.')
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Cancellation request rejected."
+      })
     } catch (error) {
       console.error('Failed to reject cancellation:', error)
-      alert('Failed to reject cancellation request. Please try again.')
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to reject cancellation request. Please try again."
+      })
     } finally {
       setProcessingId(null)
     }
@@ -584,38 +631,71 @@ export default function NotificationBell() {
 
                         {/* Action Buttons for Reschedule/Cancel Requests */}
                         {notif.appointment_details && 
-                         (notif.notification_type === 'reschedule_request' || notif.notification_type === 'cancel_request') &&
-                         notif.appointment_details.status === (notif.notification_type === 'reschedule_request' ? 'reschedule_requested' : 'cancel_requested') && (
-                          <div className="flex gap-2 mb-2">
-                            <button
-                              onClick={() => {
-                                if (notif.notification_type === 'reschedule_request') {
-                                  handleApproveReschedule(notif.appointment_details!.id, notif.id)
-                                } else {
-                                  handleApproveCancel(notif.appointment_details!.id, notif.id)
-                                }
-                              }}
-                              disabled={processingId === notif.id}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              <Check className="w-3 h-3" />
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (notif.notification_type === 'reschedule_request') {
-                                  handleRejectReschedule(notif.appointment_details!.id, notif.id)
-                                } else {
-                                  handleRejectCancel(notif.appointment_details!.id, notif.id)
-                                }
-                              }}
-                              disabled={processingId === notif.id}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              <X className="w-3 h-3" />
-                              Reject
-                            </button>
-                          </div>
+                         (notif.notification_type === 'reschedule_request' || notif.notification_type === 'cancel_request') && (
+                          <>
+                            {/* Show buttons only if still in requested state */}
+                            {notif.appointment_details.status === (notif.notification_type === 'reschedule_request' ? 'reschedule_requested' : 'cancel_requested') ? (
+                              <div className="flex gap-2 mb-2">
+                                <button
+                                  onClick={() => {
+                                    if (notif.notification_type === 'reschedule_request') {
+                                      handleApproveReschedule(notif.appointment_details!.id, notif.id)
+                                    } else {
+                                      handleApproveCancel(notif.appointment_details!.id, notif.id)
+                                    }
+                                  }}
+                                  disabled={processingId === notif.id}
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (notif.notification_type === 'reschedule_request') {
+                                      handleRejectReschedule(notif.appointment_details!.id, notif.id)
+                                    } else {
+                                      handleRejectCancel(notif.appointment_details!.id, notif.id)
+                                    }
+                                  }}
+                                  disabled={processingId === notif.id}
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              /* Show status if already handled */
+                              <div className="mb-2">
+                                {notif.notification_type === 'reschedule_request' ? (
+                                  notif.appointment_details.status === 'confirmed' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                                      <Check className="w-3 h-3" />
+                                      Already approved
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                                      <X className="w-3 h-3" />
+                                      Already rejected
+                                    </span>
+                                  )
+                                ) : (
+                                  notif.appointment_details.status === 'cancelled' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                                      <Check className="w-3 h-3" />
+                                      Already approved
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                                      <X className="w-3 h-3" />
+                                      Already rejected
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
 
                         {/* Timestamp */}
@@ -653,6 +733,14 @@ export default function NotificationBell() {
           </div>
         </>
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+      />
     </div>
   )
 }

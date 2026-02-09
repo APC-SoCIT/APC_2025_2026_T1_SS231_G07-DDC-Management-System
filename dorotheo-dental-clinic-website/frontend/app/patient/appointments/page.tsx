@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
+import AlertModal from "@/components/alert-modal"
 
 interface Appointment {
   id: number
@@ -90,6 +91,12 @@ export default function PatientAppointments() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successAppointmentDetails, setSuccessAppointmentDetails] = useState<any>(null)
   const [appointmentError, setAppointmentError] = useState("")
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
   const [cancelReason, setCancelReason] = useState("")
   const [staff, setStaff] = useState<Staff[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -723,11 +730,21 @@ export default function PatientAppointments() {
 
     // Validation
     if (!rescheduleData.date) {
-      alert("Please select a date")
+      setAlertModal({
+        isOpen: true,
+        type: "warning",
+        title: "Validation Error",
+        message: "Please select a date"
+      })
       return
     }
     if (!rescheduleData.time) {
-      alert("Please select a time")
+      setAlertModal({
+        isOpen: true,
+        type: "warning",
+        title: "Validation Error",
+        message: "Please select a time"
+      })
       return
     }
 
@@ -771,7 +788,12 @@ export default function PatientAppointments() {
       })
       setRescheduleSelectedDate(undefined)
       setRescheduleBookedSlots([])
-      alert("Reschedule request submitted! Staff will review it soon.")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Submitted",
+        message: "Reschedule request submitted! Staff will review it soon."
+      })
     } catch (error: any) {
       console.error("Error requesting reschedule:", error)
       console.error("Error details:", JSON.stringify(error, null, 2))
@@ -794,7 +816,12 @@ export default function PatientAppointments() {
         errorMsg = error.message
       }
       
-      alert(`Failed to submit reschedule request:\n${errorMsg}`)
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed to Submit",
+        message: `Failed to submit reschedule request: ${errorMsg}`
+      })
     }
   }
 
@@ -816,11 +843,21 @@ export default function PatientAppointments() {
       setShowCancelModal(false)
       setSelectedAppointment(null)
       setCancelReason("")
-      alert("Cancellation request submitted! Staff will review it soon.")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Submitted",
+        message: "Cancellation request submitted! Staff will review it soon."
+      })
     } catch (error: any) {
       console.error("Error requesting cancellation:", error)
       const errorMessage = error.message || "Failed to submit cancellation request. Please try again."
-      alert(errorMessage)
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: errorMessage
+      })
     }
   }
 
@@ -2148,6 +2185,15 @@ export default function PatientAppointments() {
           </div>
         </div>
       )}
+    
+    {/* Alert Modal */}
+    <AlertModal
+      isOpen={alertModal.isOpen}
+      onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+      type={alertModal.type}
+      title={alertModal.title}
+      message={alertModal.message}
+    />
     </div>
   )
 }

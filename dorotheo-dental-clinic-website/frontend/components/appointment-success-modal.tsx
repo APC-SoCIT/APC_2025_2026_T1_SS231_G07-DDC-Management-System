@@ -15,13 +15,15 @@ interface AppointmentSuccessModalProps {
     notes?: string
   }
   isConfirmed?: boolean
+  bookedByStaff?: boolean // If true, show "You booked" message for staff/owner
 }
 
 export default function AppointmentSuccessModal({ 
   isOpen, 
   onClose, 
   appointmentDetails,
-  isConfirmed = false
+  isConfirmed = false,
+  bookedByStaff = false
 }: AppointmentSuccessModalProps) {
   if (!isOpen) return null
 
@@ -64,10 +66,13 @@ export default function AppointmentSuccessModal({
           </div>
 
           <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center">
-            Congratulations!
+            {bookedByStaff ? "Appointment Booked!" : "Congratulations!"}
           </h2>
           <p className="text-gray-600 text-center mb-2 text-sm">
-            Your appointment has been successfully booked
+            {bookedByStaff 
+              ? `You successfully booked an appointment for ${appointmentDetails.patientName}`
+              : "Your appointment has been successfully booked"
+            }
           </p>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full mb-3 ${isConfirmed ? 'bg-green-50' : 'bg-blue-50'}`}>
             <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isConfirmed ? 'bg-green-500' : 'bg-blue-500'}`}></div>

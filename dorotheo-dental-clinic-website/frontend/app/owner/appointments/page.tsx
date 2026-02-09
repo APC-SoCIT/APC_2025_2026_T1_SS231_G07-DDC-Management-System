@@ -28,6 +28,7 @@ import BlockTimeSuccessModal from "@/components/block-time-success-modal"
 import ErrorModal from "@/components/error-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 import { CreateInvoiceModal } from "@/components/create-invoice-modal"
+import AlertModal from "@/components/alert-modal"
 
 interface Appointment {
   id: number
@@ -153,6 +154,12 @@ export default function OwnerAppointments() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [selectedAppointmentForInvoice, setSelectedAppointmentForInvoice] = useState<Appointment | null>(null)
   
@@ -705,11 +712,21 @@ export default function OwnerAppointments() {
     try {
       const updatedAppointment = await api.approveReschedule(appointment.id, token!)
       setAppointments(appointments.map(apt => apt.id === appointment.id ? updatedAppointment : apt))
-      alert("Reschedule request approved successfully!")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Reschedule request approved successfully!"
+      })
     } catch (error: any) {
       console.error("Error approving reschedule:", error)
       const errorMessage = error?.response?.data?.error || error?.message || "Failed to approve reschedule request."
-      alert(errorMessage)
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: errorMessage
+      })
     }
   }
 
@@ -720,11 +737,21 @@ export default function OwnerAppointments() {
     try {
       const updatedAppointment = await api.rejectReschedule(appointment.id, token!)
       setAppointments(appointments.map(apt => apt.id === appointment.id ? updatedAppointment : apt))
-      alert("Reschedule request rejected.")
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Reschedule request rejected."
+      })
     } catch (error: any) {
       console.error("Error rejecting reschedule:", error)
       const errorMessage = error?.response?.data?.error || error?.message || "Failed to reject reschedule request."
-      alert(errorMessage)
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: errorMessage
+      })
     }
   }
 
@@ -738,10 +765,20 @@ export default function OwnerAppointments() {
       setAppointments(appointments.map(apt => 
         apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
       ))
-      alert("Cancellation approved. Appointment marked as cancelled.")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Cancellation approved. Appointment marked as cancelled."
+      })
     } catch (error) {
       console.error("Error approving cancellation:", error)
-      alert("Failed to approve cancellation.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to approve cancellation."
+      })
     }
   }
 
@@ -2182,6 +2219,7 @@ export default function OwnerAppointments() {
           onClose={() => setShowSuccessModal(false)}
           appointmentDetails={successAppointmentDetails}
           isConfirmed={true}
+          bookedByStaff={true}
         />
       )}
 
@@ -2219,6 +2257,14 @@ export default function OwnerAppointments() {
           }}
         />
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+      />
     </div>
   )
 }

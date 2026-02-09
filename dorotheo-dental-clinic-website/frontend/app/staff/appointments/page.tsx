@@ -28,6 +28,7 @@ import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
 import BlockTimeSuccessModal from "@/components/block-time-success-modal"
 import ErrorModal from "@/components/error-modal"
+import AlertModal from "@/components/alert-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 import { CreateInvoiceModal } from "@/components/create-invoice-modal"
 
@@ -160,6 +161,12 @@ export default function StaffAppointments() {
   const [errorMessage, setErrorMessage] = useState("")
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [selectedAppointmentForInvoice, setSelectedAppointmentForInvoice] = useState<Appointment | null>(null)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
 
   // Generate time slots based on service duration from 10:00 AM to 8:00 PM
   const parseDateOnly = (dateStr?: string) => {
@@ -470,7 +477,12 @@ export default function StaffAppointments() {
     e.preventDefault()
     
     if (!token || !selectedPatientId) {
-      alert("Please select a patient")
+      setAlertModal({
+        isOpen: true,
+        type: "warning",
+        title: "Missing Information",
+        message: "Please select a patient"
+      })
       return
     }
 
@@ -615,11 +627,21 @@ export default function StaffAppointments() {
         }, 100)
       } else {
         const errorData = await response.json()
-        alert(errorData.error || "Failed to block time slot. Please try again.")
+        setAlertModal({
+          isOpen: true,
+          type: "error",
+          title: "Failed",
+          message: errorData.error || "Failed to block time slot. Please try again."
+        })
       }
     } catch (error) {
       console.error("Error blocking time slot:", error)
-      alert("Failed to block time slot. Please try again.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to block time slot. Please try again."
+      })
     }
   }
 
@@ -641,14 +663,29 @@ export default function StaffAppointments() {
 
           if (response.ok) {
             setBlockedTimeSlots(blockedTimeSlots.filter(slot => slot.id !== blockId))
-            alert("Time slot unblocked successfully!")
+            setAlertModal({
+              isOpen: true,
+              type: "success",
+              title: "Success",
+              message: "Time slot unblocked successfully!"
+            })
           } else {
             const errorData = await response.json()
-            alert(errorData.error || "Failed to unblock time slot. Please try again.")
+            setAlertModal({
+              isOpen: true,
+              type: "error",
+              title: "Failed",
+              message: errorData.error || "Failed to unblock time slot. Please try again."
+            })
           }
         } catch (error) {
           console.error("Error unblocking time slot:", error)
-          alert("Failed to unblock time slot. Please try again.")
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Failed",
+            message: "Failed to unblock time slot. Please try again."
+          })
         } finally {
           setShowConfirmModal(false)
           setConfirmModalConfig(null)
@@ -702,11 +739,21 @@ export default function StaffAppointments() {
       setAppointments(appointments.map(apt => 
         apt.id === appointment.id ? updatedAppointment : apt
       ))
-      alert("Reschedule request approved successfully!")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Reschedule request approved successfully!"
+      })
     } catch (error: any) {
       console.error("Error approving reschedule:", error)
       const errorMessage = error?.response?.data?.error || error?.message || "Failed to approve reschedule request."
-      alert(errorMessage)
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: errorMessage
+      })
     }
   }
 
@@ -720,10 +767,20 @@ export default function StaffAppointments() {
       setAppointments(appointments.map(apt => 
         apt.id === appointment.id ? updatedAppointment : apt
       ))
-      alert("Reschedule request rejected.")
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Reschedule request rejected."
+      })
     } catch (error) {
       console.error("Error rejecting reschedule:", error)
-      alert("Failed to reject reschedule request.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to reject reschedule request."
+      })
     }
   }
 
@@ -738,10 +795,20 @@ export default function StaffAppointments() {
       setAppointments(appointments.map(apt => 
         apt.id === appointment.id ? { ...apt, status: "cancelled" as const } : apt
       ))
-      alert("Cancellation approved. Appointment marked as cancelled.")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Cancellation approved. Appointment marked as cancelled."
+      })
     } catch (error) {
       console.error("Error approving cancellation:", error)
-      alert("Failed to approve cancellation.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to approve cancellation."
+      })
     }
   }
 
@@ -755,10 +822,20 @@ export default function StaffAppointments() {
       setAppointments(appointments.map(apt => 
         apt.id === appointment.id ? updatedAppointment : apt
       ))
-      alert("Cancellation request rejected. Appointment remains confirmed.")
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Cancellation request rejected. Appointment remains confirmed."
+      })
     } catch (error) {
       console.error("Error rejecting cancellation:", error)
-      alert("Failed to reject cancellation.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to reject cancellation."
+      })
     }
   }
 
@@ -781,7 +858,12 @@ export default function StaffAppointments() {
           ))
         } catch (error) {
           console.error("Error marking appointment as complete:", error)
-          alert("Failed to mark appointment as complete.")
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Failed",
+            message: "Failed to mark appointment as complete."
+          })
         }
       }
     })
@@ -803,7 +885,12 @@ export default function StaffAppointments() {
           ))
         } catch (error) {
           console.error("Error approving appointment:", error)
-          alert("Failed to approve appointment.")
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Failed",
+            message: "Failed to approve appointment."
+          })
         }
       }
     })
@@ -823,7 +910,12 @@ export default function StaffAppointments() {
           setAppointments(appointments.filter(apt => apt.id !== appointment.id))
         } catch (error) {
           console.error("Error marking appointment as missed:", error)
-          alert("Failed to mark appointment as missed.")
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Failed",
+            message: "Failed to mark appointment as missed."
+          })
         }
       }
     })
@@ -862,10 +954,20 @@ export default function StaffAppointments() {
       )
       setEditingRow(null)
       setEditedData({})
-      alert("Appointment updated successfully!")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Success",
+        message: "Appointment updated successfully!"
+      })
     } catch (error) {
       console.error("Error updating appointment:", error)
-      alert("Failed to update appointment. Please try again.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to update appointment. Please try again."
+      })
     }
   }
 
@@ -887,10 +989,20 @@ export default function StaffAppointments() {
       await api.deleteAppointment(appointmentId, token)
       setAppointments(appointments.filter((apt) => apt.id !== appointmentId))
       setExpandedRow(null)
-      alert("Appointment deleted successfully!")
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Deleted",
+        message: "Appointment deleted successfully!"
+      })
     } catch (error) {
       console.error("Error deleting appointment:", error)
-      alert("Failed to delete appointment. Please try again.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to delete appointment. Please try again."
+      })
     }
   }
 
@@ -2160,6 +2272,7 @@ export default function StaffAppointments() {
           onClose={() => setShowSuccessModal(false)}
           appointmentDetails={successAppointmentDetails}
           isConfirmed={true}
+          bookedByStaff={true}
         />
       )}
 
@@ -2219,6 +2332,14 @@ export default function StaffAppointments() {
           }}
         />
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+      />
     </div>
   )
 }

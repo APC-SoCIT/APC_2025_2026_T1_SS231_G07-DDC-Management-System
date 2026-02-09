@@ -297,17 +297,8 @@ class DentalChatbotService:
             low = user_message.lower().strip()
             hist = conversation_history or []
 
-            # ── Detect ongoing flow first (assistant step tags) ──
-            if self._in_cancel_flow(hist):
-                return self._handle_cancel(user_message, hist)
-
-            if self._in_reschedule_flow(hist):
-                return self._handle_reschedule(user_message, hist)
-
-            if self._in_booking_flow(hist):
-                return self._handle_booking(user_message, hist)
-
-            # ── Detect NEW intent from user message ──
+            # ── Detect NEW explicit intent from user message FIRST ──
+            # This allows users to switch flows or start new requests
             if self._wants_cancel(low):
                 return self._handle_cancel(user_message, hist)
 
@@ -315,6 +306,16 @@ class DentalChatbotService:
                 return self._handle_reschedule(user_message, hist)
 
             if self._wants_booking(low):
+                return self._handle_booking(user_message, hist)
+
+            # ── Continue ongoing flow (if no new explicit intent) ──
+            if self._in_cancel_flow(hist):
+                return self._handle_cancel(user_message, hist)
+
+            if self._in_reschedule_flow(hist):
+                return self._handle_reschedule(user_message, hist)
+
+            if self._in_booking_flow(hist):
                 return self._handle_booking(user_message, hist)
 
             # ── Fallback: general Q&A via Gemini ──
@@ -332,29 +333,43 @@ class DentalChatbotService:
     def _wants_booking(low):
         kw = ['book appointment', 'book an appointment', 'schedule appointment',
               'make an appointment', 'make appointment', 'set an appointment',
-              'i want to book', 'want to schedule', 'reserve appointment',
+              'i want to book', 'want to book', 'want to schedule', 'reserve appointment',
               'book a', 'schedule a', 'new appointment']
-        return any(k in low for k in kw)
+        # Don't trigger booking if clearly trying to reschedule or cancel
+        return any(k in low for k in kw) and 'reschedule' not in low and 'cancel' not in low
 
     @staticmethod
     def _wants_cancel(low):
         kw = ['cancel appointment', 'cancel my appointment', 'cancel an appointment',
-              'i want to cancel']
-        return any(k in low for k in kw) and 'book' not in low
+              'i want to cancel', 'want to cancel', 'cancel my', 'cancel the']
+        return any(k in low for k in kw) and 'book' not in low and 'reschedule' not in low
 
     @staticmethod
     def _wants_reschedule(low):
         kw = ['reschedule', 'change appointment', 'move appointment',
-              'change my appointment', 'reschedule my appointment']
-        return any(k in low for k in kw)
+              'change my appointment', 'reschedule my appointment',
+              'want to reschedule', 'i want to change', 'need to reschedule']
+        return any(k in low for k in kw) and 'cancel' not in low
 
     def _in_booking_flow(self, hist):
+        # Don't continue flow if last message indicates completion
+        last_msg = _last_assistant(hist, 1)
+        if last_msg and '[FLOW_COMPLETE]' in last_msg[0]:
+            return False
         return _step_tag(hist, '[BOOK_STEP_')
 
     def _in_cancel_flow(self, hist):
+        # Don't continue flow if last message indicates completion
+        last_msg = _last_assistant(hist, 1)
+        if last_msg and '[FLOW_COMPLETE]' in last_msg[0]:
+            return False
         return _step_tag(hist, '[CANCEL_STEP_')
 
     def _in_reschedule_flow(self, hist):
+        # Don't continue flow if last message indicates completion
+        last_msg = _last_assistant(hist, 1)
+        if last_msg and '[FLOW_COMPLETE]' in last_msg[0]:
+            return False
         return _step_tag(hist, '[RESCHED_STEP_')
 
     # ══════════════════════════════════════════════════════════════════════
@@ -368,8 +383,18 @@ class DentalChatbotService:
                 "Please log in first and try again."
             )
 
+        # Check if user is explicitly requesting a new booking
+        # If they say "book appointment" etc., always start fresh
+        low = msg.lower()
+        explicit_new_booking = self._wants_booking(low)
+        
+        # Check if this is a fresh booking intent or continuing an existing flow
+        # Fresh if: explicit intent OR not currently in a booking flow
+        is_fresh_booking = explicit_new_booking or not self._in_booking_flow(hist)
+        
         # Gather what we already know from history + current message
-        ctx = self._gather_booking_ctx(msg, hist)
+        # If fresh booking, only use current message to avoid stale context
+        ctx = self._gather_booking_ctx(msg, hist, is_fresh_booking)
         clinic = ctx['clinic']
         dentist = ctx['dentist']
         date = ctx['date']
@@ -509,6 +534,20 @@ class DentalChatbotService:
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_4]')
 
         # ── STEP 5: Validate & Finalize ───────────────────────────────
+        # Check for pending reschedule or cancellation requests
+        pending_requests = Appointment.objects.filter(
+            patient=self.user,
+            status__in=['reschedule_requested', 'cancel_requested']
+        )
+        if pending_requests.exists():
+            request_type = "reschedule" if pending_requests.filter(status='reschedule_requested').exists() else "cancellation"
+            return self._reply(
+                f"⚠️ You have a pending **{request_type} request** that needs to be reviewed by our staff.\n\n"
+                "You cannot book a new appointment until your current request is approved or rejected.\n\n"
+                "Please wait for staff to process your request, or contact the clinic for immediate assistance.",
+                tag='[PENDING_REQUEST]'
+            )
+
         # Weekly limit
         if _patient_has_appointment_this_week(self.user, date):
             iso = date.isocalendar()
@@ -552,38 +591,63 @@ class DentalChatbotService:
             f"**Time:** {_fmt_time(time_val)}\n"
             f"**Service:** {service.name}\n"
             f"**Status:** Confirmed\n\n"
-            "Your appointment has been confirmed! See you soon."
+            "Your appointment has been confirmed! See you soon.",
+            tag='[FLOW_COMPLETE]'
         )
 
     # ── gather accumulated booking context ────────────────────────────
 
-    def _gather_booking_ctx(self, msg, hist):
-        """Scan history + current message for clinic/dentist/date/time/service."""
-        combined_user = ' '.join(
-            [m['content'] for m in (hist or []) if m['role'] == 'user'] + [msg]
-        )
-        combined_all = ' '.join(
-            [m['content'] for m in (hist or [])] + [msg]
-        )
+    def _gather_booking_ctx(self, msg, hist, is_fresh_booking=False):
+        """Scan history + current message for clinic/dentist/date/time/service.
+        
+        If is_fresh_booking=True, only search current message to avoid using
+        stale context from previous failed booking attempts.
+        """
+        if is_fresh_booking:
+            # Fresh booking - only use current message, not history
+            clinic = _find_clinic(msg)
+            dentist = _find_dentist(msg)
+            date = _parse_date(msg)
+            time_val = _parse_time(msg)
+            service = _find_service(msg)
+        else:
+            # Continuing existing flow - but filter out stale data from before pending request errors
+            # Find the last [PENDING_REQUEST] tag in history to avoid using old booking data
+            filtered_hist = hist or []
+            last_pending_idx = -1
+            for i, m in enumerate(filtered_hist):
+                if m.get('role') == 'assistant' and '[PENDING_REQUEST]' in m.get('content', ''):
+                    last_pending_idx = i
+            
+            # If there was a pending request error, only use messages AFTER it
+            if last_pending_idx >= 0:
+                filtered_hist = filtered_hist[last_pending_idx + 1:]
+            
+            combined_user = ' '.join(
+                [m['content'] for m in filtered_hist if m['role'] == 'user'] + [msg]
+            )
+            combined_all = ' '.join(
+                [m['content'] for m in filtered_hist] + [msg]
+            )
 
-        clinic = _find_clinic(msg) or _find_clinic(combined_user)
-        
-        # Dentist search: Only search current message if we're at Step 2 or earlier
-        # Once past Step 2, search history to preserve the selected dentist
-        dentist = _find_dentist(msg)
-        if not dentist and _step_tag(hist, '[BOOK_STEP_3'):
-            # We're at Step 3 or later, dentist must have been selected - search history
-            dentist = _find_dentist(combined_user)
-        
-        date = _parse_date(msg) or _parse_date(combined_user)
-        
-        # Time search: Try current message first, then history
-        time_val = _parse_time(msg)
-        if not time_val:
-            # Search history for time (important for Step 4 when selecting service)
-            time_val = _parse_time(combined_user)
-        
-        service = _find_service(msg) or _find_service(combined_user)
+            clinic = _find_clinic(msg) or _find_clinic(combined_user)
+            
+            # Dentist search: Only search current message if we're at Step 2 or earlier
+            # Once past Step 2, search history to preserve the selected dentist
+            dentist = _find_dentist(msg)
+            if not dentist and _step_tag(filtered_hist, '[BOOK_STEP_3'):
+                # We're at Step 3 or later, dentist must have been selected - search history
+                dentist = _find_dentist(combined_user)
+            
+            date = _parse_date(msg) or _parse_date(combined_user)
+            
+            # Time search: Try current message first, then history
+            time_val = _parse_time(msg)
+            if not time_val:
+                # Search history for time (important for Step 4 when selecting service)
+                time_val = _parse_time(combined_user)
+            
+            service = _find_service(msg) or _find_service(combined_user)
 
         # If dentist picked but no clinic, infer from dentist's assigned_clinic or availability
         if dentist and not clinic:
@@ -747,7 +811,8 @@ class DentalChatbotService:
                 f"**Requested:** {_fmt_date(date)} at {_fmt_time(time_val)}\n"
                 f"**Dentist:** Dr. {appt.dentist.get_full_name()}\n"
                 f"**Service:** {appt.service.name if appt.service else 'N/A'}\n\n"
-                "Staff will review and confirm your reschedule request."
+                "Staff will review and confirm your reschedule request.",
+                tag='[FLOW_COMPLETE]'
             )
 
         return self._reply("Let me help you reschedule. Please say 'reschedule' to start.")
@@ -825,11 +890,15 @@ class DentalChatbotService:
                 f"**Time:** {_fmt_time(appt.time)}\n"
                 f"**Dentist:** Dr. {appt.dentist.get_full_name()}\n\n"
                 "Your request has been sent to the staff/owner for review. "
-                "You will be notified once it is approved. Your appointment remains active until then."
+                "You will be notified once it is approved. Your appointment remains active until then.",
+                tag='[FLOW_COMPLETE]'
             )
 
         if 'keep appointment' in low or 'keep my appointment' in low:
-            return self._reply("No problem! Your appointment has been kept. Is there anything else I can help with?")
+            return self._reply(
+                "No problem! Your appointment has been kept. Is there anything else I can help with?",
+                tag='[FLOW_COMPLETE]'
+            )
 
         # STEP C2: Confirmation prompt (after user selected an appointment)
         if _step_tag(hist, '[CANCEL_STEP_1]'):

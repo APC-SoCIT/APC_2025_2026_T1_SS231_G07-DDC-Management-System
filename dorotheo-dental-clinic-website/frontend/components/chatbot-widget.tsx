@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { MessageCircle, X, Send, Loader2, Trash2, Calendar, RefreshCw, XCircle, Mic, MicOff } from "lucide-react"
 import { chatbotQuery } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import ReactMarkdown from 'react-markdown'
 
 interface Message {
@@ -26,6 +27,7 @@ const defaultSuggestions = [
 ]
 
 export default function ChatbotWidget() {
+  const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
@@ -36,41 +38,80 @@ export default function ChatbotWidget() {
   const [voiceLanguage, setVoiceLanguage] = useState<'en-US' | 'fil-PH'>('en-US')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
 
-  // Load chat history from localStorage on mount
+  // Load chat history from localStorage on mount and when user changes
   useEffect(() => {
-    const savedMessages = localStorage.getItem('chatbot_messages')
-    const savedHistory = localStorage.getItem('chatbot_history')
-    
-    if (savedMessages && savedHistory) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages)
-        const parsedHistory = JSON.parse(savedHistory)
-        
-        // Convert timestamp strings back to Date objects
-        const messagesWithDates = parsedMessages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }))
-        
-        setMessages(messagesWithDates)
-        setConversationHistory(parsedHistory)
-      } catch (error) {
-        console.error('Error loading chat history:', error)
+    // Detect if user has changed
+    if (user?.id && user.id !== currentUserId) {
+      setCurrentUserId(user.id)
+      // User changed, load their specific chat history
+      const savedMessages = localStorage.getItem(`chatbot_messages_${user.id}`)
+      const savedHistory = localStorage.getItem(`chatbot_history_${user.id}`)
+      
+      if (savedMessages && savedHistory) {
+        try {
+          const parsedMessages = JSON.parse(savedMessages)
+          const parsedHistory = JSON.parse(savedHistory)
+          
+          // Convert timestamp strings back to Date objects
+          const messagesWithDates = parsedMessages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+          
+          setMessages(messagesWithDates)
+          setConversationHistory(parsedHistory)
+        } catch (error) {
+          console.error('Error loading chat history:', error)
+          initializeChat()
+        }
+      } else {
         initializeChat()
       }
-    } else {
+    } else if (!user?.id && currentUserId !== null) {
+      // User logged out, clear chat
+      setCurrentUserId(null)
       initializeChat()
+    } else if (!user?.id) {
+      // No user, initialize chat normally
+      const savedMessages = localStorage.getItem('chatbot_messages')
+      const savedHistory = localStorage.getItem('chatbot_history')
+      
+      if (savedMessages && savedHistory) {
+        try {
+          const parsedMessages = JSON.parse(savedMessages)
+          const parsedHistory = JSON.parse(savedHistory)
+          
+          const messagesWithDates = parsedMessages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+          
+          setMessages(messagesWithDates)
+          setConversationHistory(parsedHistory)
+        } catch (error) {
+          console.error('Error loading chat history:', error)
+          initializeChat()
+        }
+      } else if (messages.length === 0) {
+        initializeChat()
+      }
     }
-  }, [])
+  }, [user?.id])
 
-  // Save chat history to localStorage whenever it changes
+  // Save chat history to localStorage whenever it changes (patient-specific)
   useEffect(() => {
     if (messages.length > 0) {
-      localStorage.setItem('chatbot_messages', JSON.stringify(messages))
-      localStorage.setItem('chatbot_history', JSON.stringify(conversationHistory))
+      if (user?.id) {
+        localStorage.setItem(`chatbot_messages_${user.id}`, JSON.stringify(messages))
+        localStorage.setItem(`chatbot_history_${user.id}`, JSON.stringify(conversationHistory))
+      } else {
+        localStorage.setItem('chatbot_messages', JSON.stringify(messages))
+        localStorage.setItem('chatbot_history', JSON.stringify(conversationHistory))
+      }
     }
-  }, [messages, conversationHistory])
+  }, [messages, conversationHistory, user?.id])
 
   const initializeChat = () => {
     const welcomeMessage: Message = {
@@ -84,8 +125,13 @@ export default function ChatbotWidget() {
   }
 
   const handleDeleteHistory = () => {
-    localStorage.removeItem('chatbot_messages')
-    localStorage.removeItem('chatbot_history')
+    if (user?.id) {
+      localStorage.removeItem(`chatbot_messages_${user.id}`)
+      localStorage.removeItem(`chatbot_history_${user.id}`)
+    } else {
+      localStorage.removeItem('chatbot_messages')
+      localStorage.removeItem('chatbot_history')
+    }
     initializeChat()
     setShowDeleteConfirm(false)
   }
