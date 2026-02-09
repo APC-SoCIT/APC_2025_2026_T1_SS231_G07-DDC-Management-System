@@ -1,5 +1,5 @@
 # Azure Web App Deployment for Django Backend
-name: Build and deploy Python app to Azure Web App - dorothoedental
+name: Build and deploy Python app to Azure Web App - dorotheodentalclinic
 
 on:
   push:
@@ -69,6 +69,6 @@ jobs:
         uses: azure/webapps-deploy@v2
         id: deploy-to-webapp
         with:
-          app-name: 'dorothoedental'
+          app-name: 'dorotheodentalclinic'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_DOROTHOEDENTAL }}
