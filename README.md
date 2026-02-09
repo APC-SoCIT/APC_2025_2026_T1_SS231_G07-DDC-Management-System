@@ -472,3 +472,5 @@ Frontend will be at: `http://localhost:3000`
 The frontend will be accessible at `http://localhost:3000/`.
 
 **Note:** These commands are for local development only. For production deployment, refer to the deployment guides in the backend directory.
+#   R e d e p l o y   t o   i n s t a l l   d e p e n d e n c i e s  
+ 
