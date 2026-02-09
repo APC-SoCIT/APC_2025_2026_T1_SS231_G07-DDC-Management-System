@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'dorotheo-dental-clinic-website/backend/**'
   workflow_dispatch:
 
 jobs:
