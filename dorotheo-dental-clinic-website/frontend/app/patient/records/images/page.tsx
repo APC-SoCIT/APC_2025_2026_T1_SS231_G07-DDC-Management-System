@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Camera, Download, X, Activity, Image as ImageIcon, Scan } from "lucide-react"
+import { Camera, Download, X, Activity, Image as ImageIcon, Scan, FileHeart, FileText } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ClinicBadge } from "@/components/clinic-badge"
@@ -32,11 +32,14 @@ interface TeethImage {
   clinic_data?: ClinicLocation | null
 }
 
+type TabType = 'all' | 'xray' | 'dental_image' | 'scan'
+
 export default function TeethImages() {
   const { user, token } = useAuth()
   const [allImages, setAllImages] = useState<TeethImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('all')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,10 +92,23 @@ export default function TeethImages() {
     fetchData()
   }, [user?.id, token])
 
-  // Filter images by type
-  const xrayImages = allImages.filter(img => img.document_type === 'xray')
-  const dentalPictures = allImages.filter(img => img.document_type === 'dental_image')
-  const dentalScans = allImages.filter(img => img.document_type === 'scan')
+  // Filter images by active tab
+  const getFilteredImages = () => {
+    if (activeTab === 'all') {
+      // Sort by upload date, newest first
+      return [...allImages].sort((a, b) => 
+        new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      )
+    }
+    return allImages.filter(img => img.document_type === activeTab)
+  }
+
+  const filteredImages = getFilteredImages()
+
+  // Count images by type
+  const xrayCount = allImages.filter(img => img.document_type === 'xray').length
+  const dentalImageCount = allImages.filter(img => img.document_type === 'dental_image').length
+  const scanCount = allImages.filter(img => img.document_type === 'scan').length
 
   const handleDownloadImage = (imageUrl: string, filename: string) => {
     fetch(imageUrl)
@@ -177,83 +193,94 @@ export default function TeethImages() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
           </div>
         </div>
-      ) : allImages.length > 0 ? (
-        <div className="space-y-6">
-          {/* X-Ray Images Section */}
-          <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Activity className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">X-Ray Images</h2>
-                <p className="text-sm text-gray-600">Radiographic dental images</p>
-              </div>
-            </div>
-            {xrayImages.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {xrayImages.map((image) => renderImageCard(image))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm py-4">No X-ray images</p>
-            )}
-          </div>
-
-          {/* Dental Pictures Section */}
-          <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Dental Pictures</h2>
-                <p className="text-sm text-gray-600">Photographic dental images</p>
-              </div>
-            </div>
-            {dentalPictures.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {dentalPictures.map((image) => renderImageCard(image))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm py-4">No dental pictures</p>
-            )}
-          </div>
-
-          {/* Dental Scans Section */}
-          <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                <Scan className="w-5 h-5 text-teal-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Dental Scans</h2>
-                <p className="text-sm text-gray-600">3D scans and digital impressions</p>
-              </div>
-            </div>
-            {dentalScans.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {dentalScans.map((image) => renderImageCard(image))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm py-4">No dental scans</p>
-            )}
-          </div>
-        </div>
       ) : (
-        <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-          <div className="text-center py-12">
-            <Camera className="w-16 h-16 mx-auto mb-4 text-gray-400 opacity-30" />
-            <p className="text-lg font-medium text-gray-900 mb-2">No Teeth Images Yet</p>
-            <p className="text-sm text-gray-600">Your dentist will upload images during your visits</p>
-          </div>
-        </div>
-      )}
+        <>
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200">
+            <div className="flex flex-wrap gap-2 -mb-px">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'all'
+                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                All Files
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                  {allImages.length}
+                </span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('xray')}
+                className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'xray'
+                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Scan className="w-4 h-4" />
+                X-Ray
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                  {xrayCount}
+                </span>
+              </button>
 
-      {/* Keep old sections hidden for reference - REMOVE THIS */}
-      {false && (
-        <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-          {/* Old layout here */}
-        </div>
+              <button
+                onClick={() => setActiveTab('dental_image')}
+                className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'dental_image'
+                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <ImageIcon className="w-4 h-4" />
+                Dental Pictures
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                  {dentalImageCount}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('scan')}
+                className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'scan'
+                    ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <FileHeart className="w-4 h-4" />
+                Dental Scan
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                  {scanCount}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Image Grid */}
+          {filteredImages.length === 0 ? (
+            <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">
+                  {activeTab === 'all' 
+                    ? 'No files uploaded yet'
+                    : `No ${activeTab.replace('_', ' ')} files found`}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Your dentist will upload images during your visits</p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filteredImages.map((image) => renderImageCard(image))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Image Modal */}

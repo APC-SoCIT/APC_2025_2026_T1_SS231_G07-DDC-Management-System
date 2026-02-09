@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { DollarSign, Search, CreditCard, FileText, AlertCircle, History } from "lucide-react"
 import { RecordPaymentModal } from "@/components/record-payment-modal"
@@ -12,6 +12,8 @@ export default function StaffPaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
+  const patientDropdownRef = useRef<HTMLDivElement>(null)
 
   // Data
   const [invoices, setInvoices] = useState<InvoiceWithPatient[]>([])
@@ -24,7 +26,7 @@ export default function StaffPaymentsPage() {
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "overdue">("all")
-  const [patientFilter, setPatientFilter] = useState<number | null>(null)
+  const [selectedPatientFilter, setSelectedPatientFilter] = useState<number | null>(null)
 
   useEffect(() => {
     const storedToken = localStorage.getItem("token")
@@ -35,6 +37,17 @@ export default function StaffPaymentsPage() {
       setLoading(false)
       setError("Not authenticated")
     }
+  }, [])
+
+  // Close patient dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (patientDropdownRef.current && !patientDropdownRef.current.contains(event.target as Node)) {
+        setShowPatientDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
   const fetchData = async (authToken: string) => {
@@ -53,7 +66,6 @@ export default function StaffPaymentsPage() {
       )
 
       setInvoices(unpaidInvoices)
-      // getPatients returns paginated data, extract results array
       setPatients(Array.isArray(patientsData) ? patientsData : (patientsData.results || []))
     } catch (err: any) {
       console.error("Error fetching data:", err)
@@ -83,29 +95,20 @@ export default function StaffPaymentsPage() {
       return false
     }
 
-    // Patient filter
-    if (patientFilter && invoice.patient !== patientFilter) {
+    // Selected patient filter
+    if (selectedPatientFilter && invoice.patient !== selectedPatientFilter) {
       return false
-    }
-
-    // Search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return (
-        invoice.invoice_number.toLowerCase().includes(query) ||
-        invoice.patient_name?.toLowerCase().includes(query)
-      )
     }
 
     return true
   })
 
-  // Calculate totals
+  // Calculate totals from filtered invoices
   const totalUnpaid = filteredInvoices.reduce(
     (sum, inv) => sum + parseFloat(inv.balance),
     0
   )
-  const overdueCount = invoices.filter((inv) => inv.status === "overdue").length
+  const overdueCount = filteredInvoices.filter((inv) => inv.status === "overdue").length
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -206,33 +209,80 @@ export default function StaffPaymentsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="md:col-span-2 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search by invoice number or patient name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Patient Filter */}
-          <div>
-            <select
-              value={patientFilter || ""}
-              onChange={(e) => setPatientFilter(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Patients</option>
-              {Array.isArray(patients) && patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.first_name} {patient.last_name}
-                </option>
-              ))}
-            </select>
+        <div className="grid grid-cols-1 gap-4">
+          {/* Patient Search/Select */}
+          <div className="relative" ref={patientDropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Select Patient to View Invoices
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search by patient name or email..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setShowPatientDropdown(true)
+                }}
+                onFocus={() => setShowPatientDropdown(true)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {showPatientDropdown && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {/* Clear selection option */}
+                <div
+                  onClick={() => {
+                    setSelectedPatientFilter(null)
+                    setSearchQuery("")
+                    setShowPatientDropdown(false)
+                  }}
+                  className="px-4 py-2.5 cursor-pointer hover:bg-gray-100 border-b border-gray-200 font-medium text-blue-600"
+                >
+                  All Patients (Clear Selection)
+                </div>
+                {patients
+                  .filter((patient) => {
+                    if (!searchQuery) return true
+                    const query = searchQuery.toLowerCase()
+                    const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
+                    return (
+                      fullName.includes(query) ||
+                      patient.email.toLowerCase().includes(query)
+                    )
+                  })
+                  .map((patient) => (
+                    <div
+                      key={patient.id}
+                      onClick={() => {
+                        setSelectedPatientFilter(patient.id)
+                        setSearchQuery(`${patient.first_name} ${patient.last_name} - ${patient.email}`)
+                        setShowPatientDropdown(false)
+                      }}
+                      className={`px-4 py-2.5 cursor-pointer hover:bg-gray-100 ${
+                        selectedPatientFilter === patient.id ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <div className="font-medium text-gray-900">{patient.first_name} {patient.last_name}</div>
+                      <div className="text-sm text-gray-500">{patient.email}</div>
+                    </div>
+                  ))}
+                {patients.filter((patient) => {
+                  if (!searchQuery) return false
+                  const query = searchQuery.toLowerCase()
+                  const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
+                  return (
+                    fullName.includes(query) ||
+                    patient.email.toLowerCase().includes(query)
+                  )
+                }).length === 0 && searchQuery && (
+                  <div className="px-4 py-2.5 text-gray-500 text-sm">
+                    No patients found matching "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -264,9 +314,9 @@ export default function StaffPaymentsPage() {
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">
-              {searchQuery || patientFilter
-                ? "No invoices found matching your filters."
-                : "No unpaid invoices at this time."}
+              {selectedPatientFilter
+                ? "No unpaid invoices for this patient."
+                : "No unpaid invoices at this time. Select a patient to view their invoices."}
             </p>
           </div>
         ) : (

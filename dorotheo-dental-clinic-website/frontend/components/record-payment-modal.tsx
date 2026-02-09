@@ -62,6 +62,23 @@ export function RecordPaymentModal({
     }
   }, [isOpen])
 
+  // Clear allocations when payment amount is cleared or reduced below allocated amount
+  useEffect(() => {
+    const amount = parseFloat(paymentAmount) || 0
+    const totalAllocated = calculateTotalAllocated()
+    
+    // If payment amount is 0 or empty, clear all allocations
+    if (amount === 0 || paymentAmount === "") {
+      if (Object.keys(allocations).length > 0) {
+        setAllocations({})
+      }
+    }
+    // If payment amount is less than allocated, clear allocations to avoid negative unallocated
+    else if (amount < totalAllocated) {
+      setAllocations({})
+    }
+  }, [paymentAmount])
+
   const fetchUnpaidInvoices = async () => {
     try {
       setLoadingInvoices(true)
@@ -246,6 +263,12 @@ export function RecordPaymentModal({
   const totalAllocated = calculateTotalAllocated()
   const paymentAmountNum = parseFloat(paymentAmount) || 0
   const unallocated = paymentAmountNum - totalAllocated
+  
+  // Calculate patient's total unpaid balance
+  const patientTotalUnpaid = unpaidInvoices.reduce(
+    (sum, inv) => sum + parseFloat(inv.balance),
+    0
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -258,6 +281,9 @@ export function RecordPaymentModal({
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               For: <span className="font-semibold">{patientName}</span>
+            </p>
+            <p className="text-sm font-semibold text-red-600 mt-1">
+              Total Unpaid Balance: ₱{patientTotalUnpaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
           <button

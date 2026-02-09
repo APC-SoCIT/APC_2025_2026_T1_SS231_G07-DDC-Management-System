@@ -1854,9 +1854,9 @@ export default function OwnerAppointments() {
                             .filter((patient: Patient) => {
                               if (!patientSearchQuery) return true
                               const query = patientSearchQuery.toLowerCase()
+                              const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
                               return (
-                                patient.first_name.toLowerCase().includes(query) ||
-                                patient.last_name.toLowerCase().includes(query) ||
+                                fullName.includes(query) ||
                                 patient.email.toLowerCase().includes(query)
                               )
                             })
@@ -1907,9 +1907,9 @@ export default function OwnerAppointments() {
                           {(Array.isArray(patients) ? patients : ((patients as any).results || [] as Patient[])).filter((patient: Patient) => {
                             if (!patientSearchQuery) return true
                             const query = patientSearchQuery.toLowerCase()
+                            const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
                             return (
-                              patient.first_name.toLowerCase().includes(query) ||
-                              patient.last_name.toLowerCase().includes(query) ||
+                              fullName.includes(query) ||
                               patient.email.toLowerCase().includes(query)
                             )
                           }).length === 0 && (

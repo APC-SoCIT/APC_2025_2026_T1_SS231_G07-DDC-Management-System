@@ -7,7 +7,7 @@ import { RecordPaymentModal } from "@/components/record-payment-modal"
 import { InvoiceWithPatient, Patient } from "@/lib/types"
 import { getInvoices, getPatients } from "@/lib/api"
 
-export default function StaffBillingPage() {
+export default function OwnerPaymentsPage() {
   const [token, setToken] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -151,14 +151,14 @@ export default function StaffBillingPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">
-            Billing
+            Patient Payments
           </h1>
           <p className="text-[var(--color-text-muted)]">
-            Manage patient billing and statements of account
+            Record payments and manage unpaid invoices
           </p>
         </div>
         <Link
-          href="/staff/payments/history"
+          href="/owner/payments/history"
           className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
         >
           <History className="w-5 h-5" />
@@ -171,7 +171,7 @@ export default function StaffBillingPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Pending</p>
+              <p className="text-sm text-gray-600 mb-1">Total Unpaid</p>
               <p className="text-2xl font-bold text-gray-900">
                 ₱{totalUnpaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -289,7 +289,7 @@ export default function StaffBillingPage() {
         {/* Status Tabs */}
         <div className="flex gap-2 border-b border-gray-200">
           {[
-            { id: "all", label: "All" },
+            { id: "all", label: "All Unpaid" },
             { id: "sent", label: "Pending" },
             { id: "overdue", label: "Overdue" },
           ].map((tab) => (
@@ -315,8 +315,8 @@ export default function StaffBillingPage() {
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">
               {selectedPatientFilter
-                ? "No billing records yet. Add your first statement of account to get started!"
-                : "No billing records yet. Add your first statement of account to get started!"}
+                ? "No unpaid invoices for this patient."
+                : "No unpaid invoices at this time. Select a patient to view their invoices."}
             </p>
           </div>
         ) : (

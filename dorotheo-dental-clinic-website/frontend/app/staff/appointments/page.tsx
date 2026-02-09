@@ -1878,9 +1878,9 @@ export default function StaffAppointments() {
                         .filter((patient) => {
                           if (!patientSearchQuery) return true
                           const query = patientSearchQuery.toLowerCase()
+                          const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
                           return (
-                            patient.first_name.toLowerCase().includes(query) ||
-                            patient.last_name.toLowerCase().includes(query) ||
+                            fullName.includes(query) ||
                             patient.email.toLowerCase().includes(query)
                           )
                         })

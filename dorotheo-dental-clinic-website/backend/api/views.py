@@ -2517,6 +2517,49 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to fetch patient balance: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    
+    @action(detail=True, methods=['get'], url_path='download-pdf')
+    def download_pdf(self, request, pk=None):
+        """
+        Download invoice as PDF
+        
+        GET /api/invoices/{id}/download-pdf/
+        """
+        from django.http import HttpResponse
+        from .invoice_generator import generate_invoice_pdf, WEASYPRINT_AVAILABLE
+        
+        try:
+            invoice = self.get_object()
+            
+            # Check if user has permission to view this invoice
+            if request.user.user_type == 'patient' and invoice.patient != request.user:
+                return Response(
+                    {'error': 'You do not have permission to view this invoice'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Check if WeasyPrint is available
+            if not WEASYPRINT_AVAILABLE:
+                return Response(
+                    {'error': 'PDF generation is not available on this server'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+            
+            # Generate PDF
+            pdf_content, filename = generate_invoice_pdf(invoice)
+            
+            # Create HTTP response with PDF
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error generating invoice PDF: {str(e)}")
+            return Response(
+                {'error': f'Failed to generate PDF: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class PaymentViewSet(viewsets.ModelViewSet):

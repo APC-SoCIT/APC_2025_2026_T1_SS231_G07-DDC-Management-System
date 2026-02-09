@@ -251,6 +251,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 class InventoryItemSerializer(serializers.ModelSerializer):
     is_low_stock = serializers.BooleanField(read_only=True)
     clinic_name = serializers.CharField(source='clinic.name', read_only=True)
+    clinic_data = ClinicLocationSerializer(source='clinic', read_only=True)
 
     class Meta:
         model = InventoryItem
@@ -801,11 +802,13 @@ class PaymentRecordSerializer(serializers.Serializer):
     
     def validate_allocations(self, value):
         """Validate payment allocations"""
+        from decimal import Decimal
+        
         if not value:
             raise serializers.ValidationError("At least one invoice allocation is required")
         
         validated_allocations = []
-        total_allocated = 0
+        total_allocated = Decimal('0')
         
         for alloc in value:
             # Validate required fields
@@ -820,16 +823,16 @@ class PaymentRecordSerializer(serializers.Serializer):
             except Invoice.DoesNotExist:
                 raise serializers.ValidationError(f"Invoice {alloc['invoice_id']} not found")
             
-            # Validate amount
+            # Validate amount - convert to Decimal
             try:
-                amount = float(alloc['amount'])
-            except (ValueError, TypeError):
+                amount = Decimal(str(alloc['amount']))
+            except (ValueError, TypeError, ArithmeticError):
                 raise serializers.ValidationError(f"Invalid amount for invoice {alloc['invoice_id']}")
             
             if amount <= 0:
                 raise serializers.ValidationError(f"Allocation amount must be greater than 0")
             
-            if amount > float(invoice.balance):
+            if amount > invoice.balance:
                 raise serializers.ValidationError(
                     f"Allocation amount (PHP {amount}) exceeds invoice {invoice.invoice_number} "
                     f"balance (PHP {invoice.balance})"
@@ -846,9 +849,11 @@ class PaymentRecordSerializer(serializers.Serializer):
     
     def validate(self, data):
         """Cross-field validation"""
+        from decimal import Decimal
+        
         # Validate total allocations don't exceed payment amount
         total_allocated = sum(alloc['amount'] for alloc in data['allocations'])
-        if total_allocated > float(data['amount']):
+        if total_allocated > data['amount']:
             raise serializers.ValidationError(
                 f"Total allocations (PHP {total_allocated}) exceed payment amount (PHP {data['amount']})"
             )

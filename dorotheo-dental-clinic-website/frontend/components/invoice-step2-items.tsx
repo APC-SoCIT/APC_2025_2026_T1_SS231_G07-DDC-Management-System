@@ -14,6 +14,7 @@ import { InvoiceItem, InventoryItem, InvoiceTotals } from "@/lib/types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface InvoiceStep2ItemsProps {
+  appointment: any
   items: InvoiceItem[]
   onItemsChange: (items: InvoiceItem[]) => void
   totals: InvoiceTotals
@@ -22,6 +23,7 @@ interface InvoiceStep2ItemsProps {
 }
 
 export function InvoiceStep2Items({
+  appointment,
   items,
   onItemsChange,
   totals,
@@ -45,7 +47,6 @@ export function InvoiceStep2Items({
   
   // Dialog form state
   const [dialogQuantity, setDialogQuantity] = useState(1)
-  const [dialogUnitPrice, setDialogUnitPrice] = useState("0")
 
   // Fetch inventory
   useEffect(() => {
@@ -54,7 +55,11 @@ export function InvoiceStep2Items({
         const token = localStorage.getItem("token")
         if (!token) return
         
-        const data = await getInventory(token)
+        // Get clinic ID from appointment
+        const clinicId = appointment?.clinic?.id || appointment?.clinic
+        
+        // Fetch inventory filtered by clinic
+        const data = await getInventory(token, clinicId)
         setInventoryItems(data)
         setFilteredItems(data)
       } catch (error) {
@@ -65,7 +70,7 @@ export function InvoiceStep2Items({
     }
     
     fetchInventory()
-  }, [])
+  }, [appointment])
 
   // Search and filter
   useEffect(() => {
@@ -86,16 +91,15 @@ export function InvoiceStep2Items({
   const handleAddClick = (inventoryItem: InventoryItem) => {
     setSelectedInventoryItem(inventoryItem)
     setDialogQuantity(1)
-    setDialogUnitPrice(inventoryItem.unit_price || "0")
     setShowAddDialog(true)
   }
 
   const handleConfirmAdd = () => {
     if (!selectedInventoryItem) return
     
-    const unitPrice = parseFloat(dialogUnitPrice)
+    const unitPrice = parseFloat(selectedInventoryItem.unit_cost || "0")
     if (isNaN(unitPrice) || unitPrice <= 0) {
-      alert("Please enter a valid price")
+      alert("This inventory item has no valid price set")
       return
     }
     
@@ -122,25 +126,17 @@ export function InvoiceStep2Items({
     setSelectedInvoiceItem(item)
     setSelectedInvoiceItemIndex(index)
     setDialogQuantity(item.quantity)
-    setDialogUnitPrice(item.unit_price?.toString() || "0")
     setShowEditDialog(true)
   }
 
   const handleConfirmEdit = () => {
-    if (selectedInvoiceItemIndex === -1) return
-    
-    const unitPrice = parseFloat(dialogUnitPrice)
-    if (isNaN(unitPrice) || unitPrice <= 0) {
-      alert("Please enter a valid price")
-      return
-    }
+    if (selectedInvoiceItemIndex === -1 || !selectedInvoiceItem) return
 
     const updatedItems = [...items]
     updatedItems[selectedInvoiceItemIndex] = {
       ...updatedItems[selectedInvoiceItemIndex],
       quantity: dialogQuantity,
-      unit_price: unitPrice,
-      total_price: dialogQuantity * unitPrice,
+      total_price: dialogQuantity * selectedInvoiceItem.unit_price,
     }
 
     onItemsChange(updatedItems)
@@ -233,11 +229,11 @@ export function InvoiceStep2Items({
                             <Badge variant="outline">{item.category}</Badge>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Stock: {item.quantity} {item.unit}
+                            Stock: {item.quantity} units
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-lg font-bold">₱{parseFloat(item.unit_price).toFixed(2)}</span>
+                          <span className="text-lg font-bold">₱{parseFloat(item.unit_cost).toFixed(2)}</span>
                           <Button
                             size="sm"
                             onClick={() => handleAddClick(item)}
@@ -408,21 +404,15 @@ export function InvoiceStep2Items({
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Available: {selectedInventoryItem.quantity} {selectedInventoryItem.unit}
+                  Available: {selectedInventoryItem.quantity} units
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="add-price">Unit Price</Label>
+                <Label>Unit Price</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">₱</span>
-                  <Input
-                    id="add-price"
-                    type="number"
-                    step="0.01"
-                    value={dialogUnitPrice}
-                    onChange={(e) => setDialogUnitPrice(e.target.value)}
-                  />
+                  <span className="text-2xl font-bold">₱{parseFloat(selectedInventoryItem.unit_cost || "0").toFixed(2)}</span>
+                  <span className="text-sm text-muted-foreground">per unit</span>
                 </div>
               </div>
 
@@ -430,7 +420,7 @@ export function InvoiceStep2Items({
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total:</span>
                   <span className="text-2xl font-bold">
-                    ₱{(dialogQuantity * parseFloat(dialogUnitPrice || "0")).toFixed(2)}
+                    ₱{(dialogQuantity * parseFloat(selectedInventoryItem.unit_cost || "0")).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -492,16 +482,10 @@ export function InvoiceStep2Items({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-price">Unit Price</Label>
+                <Label>Unit Price</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">₱</span>
-                  <Input
-                    id="edit-price"
-                    type="number"
-                    step="0.01"
-                    value={dialogUnitPrice}
-                    onChange={(e) => setDialogUnitPrice(e.target.value)}
-                  />
+                  <span className="text-2xl font-bold">₱{selectedInvoiceItem.unit_price.toFixed(2)}</span>
+                  <span className="text-sm text-muted-foreground">(from inventory)</span>
                 </div>
               </div>
 
@@ -509,7 +493,7 @@ export function InvoiceStep2Items({
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total:</span>
                   <span className="text-2xl font-bold">
-                    ₱{(dialogQuantity * parseFloat(dialogUnitPrice || "0")).toFixed(2)}
+                    ₱{(dialogQuantity * selectedInvoiceItem.unit_price).toFixed(2)}
                   </span>
                 </div>
               </div>

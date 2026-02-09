@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Download, CreditCard, CheckCircle, Clock, FileText } from "lucide-react"
-import { api } from "@/lib/api"
+import { api, downloadInvoicePDF } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ClinicBadge } from "@/components/clinic-badge"
 
@@ -69,6 +69,17 @@ export default function PatientBilling() {
 
   const totalBalance = invoices.reduce((sum, inv) => sum + parseFloat(inv.balance || '0'), 0)
   const totalPaid = invoices.reduce((sum, inv) => sum + parseFloat(inv.amount_paid || '0'), 0)
+
+  const handleDownloadPDF = async (invoiceId: number) => {
+    if (!token) return
+    
+    try {
+      await downloadInvoicePDF(invoiceId, token)
+    } catch (error) {
+      console.error("Error downloading invoice PDF:", error)
+      alert("Failed to download invoice PDF. Please try again.")
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -157,6 +168,7 @@ export default function PatientBilling() {
                     </div>
 
                     <button 
+                      onClick={() => handleDownloadPDF(invoice.id)}
                       className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
                       title="Download Invoice PDF"
                     >

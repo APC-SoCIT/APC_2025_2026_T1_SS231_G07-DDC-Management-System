@@ -713,10 +713,11 @@ class Invoice(models.Model):
     
     def calculate_amount_paid_from_splits(self):
         """Calculate total amount paid from payment splits"""
+        from decimal import Decimal
         return self.payment_splits.filter(
             is_voided=False,
             payment__is_voided=False
-        ).aggregate(total=models.Sum('amount'))['total'] or 0
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
     
     def update_payment_status(self):
         """Update invoice payment status based on payment splits"""
@@ -870,14 +871,16 @@ class Payment(models.Model):
     
     def get_allocated_amount(self):
         """Calculate total amount allocated to invoices"""
+        from decimal import Decimal
         return self.splits.filter(is_voided=False).aggregate(
             total=models.Sum('amount')
-        )['total'] or 0
+        )['total'] or Decimal('0')
     
     def get_unallocated_amount(self):
         """Calculate amount not yet allocated to any invoice"""
+        from decimal import Decimal
         if self.is_voided:
-            return 0
+            return Decimal('0')
         return self.amount - self.get_allocated_amount()
 
 

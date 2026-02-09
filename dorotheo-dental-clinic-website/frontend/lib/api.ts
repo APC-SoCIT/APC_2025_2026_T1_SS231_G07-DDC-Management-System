@@ -1068,6 +1068,47 @@ export const api = {
     return response.json()
   },
 
+  downloadInvoicePDF: async (invoiceId: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/download-pdf/`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    
+    if (!response.ok) {
+      // Try to get error message from JSON response
+      try {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to download invoice PDF')
+      } catch (e) {
+        // If parsing JSON fails, throw generic error
+        if (e instanceof Error && e.message !== 'Failed to download invoice PDF') {
+          throw new Error('Failed to download invoice PDF')
+        }
+        throw e
+      }
+    }
+    
+    // Get the filename from Content-Disposition header
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = `invoice-${invoiceId}.pdf`
+    if (contentDisposition) {
+      const matches = /filename="?([^"]+)"?/.exec(contentDisposition)
+      if (matches && matches[1]) {
+        filename = matches[1]
+      }
+    }
+    
+    // Get the blob and trigger download
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  },
+
   getPatientBalance: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/invoices/patient_balance/${patientId}/`, {
       headers: { 'Authorization': `Token ${token}` },
@@ -1248,6 +1289,7 @@ export const {
   createInvoice,
   getInvoices,
   getInvoice,
+  downloadInvoicePDF,
   getPatientBalance,
   recordPayment,
   getPayments,

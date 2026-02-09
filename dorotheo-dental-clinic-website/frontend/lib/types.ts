@@ -74,8 +74,7 @@ export interface InventoryItem {
   name: string
   category: string
   quantity: number
-  unit: string
-  unit_price: string
+  unit_cost: string
   description?: string
   clinic?: number
 }

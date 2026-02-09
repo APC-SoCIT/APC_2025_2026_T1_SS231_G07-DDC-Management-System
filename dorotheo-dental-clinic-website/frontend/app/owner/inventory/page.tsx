@@ -4,12 +4,17 @@ import { useState, useEffect } from "react"
 import { Plus, AlertTriangle, Edit2, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
+import { AddInventoryModal } from "@/components/add-inventory-modal"
+import { InventorySuccessModal } from "@/components/inventory-success-modal"
+import { ClinicBadge } from "@/components/clinic-badge"
 
 export default function OwnerInventory() {
   const { selectedClinic, allClinics } = useClinic()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successItemData, setSuccessItemData] = useState<any>(null)
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [inventory, setInventory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -258,9 +263,11 @@ export default function OwnerInventory() {
                       <p className="font-medium text-[var(--color-text)]">{item.name}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                        {item.clinic_name || "N/A"}
-                      </span>
+                      {item.clinic_data ? (
+                        <ClinicBadge clinic={item.clinic_data} size="sm" />
+                      ) : (
+                        <span className="text-xs text-[var(--color-text-muted)]">N/A</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-[var(--color-text-muted)]">{item.category}</td>
                     <td className="px-6 py-4">
@@ -302,136 +309,30 @@ export default function OwnerInventory() {
       </div>
 
       {/* Add Item Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
-            <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Add Inventory Item</h2>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
-              >
-                ×
-              </button>
-            </div>
+      <AddInventoryModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={(itemData) => {
+          fetchInventory()
+          if (itemData) {
+            setSuccessItemData(itemData)
+            setShowSuccessModal(true)
+          }
+        }}
+        clinics={allClinics}
+        defaultClinic={typeof selectedClinic === 'object' ? selectedClinic?.id : undefined}
+        userType="owner"
+      />
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Clinic</label>
-                  <select
-                    name="clinic"
-                    value={formData.clinic}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  >
-                    <option value="">Select Clinic</option>
-                    {allClinics.map((clinic) => (
-                      <option key={clinic.id} value={clinic.id}>
-                        {clinic.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Item Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Category</label>
-                  <input
-                    type="text"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Quantity</label>
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Min Stock</label>
-                  <input
-                    type="number"
-                    name="min_stock"
-                    value={formData.min_stock}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Supplier</label>
-                  <input
-                    type="text"
-                    name="supplier"
-                    value={formData.supplier}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Unit Cost (PHP)</label>
-                  <input
-                    type="number"
-                    name="unit_cost"
-                    value={formData.unit_cost}
-                    onChange={handleInputChange}
-                    required
-                    min="0"
-                    step="0.01"
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                </div>
-                <div className="col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Total Cost:</span>
-                    <span className="text-xl font-bold text-[var(--color-primary)]">₱{totalCost}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{formData.quantity || 0} × ₱{formData.unit_cost || 0}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
-                >
-                  Add Item
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Success Modal */}
+      <InventorySuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false)
+          setSuccessItemData(null)
+        }}
+        itemData={successItemData}
+      />
 
       {/* Edit Item Modal */}
       {showEditModal && (
