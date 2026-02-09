@@ -1,7 +1,12 @@
 #!/bin/bash
 # Azure Startup Script for Django Backend
 
-echo "Starting Django application..."
+# Change to the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "Starting Django application from: $(pwd)"
+echo "Contents: $(ls -la)"
 
 # Run migrations
 echo "Running database migrations..."
