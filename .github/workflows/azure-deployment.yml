@@ -41,7 +41,9 @@ jobs:
           
       - name: Zip artifact for deployment
         working-directory: ./dorotheo-dental-clinic-website/backend
-        run: zip -r ../../release.zip .
+        run: |
+          # Exclude unnecessary files from deployment
+          zip -r ../../release.zip . -x "*.pyc" -x "__pycache__/*" -x "*.sqlite3" -x "media/*" -x "venv/*" -x ".env" -x "*.log"
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
