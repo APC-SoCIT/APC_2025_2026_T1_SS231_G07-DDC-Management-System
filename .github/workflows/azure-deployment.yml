@@ -26,10 +26,6 @@ jobs:
         run: |
           python -m venv venv
           source venv/bin/activate
-      
-      - name: Install dependencies
-        working-directory: ./dorotheo-dental-clinic-website/backend
-        run: |
           pip install --upgrade pip
           pip install -r requirements.txt
         
@@ -38,6 +34,7 @@ jobs:
       - name: Collect static files
         working-directory: ./dorotheo-dental-clinic-website/backend
         run: |
+          source venv/bin/activate
           python manage.py collectstatic --noinput
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
