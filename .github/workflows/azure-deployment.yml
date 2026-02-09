@@ -43,7 +43,21 @@ jobs:
         working-directory: ./dorotheo-dental-clinic-website/backend
         run: |
           # Exclude unnecessary files from deployment
-          zip -r ../../release.zip . -x "*.pyc" -x "__pycache__/*" -x "*.sqlite3" -x "media/*" -x "venv/*" -x ".env" -x "*.log"
+          zip -r ../../release.zip . \
+            -x "*.pyc" \
+            -x "__pycache__/*" \
+            -x "**/__pycache__/*" \
+            -x "*.sqlite3" \
+            -x "media/*" \
+            -x "venv/*" \
+            -x ".env*" \
+            -x "*.log" \
+            -x "*.md" \
+            -x "tests/*" \
+            -x "*.test.py" \
+            -x ".git/*" \
+            -x ".github/*"
+          echo "Package size: $(du -h ../../release.zip)"
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
@@ -64,9 +78,6 @@ jobs:
         with:
           name: python-app
 
-      - name: Unzip artifact for deployment
-        run: unzip release.zip
-      
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v2
         id: deploy-to-webapp
@@ -74,3 +85,4 @@ jobs:
           app-name: 'dorotheodentalclinic'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_DOROTHOEDENTAL }}
+          package: release.zip

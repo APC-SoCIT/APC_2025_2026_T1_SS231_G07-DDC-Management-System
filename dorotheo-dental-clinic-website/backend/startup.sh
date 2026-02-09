@@ -8,17 +8,16 @@ cd "$SCRIPT_DIR"
 echo "Starting Django application from: $(pwd)"
 echo "Contents: $(ls -la)"
 
-# Run migrations
-echo "Running database migrations..."
-python manage.py migrate --noinput
+# Run migrations only if needed (check-only mode is fast)
+echo "Checking database migrations..."
+python manage.py migrate --check || python manage.py migrate --noinput
 
 # Create initial data if needed
 echo "Setting up initial data..."
 python manage.py create_clinics --skip-services || echo "Clinics already exist"
 
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
+# Skip collectstatic - already done during build
+# Static files are collected in the GitHub Action workflow
 
 # Start Gunicorn
 echo "Starting Gunicorn server..."
