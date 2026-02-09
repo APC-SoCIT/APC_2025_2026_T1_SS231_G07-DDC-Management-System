@@ -40,7 +40,6 @@ This project proposes a transformative solution: a web-based management system i
 - ✅ **Unified Patient Database** - Central repository for all patient information and records
 - ✅ **Expandable Patient Records** - Click to view/edit full medical history
 - ✅ **Document Management** - Upload and manage X-rays, scans, and reports
-- ✅ **Medical History Tracking** - Comprehensive patient medical history and allergies
 
 #### 📅 Appointment Management
 - ✅ **Centralized Scheduling** - Unified calendar accessible to staff across all branches
@@ -472,5 +471,5 @@ Frontend will be at: `http://localhost:3000`
 The frontend will be accessible at `http://localhost:3000/`.
 
 **Note:** These commands are for local development only. For production deployment, refer to the deployment guides in the backend directory.
-#   R e d e p l o y   t o   i n s t a l l   d e p e n d e n c i e s  
+
  
