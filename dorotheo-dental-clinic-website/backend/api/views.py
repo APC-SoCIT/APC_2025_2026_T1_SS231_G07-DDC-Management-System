@@ -694,6 +694,21 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             patient = request.user
             logger.info(f"[Booking Validation] Patient from request.user: {patient.id} - {patient.get_full_name()}")
         
+        # Check if patient has any pending reschedule requests
+        pending_reschedule = Appointment.objects.filter(
+            patient=patient,
+            status='reschedule_requested'
+        ).exists()
+        
+        if pending_reschedule:
+            return Response(
+                {
+                    'error': 'Pending reschedule request',
+                    'message': 'You cannot book a new appointment while you have a pending reschedule request. Please wait for staff to approve or reject your current request.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         # Validation checks
         if appointment_date and appointment_time:
             # Normalize time to HH:MM format for comparison
