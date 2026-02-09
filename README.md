@@ -1,4 +1,4 @@
-# Dental Clinic Management System for Dorotheo Dental Clinic
+﻿# Dental Clinic Management System for Dorotheo Dental Clinic
 
 [![Status](https://img.shields.io/badge/status-in_development-orange)](https://github.com/APC-SoCIT/APC_2025_2026_T1_SS231_G07-DDC-Management-System/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -471,5 +471,3 @@ Frontend will be at: `http://localhost:3000`
 The frontend will be accessible at `http://localhost:3000/`.
 
 **Note:** These commands are for local development only. For production deployment, refer to the deployment guides in the backend directory.
-
- 
