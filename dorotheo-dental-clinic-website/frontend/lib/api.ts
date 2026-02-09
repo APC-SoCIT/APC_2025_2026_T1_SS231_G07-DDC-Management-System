@@ -127,7 +127,15 @@ export const api = {
       method: "DELETE",
       headers: { Authorization: `Token ${token}` },
     })
-    if (!response.ok) throw new Error("Failed to delete service")
+    if (!response.ok) {
+      // Try to parse error message from response
+      try {
+        const errorData = await response.json()
+        throw new Error(errorData.message || errorData.error || "Failed to delete service")
+      } catch (parseError) {
+        throw new Error("Failed to delete service")
+      }
+    }
   },
 
   // Appointments endpoints

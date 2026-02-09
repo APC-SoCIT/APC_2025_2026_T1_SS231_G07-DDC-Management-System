@@ -151,6 +151,9 @@ class Appointment(models.Model):
     # Completion timestamp
     completed_at = models.DateTimeField(null=True, blank=True)
     
+    # Track who created this appointment (patient, staff, or owner)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_appointments', help_text="User who created this appointment")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -197,6 +197,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     clinic_name = serializers.CharField(source='clinic.name', read_only=True)
     invoice_id = serializers.SerializerMethodField(read_only=True)
     has_invoice = serializers.SerializerMethodField(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_type = serializers.CharField(source='created_by.user_type', read_only=True)
 
     class Meta:
         model = Appointment

@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
+import AlertModal from "@/components/alert-modal"
 
 interface Service {
   id: number
@@ -31,6 +32,12 @@ export default function ServicesPage() {
   const [editingService, setEditingService] = useState<Service | null>(null)
   const [tempColor, setTempColor] = useState("#10b981")
   const [showColorPicker, setShowColorPicker] = useState(false)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
 
   // Format duration to show hours and minutes
   const formatDuration = (minutes: number) => {
@@ -130,7 +137,12 @@ export default function ServicesPage() {
       setIsModalOpen(false)
     } catch (error) {
       console.error("Failed to save service:", error)
-      alert("Failed to save service. Please try again.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed to Save",
+        message: "Failed to save service. Please try again."
+      })
     }
   }
 
@@ -158,8 +170,30 @@ export default function ServicesPage() {
       try {
         await api.deleteService(id, token)
         setServices(services.filter((s) => s.id !== id))
-      } catch (error) {
+        setAlertModal({
+          isOpen: true,
+          type: "success",
+          title: "Service Deleted",
+          message: "The service has been successfully deleted."
+        })
+      } catch (error: any) {
         console.error("Failed to delete service:", error)
+        // Check if it's a response error with message
+        if (error.message) {
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Cannot Delete Service",
+            message: error.message
+          })
+        } else {
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Cannot Delete Service",
+            message: "This service cannot be deleted because there are active appointments associated with it. Please cancel or reassign those appointments first."
+          })
+        }
       }
     }
   }
@@ -511,6 +545,15 @@ export default function ServicesPage() {
           </div>
         </div>
       )}
+      
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+      />
     </div>
   )
 }

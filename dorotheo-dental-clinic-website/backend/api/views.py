@@ -64,7 +64,12 @@ def create_appointment_notification(appointment, notification_type, custom_messa
         appointment_time = appointment.time
         
         if notification_type == 'new_appointment':
-            custom_message = f"New appointment booked: {patient_name} on {appointment_date} at {appointment_time}"
+            # Check if appointment was created by staff/owner or by patient
+            if appointment.created_by and appointment.created_by.user_type in ['staff', 'owner']:
+                creator_name = appointment.created_by.get_full_name()
+                custom_message = f"{creator_name} booked an appointment for {patient_name} on {appointment_date} at {appointment_time}"
+            else:
+                custom_message = f"New appointment booked: {patient_name} on {appointment_date} at {appointment_time}"
         elif notification_type == 'reschedule_request':
             new_date = appointment.reschedule_date
             new_time = appointment.reschedule_time
@@ -106,7 +111,13 @@ def create_patient_notification(appointment, notification_type, custom_message=N
         dentist_name = appointment.dentist.get_full_name() if appointment.dentist else 'our dentist'
         
         if notification_type == 'appointment_confirmed':
-            custom_message = f"Your appointment has been confirmed for {appointment_date} at {appointment_time} with Dr. {dentist_name}."
+            # Check if appointment was created by staff/owner
+            if appointment.created_by and appointment.created_by.user_type in ['staff', 'owner']:
+                creator_name = appointment.created_by.get_full_name()
+                creator_title = "Dr. " if appointment.created_by.user_type == 'staff' else ""
+                custom_message = f"{creator_title}{creator_name} booked an appointment for you on {appointment_date} at {appointment_time} with Dr. {dentist_name}."
+            else:
+                custom_message = f"Your appointment has been confirmed for {appointment_date} at {appointment_time} with Dr. {dentist_name}."
         elif notification_type == 'reschedule_approved':
             custom_message = f"Your reschedule request has been approved. Your new appointment is on {appointment_date} at {appointment_time} with Dr. {dentist_name}."
         elif notification_type == 'reschedule_rejected':
@@ -563,6 +574,27 @@ class ServiceViewSet(viewsets.ModelViewSet):
         
         return queryset
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Prevent deletion of services that have existing appointments
+        """
+        service = self.get_object()
+        
+        # Check if service has any appointments (including reschedule requests)
+        has_appointments = Appointment.objects.filter(service=service).exists()
+        has_reschedule_appointments = Appointment.objects.filter(reschedule_service=service).exists()
+        
+        if has_appointments or has_reschedule_appointments:
+            return Response(
+                {
+                    "error": "Cannot delete service",
+                    "message": "This service cannot be deleted because there are existing appointments associated with it. Please cancel or reassign those appointments first."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'])
     def by_category(self, request):
         category = request.query_params.get('category', 'all')
@@ -782,7 +814,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Update patient status and create notifications after creating appointment"""
-        appointment = serializer.save()
+        # Set the created_by field to the current user making the request
+        appointment = serializer.save(created_by=self.request.user)
         if appointment.patient:
             appointment.patient.update_patient_status()
         
