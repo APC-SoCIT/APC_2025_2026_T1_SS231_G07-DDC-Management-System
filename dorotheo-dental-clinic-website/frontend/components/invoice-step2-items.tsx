@@ -132,6 +132,13 @@ export function InvoiceStep2Items({
   const handleConfirmEdit = () => {
     if (selectedInvoiceItemIndex === -1 || !selectedInvoiceItem) return
 
+    // Validate against available stock
+    const inventoryItem = inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)
+    if (inventoryItem && dialogQuantity > inventoryItem.quantity) {
+      alert(`Cannot exceed available stock (${inventoryItem.quantity} units)`)
+      return
+    }
+
     const updatedItems = [...items]
     updatedItems[selectedInvoiceItemIndex] = {
       ...updatedItems[selectedInvoiceItemIndex],
@@ -161,9 +168,19 @@ export function InvoiceStep2Items({
   // Quantity controls for selected items
   const updateItemQuantity = (index: number, delta: number) => {
     const updatedItems = [...items]
-    const newQuantity = updatedItems[index].quantity + delta
+    const currentItem = updatedItems[index]
+    const newQuantity = currentItem.quantity + delta
     
     if (newQuantity < 1) return
+    
+    // Check if increasing quantity - validate against stock
+    if (delta > 0) {
+      const inventoryItem = inventoryItems.find(inv => inv.id === currentItem.inventory_item_id)
+      if (inventoryItem && newQuantity > inventoryItem.quantity) {
+        alert(`Cannot exceed available stock (${inventoryItem.quantity} units)`)
+        return
+      }
+    }
     
     updatedItems[index] = {
       ...updatedItems[index],
@@ -467,18 +484,29 @@ export function InvoiceStep2Items({
                     id="edit-quantity"
                     type="number"
                     min="1"
+                    max={inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)?.quantity}
                     value={dialogQuantity}
-                    onChange={(e) => setDialogQuantity(parseInt(e.target.value) || 1)}
+                    onChange={(e) => {
+                      const inventoryItem = inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)
+                      const val = parseInt(e.target.value) || 1
+                      setDialogQuantity(inventoryItem ? Math.min(val, inventoryItem.quantity) : val)
+                    }}
                     className="text-center"
                   />
                   <Button
                     size="icon"
                     variant="outline"
-                    onClick={() => setDialogQuantity(dialogQuantity + 1)}
+                    onClick={() => {
+                      const inventoryItem = inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)
+                      setDialogQuantity(inventoryItem ? Math.min(inventoryItem.quantity, dialogQuantity + 1) : dialogQuantity + 1)
+                    }}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  Available: {inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)?.quantity || 0} units
+                </p>
               </div>
 
               <div className="space-y-2">

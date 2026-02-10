@@ -1233,16 +1233,8 @@ class EmailService:
         if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
             frontend_url = 'https://dorotheodentalclinic.com'
         
-        # Determine login URL based on user type
-        if hasattr(user, 'user_type'):
-            if user.user_type == 'patient':
-                login_url = f"{frontend_url}/patient/login"
-            elif user.user_type in ['staff', 'owner']:
-                login_url = f"{frontend_url}/staff/login"
-            else:
-                login_url = f"{frontend_url}/login"
-        else:
-            login_url = f"{frontend_url}/login"
+        # All users use the same login page
+        login_url = f"{frontend_url}/login"
         
         content = f"""
             <div class="highlight-box">
