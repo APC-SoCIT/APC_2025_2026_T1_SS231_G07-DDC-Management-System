@@ -443,13 +443,16 @@ class DentistNotificationSerializer(serializers.ModelSerializer):
 
     def get_appointment_details(self, obj):
         if obj.appointment:
-            return {
-                'id': obj.appointment.id,
-                'patient_name': obj.appointment.patient.get_full_name(),
-                'date': obj.appointment.date,
-                'time': obj.appointment.time,
-                'service': obj.appointment.service.name if obj.appointment.service else None,
-            }
+            try:
+                return {
+                    'id': obj.appointment.id,
+                    'patient_name': obj.appointment.patient.get_full_name() if obj.appointment.patient else 'Unknown Patient',
+                    'date': obj.appointment.date,
+                    'time': obj.appointment.time,
+                    'service': obj.appointment.service.name if obj.appointment.service else None,
+                }
+            except Exception:
+                return {'id': obj.appointment.id, 'error': 'Could not load appointment details'}
         return None
 
 
@@ -465,27 +468,31 @@ class AppointmentNotificationSerializer(serializers.ModelSerializer):
 
     def get_appointment_details(self, obj):
         if obj.appointment:
-            appointment_data = {
-                'id': obj.appointment.id,
-                'patient_name': obj.appointment.patient.get_full_name(),
-                'date': str(obj.appointment.date),
-                'time': str(obj.appointment.time),
-                'status': obj.appointment.status,
-                'service_name': obj.appointment.service.name if obj.appointment.service else None,
-            }
-            
-            # Add reschedule details if this is a reschedule request
-            if obj.notification_type == 'reschedule_request' and obj.appointment.reschedule_date:
-                appointment_data['requested_date'] = str(obj.appointment.reschedule_date)
-                appointment_data['requested_time'] = str(obj.appointment.reschedule_time)
-                appointment_data['reschedule_service'] = obj.appointment.reschedule_service.name if obj.appointment.reschedule_service else None
-                appointment_data['reschedule_dentist'] = obj.appointment.reschedule_dentist.get_full_name() if obj.appointment.reschedule_dentist else None
-            
-            # Add cancel reason if this is a cancel request
-            if obj.notification_type == 'cancel_request' and obj.appointment.cancel_reason:
-                appointment_data['cancel_reason'] = obj.appointment.cancel_reason
-            
-            return appointment_data
+            try:
+                appointment_data = {
+                    'id': obj.appointment.id,
+                    'patient_name': obj.appointment.patient.get_full_name() if obj.appointment.patient else 'Unknown Patient',
+                    'date': str(obj.appointment.date),
+                    'time': str(obj.appointment.time),
+                    'status': obj.appointment.status,
+                    'service_name': obj.appointment.service.name if obj.appointment.service else None,
+                }
+                
+                # Add reschedule details if this is a reschedule request
+                if obj.notification_type == 'reschedule_request' and obj.appointment.reschedule_date:
+                    appointment_data['requested_date'] = str(obj.appointment.reschedule_date)
+                    appointment_data['requested_time'] = str(obj.appointment.reschedule_time)
+                    appointment_data['reschedule_service'] = obj.appointment.reschedule_service.name if obj.appointment.reschedule_service else None
+                    appointment_data['reschedule_dentist'] = obj.appointment.reschedule_dentist.get_full_name() if obj.appointment.reschedule_dentist else None
+                
+                # Add cancel reason if this is a cancel request
+                if obj.notification_type == 'cancel_request' and obj.appointment.cancel_reason:
+                    appointment_data['cancel_reason'] = obj.appointment.cancel_reason
+                
+                return appointment_data
+            except Exception as e:
+                # If any error occurs accessing appointment details, return minimal data
+                return {'id': obj.appointment.id, 'error': 'Could not load appointment details'}
         return None
 
 

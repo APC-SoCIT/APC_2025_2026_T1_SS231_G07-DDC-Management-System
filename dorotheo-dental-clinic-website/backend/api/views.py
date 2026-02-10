@@ -24,7 +24,8 @@ from .email_service import (
     send_appointment_cancelled,
     notify_staff_new_appointment,
     send_password_reset_email,
-    send_password_reset_confirmation
+    send_password_reset_confirmation,
+    send_payment_receipt
 )
 
 from .models import (
@@ -369,59 +370,71 @@ class UserViewSet(viewsets.ModelViewSet):
         Optimized patient list endpoint with N+1 fix.
         Uses select_related and prefetch_related to minimize queries.
         """
-        # Get clinic filter from query params
-        clinic_id = request.query_params.get('clinic')
-        
-        # Build base query
-        queryset = User.objects.filter(user_type='patient').order_by('date_joined', 'id')
-        
-        # Apply clinic filter if provided and user is owner
-        if clinic_id and request.user.user_type == 'owner':
-            queryset = queryset.filter(assigned_clinic_id=clinic_id)
-        
-        # Build optimized query with JOINs and prefetching
-        patients = queryset.select_related(
-            'assigned_clinic'  # JOIN for clinic data (1 query)
-        ).prefetch_related(
-            Prefetch(
-                'appointments',
-                queryset=Appointment.objects.filter(
-                    status='completed'
-                ).select_related('service', 'dentist').order_by('-completed_at', '-date', '-time')[:1],
-                to_attr='last_appointment_cache'
+        try:
+            # Get clinic filter from query params
+            clinic_id = request.query_params.get('clinic')
+            
+            # Build base query
+            queryset = User.objects.filter(user_type='patient').order_by('date_joined', 'id')
+            
+            # Apply clinic filter if provided and user is owner
+            if clinic_id and request.user.user_type == 'owner':
+                queryset = queryset.filter(assigned_clinic_id=clinic_id)
+            
+            # Build optimized query with JOINs and prefetching
+            patients = queryset.select_related(
+                'assigned_clinic'  # JOIN for clinic data (1 query)
+            ).prefetch_related(
+                Prefetch(
+                    'appointments',
+                    queryset=Appointment.objects.filter(
+                        status='completed'
+                    ).select_related('service', 'dentist').order_by('-completed_at', '-date', '-time')[:1],
+                    to_attr='last_appointment_cache'
+                )
+            ).annotate(
+                last_completed_appointment=Max('appointments__completed_at')
             )
-        ).annotate(
-            last_completed_appointment=Max('appointments__completed_at')
-        )
-        
-        # Update patient status using prefetched data (no additional queries)
-        two_years_ago = timezone.now().date() - timedelta(days=730)
-        patients_to_update = []
-        
-        for patient in patients:
-            if hasattr(patient, 'last_appointment_cache') and patient.last_appointment_cache:
-                last_apt = patient.last_appointment_cache[0]
-                new_status = last_apt.date >= two_years_ago
-                if patient.is_active_patient != new_status:
-                    patient.is_active_patient = new_status
-                    patients_to_update.append(patient)
-        
-        # Bulk update (1 query for all updates)
-        if patients_to_update:
-            User.objects.bulk_update(patients_to_update, ['is_active_patient'])
-        
-        # Apply pagination
-        paginator = PageNumberPagination()
-        paginator.page_size = int(request.query_params.get('page_size', 20))
-        page = paginator.paginate_queryset(patients, request)
-        
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return paginator.get_paginated_response(serializer.data)
-        
-        # Fallback for unpaginated requests
-        serializer = self.get_serializer(patients, many=True)
-        return Response(serializer.data)
+            
+            # Update patient status using prefetched data (no additional queries)
+            two_years_ago = timezone.now().date() - timedelta(days=730)
+            patients_to_update = []
+            
+            for patient in patients:
+                try:
+                    if hasattr(patient, 'last_appointment_cache') and patient.last_appointment_cache:
+                        last_apt = patient.last_appointment_cache[0]
+                        if hasattr(last_apt, 'date') and last_apt.date:
+                            new_status = last_apt.date >= two_years_ago
+                            if patient.is_active_patient != new_status:
+                                patient.is_active_patient = new_status
+                                patients_to_update.append(patient)
+                except Exception:
+                    # Skip patient if there's an error processing their appointment data
+                    continue
+            
+            # Bulk update (1 query for all updates)
+            if patients_to_update:
+                User.objects.bulk_update(patients_to_update, ['is_active_patient'])
+            
+            # Apply pagination
+            paginator = PageNumberPagination()
+            paginator.page_size = int(request.query_params.get('page_size', 20))
+            page = paginator.paginate_queryset(patients, request)
+            
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return paginator.get_paginated_response(serializer.data)
+            
+            # Fallback for unpaginated requests
+            serializer = self.get_serializer(patients, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            # Return error response with details
+            return Response(
+                {'error': f'Failed to fetch patients: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['get'])
     def staff(self, request):
@@ -2030,10 +2043,20 @@ class DentistNotificationViewSet(viewsets.ModelViewSet):
         """Dentists only see their own notifications"""
         user = self.request.user
         if user.user_type == 'staff' and user.role == 'dentist':
-            return DentistNotification.objects.filter(dentist=user)
+            return DentistNotification.objects.filter(dentist=user).select_related(
+                'dentist',
+                'appointment',
+                'appointment__patient',
+                'appointment__service'
+            ).order_by('-created_at')
         elif user.user_type == 'owner':
             # Owner can see all notifications
-            return DentistNotification.objects.all()
+            return DentistNotification.objects.all().select_related(
+                'dentist',
+                'appointment',
+                'appointment__patient',
+                'appointment__service'
+            ).order_by('-created_at')
         return DentistNotification.objects.none()
 
     @action(detail=True, methods=['post'])
@@ -2076,7 +2099,15 @@ class AppointmentNotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return notifications for the current user (staff, owner, or patient)"""
         user = self.request.user
-        return AppointmentNotification.objects.filter(recipient=user)
+        # Use select_related to optimize queries and prevent N+1 problems
+        return AppointmentNotification.objects.filter(recipient=user).select_related(
+            'recipient', 
+            'appointment',
+            'appointment__patient',
+            'appointment__service',
+            'appointment__reschedule_service',
+            'appointment__reschedule_dentist'
+        ).order_by('-created_at')
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -2767,6 +2798,14 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 patient_balance.current_balance = patient_balance.total_invoiced - patient_balance.total_paid
                 patient_balance.last_payment_date = data['payment_date']
                 patient_balance.save()
+                
+                # Send payment receipt email to patient
+                try:
+                    send_payment_receipt(payment)
+                    logger.info(f"Payment receipt email sent for payment {payment.payment_number}")
+                except Exception as email_error:
+                    logger.warning(f"Failed to send payment receipt email: {str(email_error)}")
+                    # Don't fail the entire request if email fails
                 
                 # Return response
                 payment_serializer = PaymentSerializer(payment, context={'request': request})

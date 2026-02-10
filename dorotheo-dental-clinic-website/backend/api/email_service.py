@@ -1138,6 +1138,186 @@ class EmailService:
         )
     
     # ============================================
+    # PAYMENT RECEIPT EMAIL
+    # ============================================
+    
+    @staticmethod
+    def send_payment_receipt(payment):
+        """
+        Send payment receipt email to patient after a payment is recorded.
+        
+        Args:
+            payment: Payment model instance (with splits prefetched)
+            
+        Returns:
+            bool: True if email was sent successfully, False otherwise
+        """
+        try:
+            from .models import PatientBalance
+            
+            # Get payment method display name
+            payment_method_display = dict(payment.PAYMENT_METHOD_CHOICES).get(
+                payment.payment_method, 
+                payment.payment_method.replace('_', ' ').title()
+            )
+            
+            # Get invoices paid
+            splits = payment.splits.select_related('invoice').all()
+            
+            # Build invoice allocations table
+            invoice_rows = ""
+            for split in splits:
+                invoice_rows += f"""
+                <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">{split.invoice.invoice_number}</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: right;">₱{split.amount:,.2f}</td>
+                    <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: right;">₱{split.invoice.balance:,.2f}</td>
+                </tr>
+                """
+            
+            # Get patient balance
+            patient_balance = PatientBalance.objects.filter(patient=payment.patient).first()
+            current_balance = patient_balance.current_balance if patient_balance else 0
+            
+            subject = f"✅ Payment Receipt - {payment.payment_number}"
+            
+            content = f"""
+                <div class="highlight-box">
+                    <div class="icon">✅</div>
+                    <div class="title">Payment Received!</div>
+                </div>
+                
+                <p class="greeting">Dear <strong>{payment.patient.get_full_name()}</strong>,</p>
+                
+                <p>Thank you for your payment! We have successfully received and processed your payment.</p>
+                
+                <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border: 3px solid #28a745; border-radius: 12px; padding: 30px; margin: 30px 0; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: #155724; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">
+                        <strong>✅ AMOUNT PAID</strong>
+                    </p>
+                    <p style="margin: 0; color: #28a745; font-size: 42px; font-weight: 700;">
+                        ₱{payment.amount:,.2f}
+                    </p>
+                    <p style="margin: 16px 0 0 0; font-size: 14px; color: #155724;">
+                        <span style="padding: 6px 16px; background-color: #28a745; color: white; border-radius: 20px; font-weight: 600; text-transform: uppercase;">
+                            PAID
+                        </span>
+                    </p>
+                </div>
+                
+                <div class="info-card">
+                    <h3>📄 Payment Details</h3>
+                    <div class="info-row">
+                        <span class="info-label">🔢 Payment Number:</span>
+                        <span class="info-value"><strong>{payment.payment_number}</strong></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">📅 Payment Date:</span>
+                        <span class="info-value">{payment.payment_date.strftime('%B %d, %Y')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">💳 Payment Method:</span>
+                        <span class="info-value">{payment_method_display}</span>
+                    </div>
+            """
+            
+            # Add optional payment details
+            if payment.check_number:
+                content += f"""
+                    <div class="info-row">
+                        <span class="info-label">📝 Check Number:</span>
+                        <span class="info-value">{payment.check_number}</span>
+                    </div>
+                """
+            
+            if payment.reference_number:
+                content += f"""
+                    <div class="info-row">
+                        <span class="info-label">📝 Reference Number:</span>
+                        <span class="info-value">{payment.reference_number}</span>
+                    </div>
+                """
+            
+            if payment.clinic:
+                content += f"""
+                    <div class="info-row">
+                        <span class="info-label">🏥 Clinic:</span>
+                        <span class="info-value">{payment.clinic.name}</span>
+                    </div>
+                """
+            
+            content += """
+                </div>
+                
+                <div class="info-card">
+                    <h3>🧾 Payment Allocation</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+                        <thead>
+                            <tr style="background-color: #f8f9fa;">
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Invoice</th>
+                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Amount Paid</th>
+                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #dee2e6;">Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            """
+            
+            content += invoice_rows
+            
+            content += f"""
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 16px; margin: 20px 0; border-radius: 4px;">
+                    <p style="margin: 0; color: #155724; font-size: 16px;">
+                        <strong>💰 Your Current Balance: ₱{current_balance:,.2f}</strong><br>
+                        <span style="font-size: 14px;">Thank you for your prompt payment!</span>
+                    </p>
+                </div>
+            """
+            
+            if payment.notes:
+                content += f"""
+                <div class="info-card">
+                    <h3>📝 Notes</h3>
+                    <p style="margin: 0; color: #495057;">{payment.notes}</p>
+                </div>
+                """
+            
+            content += """
+                <p style="text-align: center; font-size: 18px; color: #0f4c3a; margin: 30px 0;">
+                    <strong>Thank you for choosing Dorotheo Dental Clinic! 😊</strong>
+                </p>
+                
+                <div class="divider"></div>
+                
+                <p style="font-size: 14px; color: #6c757d;">
+                    If you have any questions about this payment or need a printed receipt, please contact us at <strong>(02) 1234-5678</strong>
+                </p>
+            """
+            
+            html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+                title="Payment Receipt",
+                content=content,
+                accent_color="#28a745",
+                highlight_bg="#d4edda",
+                highlight_border="#28a745",
+                highlight_color="#155724",
+                year=datetime.now().year
+            )
+            
+            return EmailService._send_email(
+                subject=subject,
+                recipient_list=[payment.patient.email],
+                html_content=html_content
+            )
+            
+        except Exception as e:
+            logger.error(f"Error sending payment receipt email: {str(e)}")
+            return False
+    
+    # ============================================
     # PASSWORD RESET EMAILS
     # ============================================
     
@@ -1626,3 +1806,6 @@ def send_invoice_email_to_staff(invoice, staff_emails=None):
 
 def send_payment_receipt_email(invoice, payment_amount):
     return EmailService.send_payment_receipt_email(invoice, payment_amount)
+
+def send_payment_receipt(payment):
+    return EmailService.send_payment_receipt(payment)
