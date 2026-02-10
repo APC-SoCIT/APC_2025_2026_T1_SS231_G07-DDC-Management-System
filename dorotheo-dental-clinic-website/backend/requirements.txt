@@ -12,3 +12,4 @@ resend==0.8.0
 weasyprint==62.3
 pydyf==0.10.0
 requests==2.31.0
+schedule==1.2.0
