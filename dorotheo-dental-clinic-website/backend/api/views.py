@@ -18,6 +18,57 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# AUDIT CONTEXT MIXIN
+# ============================================================================
+
+class AuditContextMixin:
+    """
+    Mixin to automatically inject audit context into model operations.
+    
+    This mixin overrides DRF's perform_create, perform_update, and perform_destroy
+    methods to attach audit metadata (_audit_actor, _audit_ip, _audit_user_agent)
+    to model instances before they are saved.
+    
+    The audit signal handlers (in api/signals.py) look for these attributes
+    to determine WHO made the change and FROM WHERE.
+    
+    Usage:
+        class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
+            # All audit context injection handled automatically
+            pass
+    """
+    
+    def _inject_audit_context(self, instance):
+        """Attach current request context to instance for audit logging."""
+        if hasattr(self, 'request') and self.request.user and self.request.user.is_authenticated:
+            instance._audit_actor = self.request.user
+            instance._audit_ip = get_client_ip(self.request)
+            instance._audit_user_agent = get_user_agent(self.request)
+    
+    def perform_create(self, serializer):
+        """Override to inject audit context before creation."""
+        instance = serializer.save()
+        self._inject_audit_context(instance)
+        return instance
+    
+    def perform_update(self, serializer):
+        """Override to inject audit context before update."""
+        instance = serializer.save()
+        self._inject_audit_context(instance)
+        return instance
+    
+    def perform_destroy(self, instance):
+        """Override to inject audit context before deletion."""
+        self._inject_audit_context(instance)
+        super().perform_destroy(instance)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
 # Import email service
 from .email_service import (
     send_appointment_confirmation,
@@ -27,6 +78,12 @@ from .email_service import (
     send_password_reset_confirmation,
     send_payment_receipt
 )
+
+# Import audit service
+from .audit_service import create_audit_log, get_client_ip, get_user_agent
+
+# Import audit decorators
+from .decorators import log_patient_access, log_export, log_search
 
 from .models import (
     User, Service, Appointment, DentalRecord,
@@ -183,14 +240,62 @@ def login(request):
         token, _ = Token.objects.get_or_create(user=user)
         serializer = UserSerializer(user)
         logger.info("[Django] Login successful for: %s", username)
+        
+        # CREATE AUDIT LOG FOR SUCCESSFUL LOGIN
+        try:
+            create_audit_log(
+                actor=user,
+                action_type='LOGIN_SUCCESS',
+                target_table='User',
+                target_record_id=user.id,
+                patient_id=user.id if user.user_type == 'patient' else None,
+                ip_address=get_client_ip(request),
+                user_agent=get_user_agent(request),
+                changes={'login_method': 'email' if '@' in username else 'username'}
+            )
+        except Exception as e:
+            # Log error but don't prevent login
+            logger.error("[Audit] Failed to log successful login: %s", str(e))
+        
         return Response({'token': token.key, 'user': serializer.data})
     
-    logger.warning("[Django] Login failed for: %s", username)
+    # CREATE AUDIT LOG FOR FAILED LOGIN
+    try:
+        create_audit_log(
+            actor=None,  # No authenticated user for failed login
+            action_type='LOGIN_FAILED',
+            target_table='User',
+            target_record_id=None,
+            patient_id=None,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+            changes={'username_attempted': username}  # Never log password
+        )
+    except Exception as e:
+        # Log error but don't prevent response
+        logger.error("[Audit] Failed to log failed login attempt: %s", str(e))
+    
+    logger.warning("[Django] Login failed for: %s from IP: %s", username, get_client_ip(request))
     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 @api_view(['POST'])
 def logout(request):
+    # CREATE AUDIT LOG BEFORE DELETING TOKEN
+    try:
+        create_audit_log(
+            actor=request.user,
+            action_type='LOGOUT',
+            target_table='User',
+            target_record_id=request.user.id,
+            patient_id=request.user.id if request.user.user_type == 'patient' else None,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request)
+        )
+    except Exception as e:
+        # Log error but don't prevent logout
+        logger.error("[Audit] Failed to log logout: %s", str(e))
+    
     request.user.auth_token.delete()
     return Response({'message': 'Logged out successfully'})
 
@@ -319,9 +424,84 @@ def current_user(request):
 
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
+
+    def get_queryset(self):
+        """
+        Override to add selective search logging.
+        Only logs patient-specific searches (IDs, full names, emails).
+        """
+        queryset = super().get_queryset()
+        
+        # Check for search query parameter
+        search_query = self.request.query_params.get('search', '').strip()
+        
+        if search_query and self._is_patient_specific_search(search_query):
+            # Apply search filter
+            queryset = queryset.filter(
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(email__icontains=search_query) |
+                Q(id__icontains=search_query) if search_query.isdigit() else Q()
+            )
+            
+            # Log the patient-specific search
+            if self.request.user.is_authenticated:
+                try:
+                    create_audit_log(
+                        actor=self.request.user,
+                        action_type='READ',
+                        target_table='User',
+                        target_record_id=None,
+                        patient_id=None,
+                        ip_address=get_client_ip(self.request),
+                        user_agent=get_user_agent(self.request),
+                        changes={'search_query': search_query, 'search_type': 'patient_specific'}
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to log patient search: {e}")
+        
+        return queryset
+    
+    def _is_patient_specific_search(self, query):
+        """
+        Determine if a search query is patient-specific.
+        
+        Patient-specific searches:
+        - Numeric IDs: "12345"
+        - Full names: "John Doe" (has space)
+        - Email addresses: contains @
+        
+        Generic searches (skip logging):
+        - Single words: "cavity", "active"
+        - Short queries: < 3 characters
+        """
+        if not query or len(query) < 3:
+            return False
+        
+        # Numeric ID
+        if query.isdigit():
+            return True
+        
+        # Email address
+        if '@' in query:
+            return True
+        
+        # Full name (has space)
+        if ' ' in query.strip():
+            return True
+        
+        # Everything else is generic
+        return False
+
+    @log_patient_access(action_type='READ', target_table='User')
+    def retrieve(self, request, pk=None):
+        """Get single user details - logs access to patient records."""
+        user = self.get_object()
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         # Hash password when creating user
@@ -474,6 +654,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
+    @log_export(target_table='User')
     def export_records(self, request, pk=None):
         """Export patient records as JSON (can be converted to PDF/CSV on frontend)"""
         user = self.get_object()
@@ -572,7 +753,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
-class ServiceViewSet(viewsets.ModelViewSet):
+class ServiceViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Service.objects.all().order_by('name')
     serializer_class = ServiceSerializer
     permission_classes = [AllowAny]
@@ -626,9 +807,16 @@ class ServiceViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class AppointmentViewSet(viewsets.ModelViewSet):
+class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
+
+    @log_patient_access(action_type='READ', target_table='Appointment')
+    def retrieve(self, request, pk=None):
+        """Get appointment details - logs access to patient appointment information."""
+        appointment = self.get_object()
+        serializer = self.get_serializer(appointment)
+        return Response(serializer.data)
 
     def get_queryset(self):
         user = self.request.user
@@ -1358,9 +1546,16 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class DentalRecordViewSet(viewsets.ModelViewSet):
+class DentalRecordViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = DentalRecord.objects.all()
     serializer_class = DentalRecordSerializer
+
+    @log_patient_access(action_type='READ', target_table='DentalRecord')
+    def retrieve(self, request, pk=None):
+        """Get single dental record - logs access to patient PHI."""
+        record = self.get_object()
+        serializer = self.get_serializer(record)
+        return Response(serializer.data)
 
     def get_queryset(self):
         user = self.request.user
@@ -1383,9 +1578,16 @@ class DentalRecordViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class DocumentViewSet(viewsets.ModelViewSet):
+class DocumentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
+
+    @log_patient_access(action_type='READ', target_table='Document')
+    def retrieve(self, request, pk=None):
+        """Get document metadata - logs access to patient documents."""
+        document = self.get_object()
+        serializer = self.get_serializer(document)
+        return Response(serializer.data)
 
     def get_queryset(self):
         user = self.request.user
@@ -1417,7 +1619,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class InventoryItemViewSet(viewsets.ModelViewSet):
+class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all().order_by('name')
     serializer_class = InventoryItemSerializer
 
@@ -1513,9 +1715,16 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         return Response({'count': len(low_stock_items)})
 
 
-class BillingViewSet(viewsets.ModelViewSet):
+class BillingViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Billing.objects.all()
     serializer_class = BillingSerializer
+
+    @log_patient_access(action_type='READ', target_table='Billing')
+    def retrieve(self, request, pk=None):
+        """Get billing record - logs access to patient billing information."""
+        billing = self.get_object()
+        serializer = self.get_serializer(billing)
+        return Response(serializer.data)
 
     def get_queryset(self):
         user = self.request.user
@@ -1556,15 +1765,22 @@ class BillingViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class ClinicLocationViewSet(viewsets.ModelViewSet):
+class ClinicLocationViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = ClinicLocation.objects.all().order_by('name')
     serializer_class = ClinicLocationSerializer
     permission_classes = [AllowAny]
 
 
-class TreatmentPlanViewSet(viewsets.ModelViewSet):
+class TreatmentPlanViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = TreatmentPlan.objects.all()
     serializer_class = TreatmentPlanSerializer
+
+    @log_patient_access(action_type='READ', target_table='TreatmentPlan')
+    def retrieve(self, request, pk=None):
+        """Get treatment plan - logs access to patient treatment information."""
+        plan = self.get_object()
+        serializer = self.get_serializer(plan)
+        return Response(serializer.data)
 
     def get_queryset(self):
         user = self.request.user
@@ -1573,9 +1789,16 @@ class TreatmentPlanViewSet(viewsets.ModelViewSet):
         return TreatmentPlan.objects.all()
 
 
-class TeethImageViewSet(viewsets.ModelViewSet):
+class TeethImageViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = TeethImage.objects.all()
     serializer_class = TeethImageSerializer
+
+    @log_patient_access(action_type='READ', target_table='TeethImage')
+    def retrieve(self, request, pk=None):
+        """Get teeth image record - logs access to patient dental images."""
+        image = self.get_object()
+        serializer = self.get_serializer(image)
+        return Response(serializer.data)
 
     def get_queryset(self):
         user = self.request.user
@@ -1686,7 +1909,7 @@ def analytics(request):
     })
 
 
-class StaffAvailabilityViewSet(viewsets.ModelViewSet):
+class StaffAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = StaffAvailability.objects.all()
     serializer_class = StaffAvailabilitySerializer
 
@@ -1795,7 +2018,7 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
             )
 
 
-class DentistAvailabilityViewSet(viewsets.ModelViewSet):
+class DentistAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing dentist date-specific availability (calendar-based).
     Supports clinic-specific availability filtering.
@@ -1957,7 +2180,7 @@ class DentistAvailabilityViewSet(viewsets.ModelViewSet):
         })
 
 
-class BlockedTimeSlotViewSet(viewsets.ModelViewSet):
+class BlockedTimeSlotViewSet(AuditContextMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing blocked time slots to prevent patient bookings.
     Staff and owners can block specific time ranges on specific dates.
@@ -2034,7 +2257,7 @@ class BlockedTimeSlotViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class DentistNotificationViewSet(viewsets.ModelViewSet):
+class DentistNotificationViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = DentistNotification.objects.all()
     serializer_class = DentistNotificationSerializer
     permission_classes = [IsAuthenticated]
@@ -2090,7 +2313,7 @@ class DentistNotificationViewSet(viewsets.ModelViewSet):
         return Response({'unread_count': 0})
 
 
-class AppointmentNotificationViewSet(viewsets.ModelViewSet):
+class AppointmentNotificationViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = AppointmentNotification.objects.all()
     serializer_class = AppointmentNotificationSerializer
     permission_classes = [IsAuthenticated]
@@ -2140,9 +2363,16 @@ class AppointmentNotificationViewSet(viewsets.ModelViewSet):
         return Response({'unread_count': count})
 
 
-class PatientIntakeFormViewSet(viewsets.ModelViewSet):
+class PatientIntakeFormViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = PatientIntakeForm.objects.all()
     serializer_class = PatientIntakeFormSerializer
+
+    @log_patient_access(action_type='READ', target_table='PatientIntakeForm')
+    def retrieve(self, request, pk=None):
+        """Get patient intake form - logs access to patient medical history."""
+        form = self.get_object()
+        serializer = self.get_serializer(form)
+        return Response(serializer.data)
 
     def get_queryset(self):
         """Filter based on user role"""
@@ -2170,7 +2400,7 @@ class PatientIntakeFormViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Intake form not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
-class FileAttachmentViewSet(viewsets.ModelViewSet):
+class FileAttachmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = FileAttachment.objects.all()
     serializer_class = FileAttachmentSerializer
 
@@ -2203,9 +2433,16 @@ class FileAttachmentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class ClinicalNoteViewSet(viewsets.ModelViewSet):
+class ClinicalNoteViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = ClinicalNote.objects.all()
     serializer_class = ClinicalNoteSerializer
+
+    @log_patient_access(action_type='READ', target_table='ClinicalNote')
+    def retrieve(self, request, pk=None):
+        """Get clinical note - logs access to patient clinical documentation."""
+        note = self.get_object()
+        serializer = self.get_serializer(note)
+        return Response(serializer.data)
 
     def get_queryset(self):
         """Filter based on user role"""
@@ -2234,7 +2471,7 @@ class ClinicalNoteViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class TreatmentAssignmentViewSet(viewsets.ModelViewSet):
+class TreatmentAssignmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = TreatmentAssignment.objects.all()
     serializer_class = TreatmentAssignmentSerializer
 
@@ -2345,7 +2582,7 @@ def chatbot_query(request):
 # INVOICE VIEWSET
 # ============================================================================
 
-class InvoiceViewSet(viewsets.ModelViewSet):
+class InvoiceViewSet(AuditContextMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing invoices
     
@@ -2358,6 +2595,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
     permission_classes = [IsAuthenticated]
+    
+    @log_patient_access(action_type='READ', target_table='Invoice')
+    def retrieve(self, request, pk=None):
+        """Get invoice details - logs access to patient billing records."""
+        invoice = self.get_object()
+        serializer = self.get_serializer(invoice)
+        return Response(serializer.data)
     
     def get_queryset(self):
         """Filter invoices based on user role and query parameters"""
@@ -2599,6 +2843,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
     
     @action(detail=True, methods=['get'], url_path='download-pdf')
+    @log_export(target_table='Invoice')
     def download_pdf(self, request, pk=None):
         """
         Download invoice as PDF
@@ -2642,7 +2887,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
 
 
-class PaymentViewSet(viewsets.ModelViewSet):
+class PaymentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     """
     ViewSet for managing payments
     
