@@ -30,8 +30,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const loadClinics = async () => {
     try {
       setIsLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const url = `${apiUrl}/api/locations/`;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const url = `${apiUrl}/locations/`;
       console.log('[ClinicContext] Fetching clinics from:', url);
       
       const response = await fetch(url, {

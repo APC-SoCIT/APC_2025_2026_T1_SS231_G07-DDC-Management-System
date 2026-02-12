@@ -38,34 +38,45 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-10 w-auto object-contain" />
-        </div>
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          {/* Mobile Profile Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-10 h-10 bg-[var(--color-primary)] rounded-full flex items-center justify-center"
-            >
-              <User className="w-5 h-5 text-white" />
-            </button>
-            {isProfileOpen && (
-              <div className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
-                <Link
-                  href="/staff/profile"
-                  className="block px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] rounded transition-colors"
-                >
-                  Edit Profile
-                </Link>
-              </div>
-            )}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)] shadow-sm">
+        {/* Top row with logo and user actions */}
+        <div className="px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-8 w-auto object-contain flex-shrink-0" />
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2">
-            {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            {/* Mobile Profile Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="w-9 h-9 bg-[var(--color-primary)] rounded-full flex items-center justify-center touch-manipulation"
+              >
+                <User className="w-4 h-4 text-white" />
+              </button>
+              {isProfileOpen && (
+                <div className="absolute right-0 top-11 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
+                  <Link
+                    href="/staff/profile"
+                    className="block px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] rounded transition-colors touch-manipulation"
+                  >
+                    Edit Profile
+                  </Link>
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+              className="p-2 touch-manipulation tap-target"
+              aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
+            >
+              {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+        {/* Second row with Clinic Selector */}
+        <div className="px-3 pb-2">
+          <ClinicSelector showAllOption={true} />
         </div>
       </div>
 
@@ -154,8 +165,8 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
       </aside>
 
       {/* Main Content */}
-      <main className="lg:ml-64 pt-16 lg:pt-16">
-        <div className="p-6 lg:p-8">{children}</div>
+      <main className="lg:ml-64 pt-24 lg:pt-16">
+        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
 
       {/* Overlay for mobile */}

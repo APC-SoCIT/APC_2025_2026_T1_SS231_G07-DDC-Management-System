@@ -17,13 +17,15 @@ const playfair = Playfair_Display({
 export const metadata = {
   title: "Dorotheo Dental Clinic Website",
   description: "Quality dental services with experienced professionals",
-  generator: 'v0.app',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-  }
+  generator: 'v0.app'
+}
+
+// Viewport configuration for mobile responsiveness
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 }
 
 export default function RootLayout({
@@ -33,9 +35,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${playfair.variable}`}>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-      </head>
       <body>
         <AuthProvider>
           <ClinicProvider>

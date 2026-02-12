@@ -335,29 +335,29 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       {showSuccess ? (
-        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 text-center my-auto">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
           <div className="mb-4 flex justify-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold text-[var(--color-primary)] mb-2">Registration Successful!</h3>
-          <p className="text-sm sm:text-base text-[var(--color-text)]">You may now log in.</p>
+          <h3 className="text-2xl font-bold text-[var(--color-primary)] mb-2">Registration Successful!</h3>
+          <p className="text-[var(--color-text)]">You may now log in.</p>
         </div>
       ) : (
-      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto my-auto">
-        <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
-          <h2 className="text-lg sm:text-2xl font-serif font-bold text-[var(--color-primary)]">Register as Patient</h2>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
+          <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">Register as Patient</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{error}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

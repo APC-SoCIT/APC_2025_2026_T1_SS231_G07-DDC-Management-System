@@ -366,11 +366,12 @@ export default function NotificationBell() {
           setIsOpen(!isOpen)
           if (!isOpen) fetchNotifications()
         }}
-        className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+        className="relative p-2 hover:bg-gray-100 rounded-full transition-colors touch-manipulation tap-target"
+        aria-label="Notifications"
       >
-        <Bell className="w-6 h-6 text-gray-700" />
+        <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
         {(unreadCount + birthdayNotifications.length) > 0 && (
-          <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 sm:top-0 sm:right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
             {(unreadCount + birthdayNotifications.length) > 9 ? '9+' : (unreadCount + birthdayNotifications.length)}
           </span>
         )}
@@ -381,21 +382,21 @@ export default function NotificationBell() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 z-40" 
+            className="fixed inset-0 z-40 bg-black/20 sm:bg-transparent" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Notifications Panel */}
-          <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] overflow-hidden flex flex-col">
+          <div className="fixed inset-x-2 top-16 sm:absolute sm:right-0 sm:left-auto sm:top-auto sm:mt-2 sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[calc(100vh-5rem)] sm:max-h-[600px] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-3 sm:px-4 py-3 border-b border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                <h3 className="font-semibold text-base sm:text-lg text-gray-900">Notifications</h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}
                     disabled={loading}
-                    className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 touch-manipulation px-2 py-1"
                   >
                     Mark all as read
                   </button>
@@ -408,13 +409,13 @@ export default function NotificationBell() {
                     <button
                       onClick={handleClearAll}
                       disabled={loading}
-                      className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                      className="text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 touch-manipulation tap-target"
                     >
                       Yes
                     </button>
                     <button
                       onClick={() => setShowClearConfirm(false)}
-                      className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      className="text-xs px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 touch-manipulation tap-target"
                     >
                       No
                     </button>
@@ -423,7 +424,7 @@ export default function NotificationBell() {
                   <button
                     onClick={() => setShowClearConfirm(true)}
                     disabled={loading}
-                    className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
+                    className="text-xs sm:text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1 touch-manipulation px-2 py-1"
                   >
                     <X className="w-3 h-3" />
                     Clear all notifications
@@ -433,11 +434,11 @@ export default function NotificationBell() {
             </div>
 
             {/* Notifications List */}
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 scrollbar-hide">
               {notifications.length === 0 && birthdayNotifications.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-500">
-                  <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p>No notifications yet</p>
+                <div className="px-3 sm:px-4 py-8 text-center text-gray-500">
+                  <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm sm:text-base">No notifications yet</p>
                 </div>
               ) : (
                 <>
@@ -445,12 +446,12 @@ export default function NotificationBell() {
                   {birthdayNotifications.map((birthday, index) => (
                     <div
                       key={`birthday-${index}`}
-                      className="px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
+                      className="px-3 sm:px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-2xl">🎉</span>
+                        <span className="text-xl sm:text-2xl flex-shrink-0">🎉</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-gray-900 break-words">
                             {birthday.name}'s birthday is today!
                           </p>
                           <p className="text-xs text-gray-600 mt-1">
@@ -465,30 +466,30 @@ export default function NotificationBell() {
                   {notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    className={`px-3 sm:px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
                       !notif.is_read ? 'bg-blue-50' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         {/* Type Badge */}
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                             getNotificationColor(notif.notification_type)
                           }`}>
                             {formatNotificationType(notif.notification_type)}
                           </span>
                           {!notif.is_read && (
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>
                           )}
                         </div>
 
                         {/* Message */}
-                        <p className="text-sm text-gray-900 mb-2">{notif.message}</p>
+                        <p className="text-sm text-gray-900 mb-2 break-words">{notif.message}</p>
 
                         {/* Appointment Details */}
                         {notif.appointment_details && (
-                          <div className="text-xs text-gray-600 space-y-1 mb-2">
+                          <div className="text-xs text-gray-600 space-y-1 mb-2 break-words">
                             <p><strong>Patient:</strong> {notif.appointment_details.patient_name}</p>
                             <p><strong>Current Date:</strong> {new Date(notif.appointment_details.date).toLocaleDateString()} at {notif.appointment_details.time}</p>
                             {notif.appointment_details.requested_date && (
@@ -505,7 +506,7 @@ export default function NotificationBell() {
                         {notif.appointment_details && 
                          (notif.notification_type === 'reschedule_request' || notif.notification_type === 'cancel_request') &&
                          notif.appointment_details.status === (notif.notification_type === 'reschedule_request' ? 'reschedule_requested' : 'cancel_requested') && (
-                          <div className="flex gap-2 mb-2">
+                          <div className="flex gap-2 mb-2 flex-wrap">
                             <button
                               onClick={() => {
                                 if (notif.notification_type === 'reschedule_request') {
@@ -515,7 +516,7 @@ export default function NotificationBell() {
                                 }
                               }}
                               disabled={processingId === notif.id}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation tap-target"
                             >
                               <Check className="w-3 h-3" />
                               Approve
@@ -529,7 +530,7 @@ export default function NotificationBell() {
                                 }
                               }}
                               disabled={processingId === notif.id}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="flex items-center gap-1 px-4 py-2 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation tap-target"
                             >
                               <X className="w-3 h-3" />
                               Reject
@@ -546,7 +547,7 @@ export default function NotificationBell() {
                         <button
                           onClick={() => handleMarkAsRead(notif.id)}
                           disabled={loading}
-                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap disabled:opacity-50"
+                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap disabled:opacity-50 touch-manipulation px-2 py-1 flex-shrink-0"
                         >
                           Mark read
                         </button>
@@ -560,10 +561,10 @@ export default function NotificationBell() {
 
             {/* Footer */}
             {notifications.length > 0 && (
-              <div className="px-4 py-3 border-t border-gray-200 text-center">
+              <div className="px-3 sm:px-4 py-3 border-t border-gray-200 text-center">
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="text-sm text-gray-600 hover:text-gray-800"
+                  className="text-sm text-gray-600 hover:text-gray-800 touch-manipulation px-4 py-2 tap-target"
                 >
                   Close
                 </button>

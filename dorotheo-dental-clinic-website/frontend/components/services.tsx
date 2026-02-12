@@ -67,22 +67,22 @@ export default function Services() {
   const displayedServices = showAll ? filteredServices : filteredServices.slice(0, 3)
 
   return (
-    <section id="services" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section id="services" className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-serif font-bold text-[var(--color-primary)] mb-4">Our Services</h2>
-          <p className="text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto">
+        <div className="text-center mb-8 sm:mb-10 md:mb-12">
+          <h2 className="text-3xl sm:text-4xl font-serif font-bold text-[var(--color-primary)] mb-3 sm:mb-4">Our Services</h2>
+          <p className="text-base sm:text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto px-4">
             Comprehensive dental care tailored to your needs
           </p>
         </div>
 
         {showAll && (
-          <div className="flex flex-wrap justify-center gap-3 mb-8">
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 sm:mb-8 px-2">
             {categories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`px-6 py-2.5 rounded-lg font-medium transition-colors ${
+                className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium transition-colors text-sm sm:text-base touch-manipulation ${
                   selectedCategory === category.id
                     ? "bg-[var(--color-primary)] text-white"
                     : "bg-[var(--color-background)] text-[var(--color-text)] hover:bg-[var(--color-border)]"
@@ -95,52 +95,53 @@ export default function Services() {
         )}
 
         {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+          <div className="flex justify-center items-center py-16 sm:py-20">
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-[var(--color-primary)]"></div>
           </div>
         ) : services.length === 0 ? (
-          <div className="text-center py-20 bg-[var(--color-background)] rounded-xl">
-            <p className="text-[var(--color-text-muted)] text-lg">No services available yet.</p>
+          <div className="text-center py-16 sm:py-20 bg-[var(--color-background)] rounded-xl mx-4">
+            <p className="text-[var(--color-text-muted)] text-base sm:text-lg">No services available yet.</p>
             <p className="text-[var(--color-text-muted)] text-sm mt-2">Services will appear here once added by the clinic.</p>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
               {displayedServices.map((service) => (
                 <div
                   key={service.id}
                   className="bg-white border border-[var(--color-border)] rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
                 >
-                  <div className="relative h-48">
+                  <div className="relative h-40 sm:h-48">
                     <Image 
                       src={service.image || "/placeholder.svg"} 
                       alt={service.name} 
                       fill 
                       className="object-cover"
                       unoptimized
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
                   </div>
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-xl font-semibold text-[var(--color-primary)]">{service.name}</h3>
-                      <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-full font-medium whitespace-nowrap ml-2">
+                  <div className="p-4 sm:p-6">
+                    <div className="flex items-start justify-between mb-2 gap-2">
+                      <h3 className="text-lg sm:text-xl font-semibold text-[var(--color-primary)] flex-1">{service.name}</h3>
+                      <span className="inline-block px-2 sm:px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-full font-medium whitespace-nowrap flex-shrink-0">
                         {formatDuration(service.duration)}
                       </span>
                     </div>
-                    <p className="text-[var(--color-text-muted)] leading-relaxed">{service.description}</p>
+                    <p className="text-sm sm:text-base text-[var(--color-text-muted)] leading-relaxed">{service.description}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             {filteredServices.length > 3 && (
-              <div className="text-center">
+              <div className="text-center px-4">
                 <button
                   onClick={() => setShowAll(!showAll)}
-                  className="inline-flex items-center gap-2 px-8 py-3 bg-[var(--color-accent)] text-white rounded-lg hover:bg-[var(--color-accent-dark)] transition-colors font-medium"
+                  className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 bg-[var(--color-accent)] text-white rounded-lg hover:bg-[var(--color-accent-dark)] transition-colors font-medium text-sm sm:text-base touch-manipulation"
                 >
                   {showAll ? "Show Less" : "More Services"}
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
             )}

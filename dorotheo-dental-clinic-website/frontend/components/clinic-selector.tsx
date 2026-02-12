@@ -49,24 +49,30 @@ export function ClinicSelector({ showAllOption = false, className }: ClinicSelec
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className={cn("justify-between min-w-[200px]", className)}>
-          <div className="flex items-center">
-            <Building2 className="mr-2 h-4 w-4" />
+        <Button 
+          variant="outline" 
+          className={cn(
+            "justify-between w-full sm:min-w-[200px] sm:w-auto touch-manipulation",
+            className
+          )}
+        >
+          <div className="flex items-center min-w-0 flex-1">
+            <Building2 className="mr-2 h-4 w-4 flex-shrink-0" />
             <span className="truncate">{displayText}</span>
           </div>
-          <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+          <ChevronDown className="ml-2 h-4 w-4 opacity-50 flex-shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
+      <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-[240px] max-w-xs">
         {showAllOption && (
           <DropdownMenuItem
             onClick={() => setSelectedClinic("all")}
-            className="cursor-pointer"
+            className="cursor-pointer touch-manipulation px-3 py-2.5 sm:px-2 sm:py-1.5"
           >
-            <div className="flex items-center justify-between w-full">
-              <span>All Clinics</span>
+            <div className="flex items-center justify-between w-full gap-2">
+              <span className="text-sm sm:text-sm">All Clinics</span>
               {selectedClinic === "all" && (
-                <Check className="h-4 w-4 text-primary" />
+                <Check className="h-4 w-4 text-primary flex-shrink-0" />
               )}
             </div>
           </DropdownMenuItem>
@@ -75,12 +81,14 @@ export function ClinicSelector({ showAllOption = false, className }: ClinicSelec
           <DropdownMenuItem
             key={clinic.id}
             onClick={() => setSelectedClinic(clinic)}
-            className="cursor-pointer"
+            className="cursor-pointer touch-manipulation px-3 py-2.5 sm:px-2 sm:py-1.5"
           >
-            <div className="flex items-center justify-between w-full">
-              <span title={clinic.name}>{getShortClinicName(clinic.name)}</span>
+            <div className="flex items-center justify-between w-full gap-2">
+              <span className="text-sm sm:text-sm truncate" title={clinic.name}>
+                {getShortClinicName(clinic.name)}
+              </span>
               {selectedClinic !== "all" && selectedClinic?.id === clinic.id && (
-                <Check className="h-4 w-4 text-primary ml-2 flex-shrink-0" />
+                <Check className="h-4 w-4 text-primary flex-shrink-0" />
               )}
             </div>
           </DropdownMenuItem>
