@@ -20,12 +20,12 @@ export const metadata = {
   generator: 'v0.app'
 }
 
-// Viewport configuration for mobile responsiveness
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
+  viewportFit: 'cover'
 }
 
 export default function RootLayout({

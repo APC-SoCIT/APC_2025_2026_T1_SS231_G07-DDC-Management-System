@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Bell, Check, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import AlertModal from './alert-modal'
 
 interface Notification {
   id: number
@@ -25,7 +26,7 @@ interface Notification {
 }
 
 export default function NotificationBell() {
-  const { user } = useAuth()
+  const { user, isLoading: authLoading, token: authToken } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [birthdayNotifications, setBirthdayNotifications] = useState<Array<{name: string, role: string}>>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -33,28 +34,69 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false)
   const [processingId, setProcessingId] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const canFetchUnreadRef = useRef(false)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
 
   useEffect(() => {
-    // Only fetch notifications for owner and staff users
-    if (!user || user.role === 'patient') {
+    // Wait for auth to finish loading
+    if (authLoading) {
+      console.log('[NotificationBell] Waiting for auth to load...')
       return
     }
     
-    fetchNotifications()
-    fetchUnreadCount()
+    // Only fetch notifications for owner and staff users
+    if (!user || user.user_type === 'patient') {
+      console.log('[NotificationBell] User check:', { user, userType: user?.user_type })
+      return
+    }
+    
+    // Double-check both localStorage token AND auth context token exist
+    const token = localStorage.getItem('token')
+    if (!token || token.trim() === '' || !authToken) {
+      console.log('[NotificationBell] No valid token available yet', { hasLocalStorage: !!token, hasAuthToken: !!authToken })
+      return
+    }
+    
+    console.log('[NotificationBell] Initializing notifications for user:', user.user_type, user.email)
+    
+    // Fetch notifications first to verify token works
+    fetchNotifications().then(() => {
+      console.log('[NotificationBell] Notifications loaded successfully, can now poll unread count')
+      // Mark that we can now safely fetch unread count (use ref to avoid closure issues)
+      canFetchUnreadRef.current = true
+    }).catch(err => {
+      console.log('[NotificationBell] Failed to load notifications:', err)
+    })
+    
     fetchBirthdays()
     
-    // Poll for new notifications every 30 seconds only for owner/staff
+    // Poll for unread count every 30 seconds (only after initial load succeeds)
     const interval = setInterval(() => {
-      fetchUnreadCount()
-      if (isOpen) {
-        fetchNotifications()
-        fetchBirthdays()
+      if (canFetchUnreadRef.current) {
+        fetchUnreadCount()
       }
     }, 30000)
     
     return () => clearInterval(interval)
-  }, [isOpen, user])
+  }, [user, authLoading, authToken])
+
+  // Separate effect to refresh when dropdown opens
+  useEffect(() => {
+    if (isOpen && user && !authLoading && user.user_type !== 'patient' && canFetchUnreadRef.current) {
+      const token = localStorage.getItem('token')
+      if (token && token.trim() !== '') {
+        console.log('[NotificationBell] Dropdown opened, refreshing...')
+        fetchNotifications()
+        fetchBirthdays()
+        fetchUnreadCount()
+      }
+    }
+  }, [isOpen])
 
   const fetchBirthdays = async () => {
     try {
@@ -103,30 +145,75 @@ export default function NotificationBell() {
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('token')
-      if (!token) return
+      if (!token) {
+        console.log('[NotificationBell] No token found')
+        setNotifications([])
+        return
+      }
       
+      console.log('[NotificationBell] Fetching notifications from API...')
       // Use the new AppointmentNotification API
       const data = await api.getAppointmentNotifications(token)
-      setNotifications(data)
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
+      console.log('[NotificationBell] Received notifications:', data)
+      
+      // Handle both paginated response and plain array
+      let notificationsArray: Notification[]
+      if (data && typeof data === 'object' && 'results' in data) {
+        // Paginated response
+        console.log('[NotificationBell] Handling paginated response')
+        notificationsArray = Array.isArray(data.results) ? data.results : []
+      } else {
+        // Plain array response
+        notificationsArray = Array.isArray(data) ? data : []
+      }
+      
+      console.log('[NotificationBell] Setting notifications:', notificationsArray.length, 'items')
+      setNotifications(notificationsArray)
+      
+      // Calculate unread count from notifications to avoid extra API call
+      const unread = notificationsArray.filter(n => !n.is_read).length
+      console.log('[NotificationBell] Calculated unread count:', unread)
+      setUnreadCount(unread)
+    } catch (error: any) {
+      // Silently fail for 401 errors (user not authenticated or token expired)
+      if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+        console.log('[NotificationBell] Authentication error:', error)
+        setNotifications([])
+        return
+      }
+      console.error('[NotificationBell] Failed to fetch notifications:', error)
+      // Ensure notifications is always an array even on error
+      setNotifications([])
     }
   }
 
   const fetchUnreadCount = async () => {
+    // Only fetch if we've confirmed tokens work via successful notification fetch
+    if (!canFetchUnreadRef.current) {
+      console.log('[NotificationBell] Skipping unread count - not ready yet')
+      return
+    }
+    
     try {
       const token = localStorage.getItem('token')
-      if (!token) return
+      if (!token || token.trim() === '') {
+        console.log('[NotificationBell] No valid token for unread count')
+        setUnreadCount(0)
+        return
+      }
       
+      console.log('[NotificationBell] Fetching unread count...')
       const data = await api.getAppointmentNotificationUnreadCount(token)
+      console.log('[NotificationBell] Unread count:', data.unread_count)
       setUnreadCount(data.unread_count || 0)
     } catch (error: any) {
       // Silently fail for 401 errors (user not authenticated or token expired)
       if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+        console.log('[NotificationBell] Auth error on unread count')
         setUnreadCount(0)
         return
       }
-      console.error('Failed to fetch unread count:', error)
+      console.error('[NotificationBell] Failed to fetch unread count:', error)
     }
   }
 
@@ -206,10 +293,21 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Reschedule request approved successfully!')
-    } catch (error) {
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Reschedule request approved successfully!"
+      })
+    } catch (error: any) {
       console.error('Failed to approve reschedule:', error)
-      alert('Failed to approve reschedule request. Please try again.')
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to approve reschedule request. Please try again.'
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: errorMessage
+      })
     } finally {
       setProcessingId(null)
     }
@@ -227,10 +325,20 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Reschedule request rejected.')
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Reschedule request rejected."
+      })
     } catch (error) {
       console.error('Failed to reject reschedule:', error)
-      alert('Failed to reject reschedule request. Please try again.')
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to reject reschedule request. Please try again."
+      })
     } finally {
       setProcessingId(null)
     }
@@ -248,10 +356,20 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Cancellation request approved successfully!')
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Request Approved",
+        message: "Cancellation request approved successfully!"
+      })
     } catch (error) {
       console.error('Failed to approve cancellation:', error)
-      alert('Failed to approve cancellation request. Please try again.')
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to approve cancellation request. Please try again."
+      })
     } finally {
       setProcessingId(null)
     }
@@ -269,10 +387,20 @@ export default function NotificationBell() {
       await handleMarkAsRead(notificationId)
       await fetchNotifications()
       
-      alert('Cancellation request rejected.')
+      setAlertModal({
+        isOpen: true,
+        type: "info",
+        title: "Request Rejected",
+        message: "Cancellation request rejected."
+      })
     } catch (error) {
       console.error('Failed to reject cancellation:', error)
-      alert('Failed to reject cancellation request. Please try again.')
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed",
+        message: "Failed to reject cancellation request. Please try again."
+      })
     } finally {
       setProcessingId(null)
     }
@@ -355,7 +483,19 @@ export default function NotificationBell() {
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
     
-    return date.toLocaleDateString()
+    // Use consistent date formatting to avoid hydration errors
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${month}/${day}/${year}`
+  }
+
+  const formatAppointmentDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${month}/${day}/${year}`
   }
 
   return (
@@ -366,12 +506,11 @@ export default function NotificationBell() {
           setIsOpen(!isOpen)
           if (!isOpen) fetchNotifications()
         }}
-        className="relative p-2 hover:bg-gray-100 rounded-full transition-colors touch-manipulation tap-target"
-        aria-label="Notifications"
+        className="relative p-1.5 lg:p-2 hover:bg-gray-100 rounded-full transition-colors"
       >
-        <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
+        <Bell className="w-5 h-5 lg:w-6 lg:h-6 text-gray-700" />
         {(unreadCount + birthdayNotifications.length) > 0 && (
-          <span className="absolute -top-1 -right-1 sm:top-0 sm:right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 lg:top-0 lg:right-0 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 lg:w-5 lg:h-5 flex items-center justify-center">
             {(unreadCount + birthdayNotifications.length) > 9 ? '9+' : (unreadCount + birthdayNotifications.length)}
           </span>
         )}
@@ -382,40 +521,40 @@ export default function NotificationBell() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 z-40 bg-black/20 sm:bg-transparent" 
+            className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Notifications Panel */}
-          <div className="fixed inset-x-2 top-16 sm:absolute sm:right-0 sm:left-auto sm:top-auto sm:mt-2 sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[calc(100vh-5rem)] sm:max-h-[600px] overflow-hidden flex flex-col">
+          <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[min(70vh,600px)] sm:max-h-[600px] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="px-3 sm:px-4 py-3 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-base sm:text-lg text-gray-900">Notifications</h3>
+            <div className="px-3 sm:px-5 py-3 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2 gap-3">
+                <h3 className="font-semibold text-gray-900 text-base flex-shrink-0">Notifications</h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}
                     disabled={loading}
-                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 touch-manipulation px-2 py-1"
+                    className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap flex-shrink-0"
                   >
-                    Mark all as read
+                    Mark all read
                   </button>
                 )}
               </div>
-              {notifications.length > 0 && (
+              {Array.isArray(notifications) && notifications.length > 0 && (
                 showClearConfirm ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-gray-600">Clear all?</span>
                     <button
                       onClick={handleClearAll}
                       disabled={loading}
-                      className="text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 touch-manipulation tap-target"
+                      className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                     >
                       Yes
                     </button>
                     <button
                       onClick={() => setShowClearConfirm(false)}
-                      className="text-xs px-3 py-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 touch-manipulation tap-target"
+                      className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                     >
                       No
                     </button>
@@ -424,21 +563,21 @@ export default function NotificationBell() {
                   <button
                     onClick={() => setShowClearConfirm(true)}
                     disabled={loading}
-                    className="text-xs sm:text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1 touch-manipulation px-2 py-1"
+                    className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    <X className="w-3 h-3" />
-                    Clear all notifications
+                    <X className="w-4 h-4 flex-shrink-0" />
+                    <span>Clear all</span>
                   </button>
                 )
               )}
             </div>
 
             {/* Notifications List */}
-            <div className="overflow-y-auto flex-1 scrollbar-hide">
-              {notifications.length === 0 && birthdayNotifications.length === 0 ? (
-                <div className="px-3 sm:px-4 py-8 text-center text-gray-500">
-                  <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm sm:text-base">No notifications yet</p>
+            <div className="overflow-y-auto flex-1 overscroll-contain">
+              {(!Array.isArray(notifications) || notifications.length === 0) && birthdayNotifications.length === 0 ? (
+                <div className="px-3 sm:px-5 py-8 text-center text-gray-500">
+                  <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No notifications yet</p>
                 </div>
               ) : (
                 <>
@@ -446,15 +585,15 @@ export default function NotificationBell() {
                   {birthdayNotifications.map((birthday, index) => (
                     <div
                       key={`birthday-${index}`}
-                      className="px-3 sm:px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
+                      className="px-3 sm:px-5 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-xl sm:text-2xl flex-shrink-0">🎉</span>
+                        <span className="text-2xl flex-shrink-0">🎉</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 break-words">
+                          <p className="text-sm font-medium text-gray-900 break-words hyphens-auto">
                             {birthday.name}'s birthday is today!
                           </p>
-                          <p className="text-xs text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600 mt-1 break-words hyphens-auto">
                             Wish them a happy birthday!
                           </p>
                         </div>
@@ -463,14 +602,14 @@ export default function NotificationBell() {
                   ))}
 
                   {/* Appointment Notifications */}
-                  {notifications.map((notif) => (
+                  {Array.isArray(notifications) && notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`px-3 sm:px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    className={`px-3 sm:px-5 py-3.5 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
                       !notif.is_read ? 'bg-blue-50' : ''
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         {/* Type Badge */}
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -485,61 +624,94 @@ export default function NotificationBell() {
                         </div>
 
                         {/* Message */}
-                        <p className="text-sm text-gray-900 mb-2 break-words">{notif.message}</p>
+                        <p className="text-sm text-gray-900 mb-2 break-words hyphens-auto">{notif.message}</p>
 
                         {/* Appointment Details */}
                         {notif.appointment_details && (
-                          <div className="text-xs text-gray-600 space-y-1 mb-2 break-words">
-                            <p><strong>Patient:</strong> {notif.appointment_details.patient_name}</p>
-                            <p><strong>Current Date:</strong> {new Date(notif.appointment_details.date).toLocaleDateString()} at {notif.appointment_details.time}</p>
+                          <div className="text-sm text-gray-600 space-y-1 mb-2">
+                            <p className="break-words hyphens-auto"><strong>Patient:</strong> {notif.appointment_details.patient_name}</p>
+                            <p className="break-words hyphens-auto"><strong>Current Date:</strong> {formatAppointmentDate(notif.appointment_details.date)} at {notif.appointment_details.time}</p>
                             {notif.appointment_details.requested_date && (
-                              <p className="text-blue-600"><strong>Requested Date:</strong> {new Date(notif.appointment_details.requested_date).toLocaleDateString()} at {notif.appointment_details.requested_time}</p>
+                              <p className="text-blue-600 break-words hyphens-auto"><strong>Requested Date:</strong> {formatAppointmentDate(notif.appointment_details.requested_date)} at {notif.appointment_details.requested_time}</p>
                             )}
                             {notif.appointment_details.cancel_reason && (
-                              <p className="text-red-600"><strong>Reason:</strong> {notif.appointment_details.cancel_reason}</p>
+                              <p className="text-red-600 break-words hyphens-auto"><strong>Reason:</strong> {notif.appointment_details.cancel_reason}</p>
                             )}
-                            <p><strong>Service:</strong> {notif.appointment_details.service_name}</p>
+                            <p className="break-words hyphens-auto"><strong>Service:</strong> {notif.appointment_details.service_name}</p>
                           </div>
                         )}
 
                         {/* Action Buttons for Reschedule/Cancel Requests */}
                         {notif.appointment_details && 
-                         (notif.notification_type === 'reschedule_request' || notif.notification_type === 'cancel_request') &&
-                         notif.appointment_details.status === (notif.notification_type === 'reschedule_request' ? 'reschedule_requested' : 'cancel_requested') && (
-                          <div className="flex gap-2 mb-2 flex-wrap">
-                            <button
-                              onClick={() => {
-                                if (notif.notification_type === 'reschedule_request') {
-                                  handleApproveReschedule(notif.appointment_details!.id, notif.id)
-                                } else {
-                                  handleApproveCancel(notif.appointment_details!.id, notif.id)
-                                }
-                              }}
-                              disabled={processingId === notif.id}
-                              className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation tap-target"
-                            >
-                              <Check className="w-3 h-3" />
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (notif.notification_type === 'reschedule_request') {
-                                  handleRejectReschedule(notif.appointment_details!.id, notif.id)
-                                } else {
-                                  handleRejectCancel(notif.appointment_details!.id, notif.id)
-                                }
-                              }}
-                              disabled={processingId === notif.id}
-                              className="flex items-center gap-1 px-4 py-2 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation tap-target"
-                            >
-                              <X className="w-3 h-3" />
-                              Reject
-                            </button>
-                          </div>
+                         (notif.notification_type === 'reschedule_request' || notif.notification_type === 'cancel_request') && (
+                          <>
+                            {/* Show buttons only if still in requested state */}
+                            {notif.appointment_details.status === (notif.notification_type === 'reschedule_request' ? 'reschedule_requested' : 'cancel_requested') ? (
+                              <div className="flex gap-2 mb-2 flex-wrap">
+                                <button
+                                  onClick={() => {
+                                    if (notif.notification_type === 'reschedule_request') {
+                                      handleApproveReschedule(notif.appointment_details!.id, notif.id)
+                                    } else {
+                                      handleApproveCancel(notif.appointment_details!.id, notif.id)
+                                    }
+                                  }}
+                                  disabled={processingId === notif.id}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                              >
+                                <Check className="w-4 h-4 flex-shrink-0" />
+                                  <span>Approve</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (notif.notification_type === 'reschedule_request') {
+                                      handleRejectReschedule(notif.appointment_details!.id, notif.id)
+                                    } else {
+                                      handleRejectCancel(notif.appointment_details!.id, notif.id)
+                                    }
+                                  }}
+                                  disabled={processingId === notif.id}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-sm rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                              >
+                                <X className="w-4 h-4 flex-shrink-0" />
+                                  <span>Reject</span>
+                                </button>
+                              </div>
+                            ) : (
+                              /* Show status if already handled */
+                              <div className="mb-2">
+                                {notif.notification_type === 'reschedule_request' ? (
+                                  notif.appointment_details.status === 'confirmed' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-sm rounded">
+                                      <Check className="w-4 h-4 flex-shrink-0" />
+                                      Already approved
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                                      <X className="w-4 h-4 flex-shrink-0" />
+                                      Already rejected
+                                    </span>
+                                  )
+                                ) : (
+                                  notif.appointment_details.status === 'cancelled' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-sm rounded">
+                                      <Check className="w-4 h-4 flex-shrink-0" />
+                                      Already approved
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                                      <X className="w-4 h-4 flex-shrink-0" />
+                                      Already rejected
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
 
                         {/* Timestamp */}
-                        <p className="text-xs text-gray-500">{formatDate(notif.created_at)}</p>
+                        <p className="text-sm text-gray-500">{formatDate(notif.created_at)}</p>
                       </div>
 
                       {/* Mark as Read Button */}
@@ -547,7 +719,7 @@ export default function NotificationBell() {
                         <button
                           onClick={() => handleMarkAsRead(notif.id)}
                           disabled={loading}
-                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap disabled:opacity-50 touch-manipulation px-2 py-1 flex-shrink-0"
+                          className="text-sm text-blue-600 hover:text-blue-800 whitespace-nowrap disabled:opacity-50 flex-shrink-0"
                         >
                           Mark read
                         </button>
@@ -560,11 +732,11 @@ export default function NotificationBell() {
             </div>
 
             {/* Footer */}
-            {notifications.length > 0 && (
-              <div className="px-3 sm:px-4 py-3 border-t border-gray-200 text-center">
+            {Array.isArray(notifications) && notifications.length > 0 && (
+              <div className="px-3 sm:px-5 py-3 border-t border-gray-200 text-center flex-shrink-0">
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="text-sm text-gray-600 hover:text-gray-800 touch-manipulation px-4 py-2 tap-target"
+                  className="text-sm text-gray-600 hover:text-gray-800"
                 >
                   Close
                 </button>
@@ -573,6 +745,14 @@ export default function NotificationBell() {
           </div>
         </>
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+      />
     </div>
   )
 }

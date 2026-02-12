@@ -6,13 +6,21 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Django settings for Dorotheo Dental Clinic
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-in-production')
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
+# ALLOWED_HOSTS configuration - support Azure and custom hosts
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# Add Azure hostname if running on Azure
+if 'WEBSITE_HOSTNAME' in os.environ:
+    ALLOWED_HOSTS.append(os.environ['WEBSITE_HOSTNAME'])
+# Clean up empty strings and duplicates
+ALLOWED_HOSTS = list(set(filter(None, ALLOWED_HOSTS)))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -44,7 +52,7 @@ ROOT_URLCONF = 'dental_clinic.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -104,17 +112,50 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    # Pagination settings for improved performance
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,  # Return 20 items per page by default
 }
 
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
+# CORS Configuration - Use specific allowed origins when credentials are needed
+# Cannot use CORS_ALLOW_ALL_ORIGINS with CORS_ALLOW_CREDENTIALS due to browser security
+CORS_ALLOWED_ORIGINS = [
+    'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
+    'https://*.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://192.168.1.77:3000',  # Local network IP for mobile testing
+]
+
+# Allow additional origins from environment variable
+custom_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if custom_cors_origins:
+    CORS_ALLOWED_ORIGINS.extend(custom_cors_origins.split(','))
+
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight requests for 24 hours
 
 # Allow media files to be embedded in iframes
 X_FRAME_OPTIONS = 'SAMEORIGIN'
-
-# If you want to specify allowed origins in production, use:
-# CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-# For now, allowing all origins for easier setup
 
 # CSRF Settings for Railway deployment
 CSRF_TRUSTED_ORIGINS = [
@@ -122,6 +163,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:8000',
+    'http://192.168.1.77:3000',  # Local network IP for mobile testing
     'https://dorothedentallossc.com.ph',
     'https://www.dorothedentallossc.com.ph',
 ]

@@ -123,3 +123,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .hyphens-auto {
+    hyphens: auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}

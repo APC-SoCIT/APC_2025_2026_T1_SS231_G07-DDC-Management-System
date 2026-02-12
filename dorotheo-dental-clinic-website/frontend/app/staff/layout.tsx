@@ -38,19 +38,19 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)] shadow-sm">
-        {/* Top row with logo and user actions */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)]">
+        {/* Top Row - Logo and Actions */}
         <div className="px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-8 w-auto object-contain flex-shrink-0" />
-          </div>
           <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-8 w-auto object-contain" />
+          </div>
+          <div className="flex items-center gap-1">
             <NotificationBell />
             {/* Mobile Profile Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="w-9 h-9 bg-[var(--color-primary)] rounded-full flex items-center justify-center touch-manipulation"
+                className="w-9 h-9 bg-[var(--color-primary)] rounded-full flex items-center justify-center"
               >
                 <User className="w-4 h-4 text-white" />
               </button>
@@ -58,25 +58,21 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
                 <div className="absolute right-0 top-11 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
                   <Link
                     href="/staff/profile"
-                    className="block px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] rounded transition-colors touch-manipulation"
+                    className="block px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] rounded transition-colors"
                   >
                     Edit Profile
                   </Link>
                 </div>
               )}
             </div>
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-              className="p-2 touch-manipulation tap-target"
-              aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
-            >
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1.5">
               {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
-        {/* Second row with Clinic Selector */}
+        {/* Bottom Row - Clinic Selector */}
         <div className="px-3 pb-2">
-          <ClinicSelector showAllOption={true} />
+          <ClinicSelector showAllOption={true} className="w-full min-w-0 text-sm h-9" />
         </div>
       </div>
 
@@ -133,7 +129,8 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
 
           <nav className="flex-1 p-4 space-y-2">
             {navigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/') || 
+                (item.href === '/staff/billing' && pathname.startsWith('/staff/payments'))
               return (
                 <Link
                   key={item.name}
@@ -166,7 +163,7 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
 
       {/* Main Content */}
       <main className="lg:ml-64 pt-24 lg:pt-16">
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+        <div className="p-4 lg:p-8">{children}</div>
       </main>
 
       {/* Overlay for mobile */}
