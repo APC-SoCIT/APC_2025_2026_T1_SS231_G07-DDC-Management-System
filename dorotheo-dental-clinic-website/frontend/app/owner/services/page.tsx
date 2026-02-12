@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
+import AlertModal from "@/components/alert-modal"
 
 interface Service {
   id: number
@@ -31,6 +32,12 @@ export default function ServicesPage() {
   const [editingService, setEditingService] = useState<Service | null>(null)
   const [tempColor, setTempColor] = useState("#10b981")
   const [showColorPicker, setShowColorPicker] = useState(false)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    type: "success" | "error" | "warning" | "info"
+    title: string
+    message: string
+  }>({ isOpen: false, type: "info", title: "", message: "" })
 
   // Format duration to show hours and minutes
   const formatDuration = (minutes: number) => {
@@ -130,7 +137,12 @@ export default function ServicesPage() {
       setIsModalOpen(false)
     } catch (error) {
       console.error("Failed to save service:", error)
-      alert("Failed to save service. Please try again.")
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Failed to Save",
+        message: "Failed to save service. Please try again."
+      })
     }
   }
 
@@ -158,8 +170,30 @@ export default function ServicesPage() {
       try {
         await api.deleteService(id, token)
         setServices(services.filter((s) => s.id !== id))
-      } catch (error) {
+        setAlertModal({
+          isOpen: true,
+          type: "success",
+          title: "Service Deleted",
+          message: "The service has been successfully deleted."
+        })
+      } catch (error: any) {
         console.error("Failed to delete service:", error)
+        // Check if it's a response error with message
+        if (error.message) {
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Cannot Delete Service",
+            message: error.message
+          })
+        } else {
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Cannot Delete Service",
+            message: "This service cannot be deleted because there are active appointments associated with it. Please cancel or reassign those appointments first."
+          })
+        }
       }
     }
   }
@@ -210,15 +244,15 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Services Management</h1>
+    <div className="p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between sm:gap-6 mb-8 gap-4">
+        <div className="flex-1">
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Services Management</h1>
           <p className="text-[var(--color-text-muted)]">Add, edit, or remove dental services</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors w-full sm:w-auto flex-shrink-0"
         >
           <Plus className="w-5 h-5" />
           Add Service
@@ -247,8 +281,12 @@ export default function ServicesPage() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">
                     <span 
-                      className="px-3 py-1 rounded-lg"
-                      style={{ backgroundColor: service.color, color: '#ffffff' }}
+                      className="px-3 py-1 rounded-lg font-bold border"
+                      style={{ 
+                        backgroundColor: `${service.color}20`, 
+                        color: service.color,
+                        borderColor: `${service.color}50`
+                      }}
                     >
                       {service.name}
                     </span>
@@ -307,7 +345,7 @@ export default function ServicesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-[var(--color-border)] p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-serif font-bold text-[var(--color-primary)]">
+              <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">
                 {editingService ? "Edit Service" : "Add New Service"}
               </h2>
               <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -507,6 +545,15 @@ export default function ServicesPage() {
           </div>
         </div>
       )}
+      
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+      />
     </div>
   )
 }
