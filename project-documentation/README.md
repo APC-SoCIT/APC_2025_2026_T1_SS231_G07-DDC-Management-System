@@ -1,6 +1,6 @@
 # Project Documentation Index
 
-> **Last Updated:** February 10, 2026  
+> **Last Updated:** February 11, 2026  
 > All project documentation has been reorganized for better accessibility and maintenance.
 
 This folder contains all project-related documentation organized by category for easy navigation.
@@ -60,14 +60,29 @@ This folder contains all project-related documentation organized by category for
 ---
 
 ### 🚀 Deployment Guides (`deployment-guides/`)
+
+#### Production Deployment
 - [RAILWAY_DEPLOYMENT_GUIDE.md](deployment-guides/RAILWAY_DEPLOYMENT_GUIDE.md) - Deploy backend to Railway
 - [RAILWAY_DATABASE_SETUP.md](deployment-guides/RAILWAY_DATABASE_SETUP.md) - Railway PostgreSQL setup
 - [RAILWAY_AUTO_CLINIC_SETUP.md](deployment-guides/RAILWAY_AUTO_CLINIC_SETUP.md) - Automated clinic setup on Railway
 - [HOW_TO_GET_RAILWAY_URL.md](deployment-guides/HOW_TO_GET_RAILWAY_URL.md) - Railway backend URL guide
 - [VERCEL_DEPLOYMENT_GUIDE.md](deployment-guides/VERCEL_DEPLOYMENT_GUIDE.md) - Deploy frontend to Vercel
 - [VERCEL_ENV_VARS_QUICK_REF.md](deployment-guides/VERCEL_ENV_VARS_QUICK_REF.md) - Vercel environment variables reference
+
+#### CORS Configuration (Azure + Vercel)
+- [CORS_SETUP_AT_A_GLANCE.md](deployment-guides/CORS_SETUP_AT_A_GLANCE.md) - **Ultra-concise CORS overview** (30 seconds)
+- [CORS_QUICK_REFERENCE.md](deployment-guides/CORS_QUICK_REFERENCE.md) - CORS quick reference
+- [CORS_CONFIGURATION_AZURE_VERCEL.md](deployment-guides/CORS_CONFIGURATION_AZURE_VERCEL.md) - Comprehensive CORS setup guide
+
+#### Automated Tasks
+- [AZURE_AUTOMATED_TASKS_SETUP.md](deployment-guides/AZURE_AUTOMATED_TASKS_SETUP.md) - Azure automated tasks setup
+- [LOCAL_AUTOMATED_TASKS_SETUP.md](deployment-guides/LOCAL_AUTOMATED_TASKS_SETUP.md) - Local automated tasks setup
+- [AUTOMATED_TASKS_QUICK_REFERENCE.md](deployment-guides/AUTOMATED_TASKS_QUICK_REFERENCE.md) - Automated tasks quick reference
+
+#### Feature-Specific Production Setup
 - [PASSWORD_RESET_PRODUCTION_SETUP.md](deployment-guides/PASSWORD_RESET_PRODUCTION_SETUP.md) - Password reset in production
 - [QUICK_REFERENCE_PASSWORD_RESET.md](deployment-guides/QUICK_REFERENCE_PASSWORD_RESET.md) - Password reset quick reference
+- [AZURE_PASSWORD_RESET_FIX.md](deployment-guides/AZURE_PASSWORD_RESET_FIX.md) - Azure password reset fixes
 
 ---
 
@@ -176,6 +191,7 @@ Documentation submitted for academic requirements, including analysis, design do
 
 ## 📝 Latest Updates
 
+- **February 11, 2026**: Azure + Vercel CORS configuration documentation
 - **February 10, 2026**: Complete documentation reorganization and consolidation
 - **February 5, 2026**: Inventory management and low stock notifications, dashboard improvements
 - **February 4, 2026**: Password reset feature, availability and email fixes

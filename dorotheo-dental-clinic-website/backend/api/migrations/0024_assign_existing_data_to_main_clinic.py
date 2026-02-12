@@ -24,28 +24,28 @@ def create_main_clinic_and_assign_data(apps, schema_editor):
     )
     
     if created:
-        print(f"✓ Created Main Clinic (ID: {main_clinic.id})")
+        print(f"[OK] Created Main Clinic (ID: {main_clinic.id})")
     else:
-        print(f"✓ Main Clinic already exists (ID: {main_clinic.id})")
+        print(f"[OK] Main Clinic already exists (ID: {main_clinic.id})")
     
     # Assign all existing appointments to Main Clinic
     appointments_updated = Appointment.objects.filter(clinic__isnull=True).update(clinic=main_clinic)
-    print(f"✓ Assigned {appointments_updated} appointments to Main Clinic")
+    print(f"[OK] Assigned {appointments_updated} appointments to Main Clinic")
     
     # Assign all staff and owners to Main Clinic
     staff_updated = User.objects.filter(
         user_type__in=['staff', 'owner'],
         assigned_clinic__isnull=True
     ).update(assigned_clinic=main_clinic)
-    print(f"✓ Assigned {staff_updated} staff/owners to Main Clinic")
+    print(f"[OK] Assigned {staff_updated} staff/owners to Main Clinic")
     
     # Assign all services to Main Clinic (ManyToMany)
     services_without_clinic = Service.objects.filter(clinics__isnull=True)
     for service in services_without_clinic:
         service.clinics.add(main_clinic)
-    print(f"✓ Assigned {services_without_clinic.count()} services to Main Clinic")
+    print(f"[OK] Assigned {services_without_clinic.count()} services to Main Clinic")
     
-    print("✓ Data migration completed successfully!")
+    print("[OK] Data migration completed successfully!")
 
 
 def reverse_migration(apps, schema_editor):
@@ -56,7 +56,7 @@ def reverse_migration(apps, schema_editor):
     
     # We don't delete the Main Clinic, just clear associations
     # This is safer for rollback scenarios
-    print("⚠ Reversing clinic assignments (not deleting Main Clinic)")
+    print("[WARNING] Reversing clinic assignments (not deleting Main Clinic)")
 
 
 class Migration(migrations.Migration):

@@ -1,0 +1,92 @@
+{% extends "admin/index.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+.audit-dashboard-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    padding: 0;
+    margin: 20px 0 30px 0;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    overflow: hidden;
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    padding: 25px 30px;
+    gap: 20px;
+}
+
+.banner-icon {
+    font-size: 48px;
+    line-height: 1;
+}
+
+.banner-text {
+    flex: 1;
+}
+
+.banner-text h3 {
+    margin: 0 0 5px 0;
+    color: white;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.banner-text p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+}
+
+.banner-button {
+    background: white;
+    color: #667eea;
+    padding: 12px 28px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 15px;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.banner-button:hover {
+    background: #f8f9fa;
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+    .banner-content {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    .banner-button {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+{% block content %}
+<!-- Audit Dashboard Banner -->
+<div class="audit-dashboard-banner">
+    <div class="banner-content">
+        <div class="banner-icon">📊</div>
+        <div class="banner-text">
+            <h3>Audit Log Dashboard</h3>
+            <p>Monitor HIPAA compliance, security events, and system activity</p>
+        </div>
+        <a href="{% url 'admin:auditlog_dashboard' %}" class="banner-button">
+            View Dashboard →
+        </a>
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

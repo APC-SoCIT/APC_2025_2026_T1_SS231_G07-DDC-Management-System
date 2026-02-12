@@ -141,11 +141,16 @@ def user_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
-            # Track what changed
+            # Track what changed using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             changes = new_data
         
@@ -232,10 +237,16 @@ def dental_record_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
+            # Track what changed using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             # For creates, log key medical information but not full content
             changes = {
@@ -327,10 +338,16 @@ def appointment_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
+            # Track what changed using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             changes = {
                 'date': str(instance.date),
@@ -423,11 +440,16 @@ def billing_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
-            # Track financial changes
+            # Track financial changes using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             changes = {
                 'amount': str(instance.amount),
@@ -516,10 +538,16 @@ def invoice_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
+            # Track what changed using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             changes = {
                 'invoice_number': instance.invoice_number if hasattr(instance, 'invoice_number') else None,
@@ -608,10 +636,16 @@ def treatment_plan_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
+            # Track what changed using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             changes = {
                 'title': instance.title,
@@ -700,10 +734,16 @@ def document_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
+            # Track what changed using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             # Log metadata but not file content
             changes = {
@@ -794,11 +834,16 @@ def patient_intake_form_post_save(sender, instance, created, **kwargs):
         
         changes = {}
         if not created and old_data:
-            # Track medical information changes
+            # Track medical information changes using before/after format
+            before = {}
+            after = {}
             for field, new_value in new_data.items():
                 old_value = old_data.get(field)
                 if old_value != new_value:
-                    changes[field] = {'old': old_value, 'new': new_value}
+                    before[field] = old_value
+                    after[field] = new_value
+            if before:  # Only log if something actually changed
+                changes = {'before': before, 'after': after}
         elif created:
             # Log form creation but not full medical content
             changes = {

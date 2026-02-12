@@ -29,10 +29,13 @@ class AuditContextMixin:
     
     This mixin overrides DRF's perform_create, perform_update, and perform_destroy
     methods to attach audit metadata (_audit_actor, _audit_ip, _audit_user_agent)
-    to model instances before they are saved.
+    to model instances BEFORE they are saved (so audit signals can access them).
     
     The audit signal handlers (in api/signals.py) look for these attributes
     to determine WHO made the change and FROM WHERE.
+    
+    CRITICAL: Audit context must be injected BEFORE save() is called, otherwise
+    post_save signals will fire with actor=None (HIPAA compliance issue).
     
     Usage:
         class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
@@ -48,16 +51,87 @@ class AuditContextMixin:
             instance._audit_user_agent = get_user_agent(self.request)
     
     def perform_create(self, serializer):
-        """Override to inject audit context before creation."""
-        instance = serializer.save()
-        self._inject_audit_context(instance)
-        return instance
+        """
+        Override to inject audit context BEFORE creation.
+        
+        IMPORTANT: We wrap the serializer's create() method to inject audit
+        context onto the instance BEFORE instance.save() is called. This ensures
+        the post_save signal handler has access to _audit_actor.
+        """
+        if hasattr(self, 'request') and self.request.user and self.request.user.is_authenticated:
+            # Store audit context from request
+            audit_actor = self.request.user
+            audit_ip = get_client_ip(self.request)
+            audit_user_agent = get_user_agent(self.request)
+            
+            # Wrap the serializer's create method to inject audit context
+            original_create = serializer.create
+            
+            def create_with_audit(validated_data):
+                # Create instance using the default ModelSerializer logic
+                ModelClass = serializer.Meta.model
+                instance = ModelClass(**validated_data)
+                
+                # Inject audit context BEFORE saving
+                instance._audit_actor = audit_actor
+                instance._audit_ip = audit_ip
+                instance._audit_user_agent = audit_user_agent
+                
+                # Now save (post_save signal will have access to _audit_actor)
+                instance.save()
+                return instance
+            
+            # Temporarily replace create method
+            serializer.create = create_with_audit
+            try:
+                instance = serializer.save()
+            finally:
+                # Restore original method
+                serializer.create = original_create
+            return instance
+        else:
+            return serializer.save()
     
     def perform_update(self, serializer):
-        """Override to inject audit context before update."""
-        instance = serializer.save()
-        self._inject_audit_context(instance)
-        return instance
+        """
+        Override to inject audit context BEFORE update.
+        
+        IMPORTANT: Injects audit context before save() so post_save signal
+        handler can access _audit_actor.
+        """
+        if hasattr(self, 'request') and self.request.user and self.request.user.is_authenticated:
+            # Store audit context from request
+            audit_actor = self.request.user
+            audit_ip = get_client_ip(self.request)
+            audit_user_agent = get_user_agent(self.request)
+            
+            # Wrap the serializer's update method
+            original_update = serializer.update
+            
+            def update_with_audit(instance, validated_data):
+                # Inject audit context BEFORE saving
+                instance._audit_actor = audit_actor
+                instance._audit_ip = audit_ip
+                instance._audit_user_agent = audit_user_agent
+                
+                # Apply updates using the default logic
+                for attr, value in validated_data.items():
+                    setattr(instance, attr, value)
+                
+                # Now save (post_save signal will have access to _audit_actor)
+                instance.save()
+                return instance
+            
+            # Temporarily replace update method
+            serializer.update = update_with_audit
+            try:
+                instance = serializer.save()
+            finally:
+                # Restore original method
+                serializer.update = original_update
+            return instance
+        else:
+            return serializer.save()
     
     def perform_destroy(self, instance):
         """Override to inject audit context before deletion."""
@@ -251,7 +325,7 @@ def login(request):
                 patient_id=user.id if user.user_type == 'patient' else None,
                 ip_address=get_client_ip(request),
                 user_agent=get_user_agent(request),
-                changes={'login_method': 'email' if '@' in username else 'username'}
+                changes={'username': username}  # Store actual username for audit trail
             )
         except Exception as e:
             # Log error but don't prevent login
@@ -269,7 +343,7 @@ def login(request):
             patient_id=None,
             ip_address=get_client_ip(request),
             user_agent=get_user_agent(request),
-            changes={'username_attempted': username}  # Never log password
+            changes={'username': username}  # Store attempted username (never password)
         )
     except Exception as e:
         # Log error but don't prevent response
@@ -3174,7 +3248,7 @@ class PaymentViewSet(AuditContextMixin, viewsets.ModelViewSet):
             # Calculate summary statistics
             active_payments = payments.filter(is_voided=False)
             total_paid = active_payments.aggregate(
-                total=models.Sum('amount')
+                total=Sum('amount')
             )['total'] or 0
             
             # Serialize data
