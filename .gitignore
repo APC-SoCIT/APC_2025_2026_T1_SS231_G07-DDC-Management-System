@@ -17,6 +17,12 @@ frontend/build/
 .env*.local
 backend/.env
 
+# Database files (NEVER commit these!)
+*.sqlite3
+*.db
+db.sqlite3
+backend/db.sqlite3
+dorotheo-dental-clinic-website/backend/db.sqlite3
 
 # Python
 *.pyc
