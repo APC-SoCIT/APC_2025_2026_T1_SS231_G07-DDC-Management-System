@@ -455,37 +455,37 @@ export default function OwnerPatients() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 lg:pb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Patients</h1>
-          <p className="text-[var(--color-text-muted)]">Manage patient records and information</p>
+          <h1 className="text-2xl lg:text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Patients</h1>
+          <p className="text-sm lg:text-base text-[var(--color-text-muted)]">Manage patient records and information</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          className="flex items-center justify-center gap-2 px-4 lg:px-6 py-2.5 lg:py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors text-sm lg:text-base w-full sm:w-auto"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
           Add Patient
         </button>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-4 lg:p-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-muted)]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 lg:w-5 lg:h-5 text-[var(--color-text-muted)]" />
             <input
               type="text"
               placeholder="Search patients by name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full pl-9 lg:pl-10 pr-4 py-2 lg:py-2.5 text-sm lg:text-base border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
         </div>
 
-        <div className="flex gap-2 mt-4 border-b border-[var(--color-border)]">
+        <div className="flex gap-1 lg:gap-2 mt-4 border-b border-[var(--color-border)] overflow-x-auto mobile-scroll-container">
           {[
             { id: "all", label: "All Patients" },
             { id: "active", label: "Active" },
@@ -495,7 +495,7 @@ export default function OwnerPatients() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-3 lg:px-4 py-2 font-medium transition-colors whitespace-nowrap text-sm lg:text-base ${
                 activeTab === tab.id
                   ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
@@ -509,117 +509,117 @@ export default function OwnerPatients() {
 
       {/* Patients Table */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto mobile-table-wrapper">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr>
                 <th 
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  className="px-3 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => handleSort('name')}
                 >
                   <div className="flex items-center gap-2">
                     Name
                     {sortColumn === 'name' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 lg:w-4 lg:h-4" /> : <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
                     )}
                   </div>
                 </th>
                 <th 
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  className="px-3 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => handleSort('email')}
                 >
                   <div className="flex items-center gap-2">
                     Email
                     {sortColumn === 'email' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 lg:w-4 lg:h-4" /> : <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
                     )}
                   </div>
                 </th>
                 <th 
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  className="px-3 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => handleSort('phone')}
                 >
                   <div className="flex items-center gap-2">
                     Phone
                     {sortColumn === 'phone' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 lg:w-4 lg:h-4" /> : <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
                     )}
                   </div>
                 </th>
                 <th 
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  className="px-3 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => handleSort('lastVisit')}
                 >
                   <div className="flex items-center gap-2">
                     Last Visit
                     {sortColumn === 'lastVisit' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 lg:w-4 lg:h-4" /> : <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
                     )}
                   </div>
                 </th>
                 <th 
-                  className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
+                  className="px-3 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 select-none"
                   onClick={() => handleSort('status')}
                 >
                   <div className="flex items-center gap-2">
                     Status
                     {sortColumn === 'status' && (
-                      sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 lg:w-4 lg:h-4" /> : <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--color-text)]">Actions</th>
+                <th className="px-3 lg:px-6 py-3 lg:py-4 text-left text-xs lg:text-sm font-semibold text-[var(--color-text)]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
               {filteredPatients.map((patient) => (
                 <tr key={patient.id} className="hover:bg-[var(--color-background)] transition-all duration-200">
-                  <td className="px-6 py-4">
+                  <td className="px-3 lg:px-6 py-3 lg:py-4">
                     <button
                       onClick={() => handleRowClick(patient.id)}
-                      className="font-medium text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline hover:scale-105 transition-all duration-200 cursor-pointer text-left"
+                      className="font-medium text-xs lg:text-sm text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline hover:scale-105 transition-all duration-200 cursor-pointer text-left"
                     >
                       {patient.name}
                     </button>
                   </td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.email}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{patient.phone}</td>
-                    <td className="px-6 py-4 text-[var(--color-text-muted)]">{formatLastVisit(patient.lastVisit)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 lg:px-6 py-3 lg:py-4 text-xs lg:text-sm text-[var(--color-text-muted)]">{patient.email}</td>
+                    <td className="px-3 lg:px-6 py-3 lg:py-4 text-xs lg:text-sm text-[var(--color-text-muted)]">{patient.phone}</td>
+                    <td className="px-3 lg:px-6 py-3 lg:py-4 text-xs lg:text-sm text-[var(--color-text-muted)]">{formatLastVisit(patient.lastVisit)}</td>
+                    <td className="px-3 lg:px-6 py-3 lg:py-4">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        className={`px-2 lg:px-3 py-1 rounded-full text-xs font-medium ${
                           patient.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
                         }`}
                       >
                         {patient.status}
                       </span>
                     </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
+                  <td className="px-3 lg:px-6 py-3 lg:py-4">
+                    <div className="flex items-center gap-1 lg:gap-2">
                       {activeTab !== "archived" ? (
                         <>
                           <button
                             onClick={(e) => handleArchive(patient.id, e)}
-                            className="p-2 hover:bg-orange-50 rounded-lg transition-colors"
+                            className="p-1.5 lg:p-2 hover:bg-orange-50 rounded-lg transition-colors"
                             title="Archive Patient"
                           >
-                            <Archive className="w-4 h-4 text-orange-600" />
+                            <Archive className="w-3 h-3 lg:w-4 lg:h-4 text-orange-600" />
                           </button>
                           <button
                             onClick={(e) => handleDelete(patient.id, e)}
-                            className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1.5 lg:p-2 hover:bg-red-50 rounded-lg transition-colors"
                             title="Delete"
                           >
-                            <Trash2 className="w-4 h-4 text-red-600" />
+                            <Trash2 className="w-3 h-3 lg:w-4 lg:h-4 text-red-600" />
                           </button>
                         </>
                       ) : (
                         <button
                           onClick={(e) => handleRestore(patient.id, e)}
-                          className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                          className="p-1.5 lg:p-2 hover:bg-green-50 rounded-lg transition-colors"
                           title="Restore Patient"
                         >
-                          <ArchiveRestore className="w-4 h-4 text-green-600" />
+                          <ArchiveRestore className="w-3 h-3 lg:w-4 lg:h-4 text-green-600" />
                         </button>
                       )}
                     </div>

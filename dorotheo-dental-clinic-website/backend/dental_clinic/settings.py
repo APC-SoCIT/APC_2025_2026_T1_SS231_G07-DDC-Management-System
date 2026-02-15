@@ -135,7 +135,21 @@ CORS_ALLOWED_ORIGINS = [
     'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:8000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8000',
 ]
+
+# In development, allow CORS from any origin for mobile testing
+if DEBUG:
+    # Allow all origins in development for mobile device access
+    CORS_ALLOW_ALL_ORIGINS = False  # Keep False to use CORS_ALLOWED_ORIGIN_REGEXES
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://192\.168\.\d{1,3}\.\d{1,3}:\d+$",  # Local network IPs
+        r"^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$",  # Private network IPs
+        r"^http://172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}:\d+$",  # Private network IPs
+        r"^http://localhost:\d+$",
+        r"^http://127\.0\.0\.1:\d+$",
+    ]
 
 # Allow additional origins from environment variable
 custom_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
@@ -173,9 +187,22 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:8000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8000',
     'https://dorothedentallossc.com.ph',
     'https://www.dorothedentallossc.com.ph',
 ]
+
+# In development, add local network IP patterns for mobile testing
+if DEBUG:
+    # Add common local network IP ranges
+    import re
+    # These will be validated by Django's CSRF middleware
+    CSRF_TRUSTED_ORIGINS.extend([
+        'http://192.168.0.0',
+        'http://192.168.1.0',
+        'http://10.0.0.0',
+    ])
 
 # Add any custom domains from environment variable
 custom_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')

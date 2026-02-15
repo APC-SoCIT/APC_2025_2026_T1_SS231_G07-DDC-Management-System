@@ -514,16 +514,16 @@ export default function NotificationBell() {
           />
           
           {/* Notifications Panel */}
-          <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] overflow-hidden flex flex-col">
+          <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[80vh] sm:max-h-[600px] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-3 sm:px-4 py-3 border-b border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                <h3 className="font-semibold text-sm sm:text-base text-gray-900">Notifications</h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}
                     disabled={loading}
-                    className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
                   >
                     Mark all as read
                   </button>
@@ -551,21 +551,22 @@ export default function NotificationBell() {
                   <button
                     onClick={() => setShowClearConfirm(true)}
                     disabled={loading}
-                    className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
+                    className="text-xs sm:text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
                   >
                     <X className="w-3 h-3" />
-                    Clear all notifications
+                    <span className="hidden sm:inline">Clear all notifications</span>
+                    <span className="sm:hidden">Clear all</span>
                   </button>
                 )
               )}
             </div>
 
             {/* Notifications List */}
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 mobile-scroll-container">
               {(!Array.isArray(notifications) || notifications.length === 0) && birthdayNotifications.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-500">
-                  <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p>No notifications yet</p>
+                <div className="px-3 sm:px-4 py-8 text-center text-gray-500">
+                  <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm sm:text-base">No notifications yet</p>
                 </div>
               ) : (
                 <>
@@ -573,12 +574,12 @@ export default function NotificationBell() {
                   {birthdayNotifications.map((birthday, index) => (
                     <div
                       key={`birthday-${index}`}
-                      className="px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
+                      className="px-3 sm:px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">🎉</span>
+                      <div className="flex items-start gap-2 sm:gap-3">
+                        <span className="text-xl sm:text-2xl">🎉</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900">
                             {birthday.name}'s birthday is today!
                           </p>
                           <p className="text-xs text-gray-600 mt-1">
@@ -593,7 +594,7 @@ export default function NotificationBell() {
                   {Array.isArray(notifications) && notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    className={`px-3 sm:px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
                       !notif.is_read ? 'bg-blue-50' : ''
                     }`}
                   >
