@@ -35,7 +35,6 @@ export default function ChatbotWidget() {
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isListening, setIsListening] = useState(false)
-  const [voiceLanguage, setVoiceLanguage] = useState<'en-US' | 'fil-PH'>('en-US')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
@@ -182,14 +181,9 @@ export default function ChatbotWidget() {
       recognitionRef.current.stop()
       setIsListening(false)
     } else {
-      recognitionRef.current.lang = voiceLanguage // Update language before starting
       recognitionRef.current.start()
       setIsListening(true)
     }
-  }
-
-  const toggleLanguage = () => {
-    setVoiceLanguage(prev => prev === 'en-US' ? 'fil-PH' : 'en-US')
   }
 
   const handleSendMessage = async (message?: string) => {
@@ -427,20 +421,12 @@ export default function ChatbotWidget() {
           {/* Input */}
           <div className="p-4 bg-white border-t border-gray-200">
             <div className="flex gap-2 items-center">
-              <button
-                onClick={toggleLanguage}
-                className="px-3 py-2.5 bg-[var(--color-primary)] text-white rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
-                disabled={isTyping || isListening}
-                title={`Switch to ${voiceLanguage === 'en-US' ? 'Filipino' : 'English'}`}
-              >
-                {voiceLanguage === 'en-US' ? '🇺🇸 EN' : '🇵🇭 FIL'}
-              </button>
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && !isTyping && !isListening && handleSendMessage()}
-                placeholder={isListening ? `Listening (${voiceLanguage === 'en-US' ? 'English' : 'Filipino'})...` : "Ask Sage about dental care..."}
+                placeholder={isListening ? "Listening..." : "Ask Sage about dental care..."}
                 disabled={isTyping || isListening}
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm disabled:opacity-50"
               />
@@ -453,7 +439,7 @@ export default function ChatbotWidget() {
                 }`}
                 disabled={isTyping}
                 aria-label={isListening ? "Stop recording" : "Start voice input"}
-                title={isListening ? "Stop recording" : `Voice input (${voiceLanguage === 'en-US' ? 'English' : 'Filipino'})`}
+                title={isListening ? "Stop recording" : "Voice input (English, Tagalog, or Taglish)"}
               >
                 {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
               </button>

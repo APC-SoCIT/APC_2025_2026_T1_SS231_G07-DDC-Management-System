@@ -141,16 +141,25 @@ DAYS_OF_WEEK = {
     'monday': 0, 'mon': 0, 'tuesday': 1, 'tue': 1, 'tues': 1,
     'wednesday': 2, 'wed': 2, 'thursday': 3, 'thu': 3, 'thurs': 3,
     'friday': 4, 'fri': 4, 'saturday': 5, 'sat': 5, 'sunday': 6, 'sun': 6,
+    # Tagalog days
+    'lunes': 0, 'martes': 1, 'miyerkules': 2, 'huwebes': 3,
+    'biyernes': 4, 'sabado': 5, 'linggo': 6,
 }
 
 
 def _parse_date(msg):
     today = datetime.now().date()
     low = msg.lower()
-    if 'today' in low:
+    # English & Tagalog & Taglish
+    if 'today' in low or 'ngayon' in low:
         return today
-    if 'tomorrow' in low:
+    if 'tomorrow' in low or 'bukas' in low:
         return today + timedelta(days=1)
+    if 'the day after tomorrow' in low or 'samakalawa' in low or 'makalawa' in low:
+        return today + timedelta(days=2)
+    # Tagalog: "next week" / "susunod na linggo"
+    if 'next week' in low or 'susunod na linggo' in low:
+        return today + timedelta(days=(7 - today.weekday()))  # next Monday
     # Month + day
     for mname, mnum in MONTHS.items():
         m = re.search(rf'{mname}\s+(\d{{1,2}})', low)
@@ -199,27 +208,44 @@ def _parse_time(msg):
             elif period == 'am' and hour == 12:
                 hour = 0
             return time_obj(hour, minute)
+    # Tagalog time: "9 ng umaga", "3 ng hapon", "tanghali" (noon)
+    m_tl = re.search(r'(\d{1,2})\s*(?:ng\s+|sa\s+)?(umaga|hapon|gabi)', low)
+    if m_tl:
+        hour = int(m_tl.group(1))
+        period_tl = m_tl.group(2)
+        if period_tl in ('hapon', 'gabi') and hour != 12:
+            hour += 12
+        elif period_tl == 'umaga' and hour == 12:
+            hour = 0
+        return time_obj(hour, 0)
+    if 'tanghali' in low:
+        return time_obj(12, 0)
     return None
 
 
 def _find_dentist(msg):
-    """Only match dentist if message explicitly contains 'Dr.' prefix or exact full name match."""
+    """Match dentist from message. Supports Dr./Doc prefix and partial last-name matching."""
     low = msg.lower()
     
-    # Only match if message contains "dr" or "doctor" prefix
-    if 'dr.' not in low and 'dr ' not in low and 'doctor ' not in low:
-        return None
-    
+    # Try exact "Dr. FullName" style first
     for d in _dentists_qs():
         full = d.get_full_name().lower()
-        # Match "Dr. FirstName LastName" or "Dr FirstName LastName" or "Doctor FirstName LastName"
+        last = d.last_name.lower() if d.last_name else ''
+        first = d.first_name.lower() if d.first_name else ''
         patterns = [
-            f'dr. {full}',
-            f'dr {full}',
-            f'doctor {full}',
+            f'dr. {full}', f'dr {full}', f'doctor {full}', f'doc {full}',
+            f'dr. {last}', f'dr {last}', f'doctor {last}', f'doc {last}',
         ]
         if any(p in low for p in patterns):
             return d
+    
+    # Fallback: match just the last name if "dr/doc/doctor" prefix is present
+    has_prefix = any(p in low for p in ['dr.', 'dr ', 'doc ', 'doctor '])
+    if has_prefix:
+        for d in _dentists_qs():
+            last = d.last_name.lower() if d.last_name else ''
+            if last and last in low:
+                return d
     
     return None
 
@@ -229,14 +255,57 @@ def _find_clinic(msg):
     for c in ClinicLocation.objects.all():
         if c.name.lower() in low:
             return c
+    # Partial matching: check if key location words appear (e.g. "bacoor", "alabang", "poblacion")
+    for c in ClinicLocation.objects.all():
+        # Split clinic name and check if any significant word (>3 chars) matches
+        for word in c.name.lower().split():
+            if len(word) > 3 and word not in ('dental', 'clinic', 'dorotheo') and word in low:
+                return c
     return None
 
 
 def _find_service(msg):
     low = msg.lower()
+    
+    # Common aliases first (explicit intent - more reliable)
+    SERVICE_ALIASES = {
+        'cleaning': ['cleaning', 'clean', 'linis', 'paglinis', 'teeth cleaning', 'clean teeth'],
+        'consultation': ['consultation', 'consult', 'checkup', 'check-up', 'check up',
+                         'konsulta', 'pa-check', 'pacheck', 'tingin', 'check ko', 'pa-checkup'],
+        'extraction': ['extraction', 'extract', 'bunot', 'pabunot', 'pull tooth', 'pull',
+                       'bunot ng ngipin', 'tanggal ngipin', 'bunot ko'],
+        'filling': ['filling', 'fill', 'pasta', 'papasta', 'tooth filling',
+                    'pasta ng ngipin', 'palagyan ng pasta', 'fill ko'],
+        'whitening': ['whitening', 'whiten', 'bleach', 'paputi', 'teeth whitening',
+                      'paputi ng ngipin', 'whitening treatment'],
+        'braces': ['braces', 'orthodontic', 'bracket', 'pabrace',
+                   'brace', 'lagyan ng braces', 'bracket ng ngipin'],
+        'root canal': ['root canal', 'rootcanal'],
+        'denture': ['denture', 'dentures', 'pustiso', 'false teeth',
+                    'pangil', 'pustiso ng ngipin'],
+        'crown': ['crown', 'dental crown', 'cap'],
+        'veneers': ['veneer', 'veneers'],
+    }
+    
+    # Check aliases first (more explicit and reliable)
+    for svc_name, aliases in SERVICE_ALIASES.items():
+        if any(alias in low for alias in aliases):
+            # Try to find matching service in DB
+            match = Service.objects.filter(name__icontains=svc_name).first()
+            if match:
+                return match
+    
+    # Exact name match with word boundaries (stricter - only as fallback)
+    # This prevents accidental matches on common short words
     for s in Service.objects.all():
-        if s.name.lower() in low:
+        sname = s.name.lower()
+        # Only match if it appears as a distinct word/phrase, not buried in another word
+        # Require either: start of string, or preceded by space/punctuation
+        # and either: end of string, or followed by space/punctuation
+        pattern = r'(?:^|[\s,.:;!?-])' + re.escape(sname) + r'(?:$|[\s,.:;!?-])'
+        if re.search(pattern, low):
             return s
+    
     return None
 
 
@@ -282,6 +351,60 @@ class DentalChatbotService:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(self.MODEL_NAME)
 
+    # ── pending request lock ───────────────────────────────────────────────
+
+    def _check_pending_requests(self):
+        """Check if patient has any pending reschedule or cancellation requests.
+        Returns a reply dict if blocked, or None if clear to proceed.
+        Enforces: No booking, rescheduling, or cancelling while a request is pending.
+        """
+        if not self.is_authenticated:
+            return None
+
+        pending_reschedule = Appointment.objects.filter(
+            patient=self.user,
+            status='reschedule_requested'
+        ).exists()
+
+        pending_cancel = Appointment.objects.filter(
+            patient=self.user,
+            status='cancel_requested'
+        ).exists()
+
+        if pending_reschedule:
+            return self._reply(
+                "🚫 You cannot book, reschedule, or cancel while a reschedule request is pending.\n\n"
+                "Please wait for staff/owner to review and confirm your pending reschedule request "
+                "before taking any new action.",
+                tag='[PENDING_BLOCK]'
+            )
+
+        if pending_cancel:
+            return self._reply(
+                "🚫 You cannot book, reschedule, or cancel while a cancellation request is pending.\n\n"
+                "Please wait for staff/owner to review and confirm your pending cancellation request "
+                "before taking any new action.",
+                tag='[PENDING_BLOCK]'
+            )
+
+        return None
+
+    def _was_just_unblocked(self, hist):
+        """True if the last assistant message was a PENDING_BLOCK but
+        the patient no longer has any pending requests (i.e. staff approved it).
+        This means we should welcome them back to the main menu."""
+        if not self.is_authenticated:
+            return False
+        last_msg = _last_assistant(hist, 1)
+        if not last_msg or '[PENDING_BLOCK]' not in last_msg[0]:
+            return False
+        # They WERE blocked — check if they're still blocked
+        still_pending = Appointment.objects.filter(
+            patient=self.user,
+            status__in=['reschedule_requested', 'cancel_requested']
+        ).exists()
+        return not still_pending
+
     # ── public entry point ────────────────────────────────────────────────
 
     def get_response(self, user_message, conversation_history=None):
@@ -297,25 +420,45 @@ class DentalChatbotService:
             low = user_message.lower().strip()
             hist = conversation_history or []
 
+            # ── Detect if user was previously blocked but is now unblocked ──
+            # (Staff/Owner approved the pending request)
+            if self._was_just_unblocked(hist):
+                return self._reply(
+                    "\u2705 **Your request has been approved!** You can now book, reschedule, "
+                    "or cancel appointments.\n\n"
+                    "What would you like to do?\n\n"
+                    "\u2022 **Book Appointment**\n"
+                    "\u2022 **Reschedule Appointment**\n"
+                    "\u2022 **Cancel Appointment**",
+                    ['Book Appointment', 'Reschedule Appointment', 'Cancel Appointment'],
+                    tag='[APPROVAL_WELCOME]'
+                )
+
             # ── Detect NEW explicit intent from user message FIRST ──
-            # This allows users to switch flows or start new requests
+            # Button clicks and explicit intents always take priority.
+            # Pass EMPTY history so the new flow starts completely fresh —
+            # this prevents stale step tags from a previous/different flow
+            # from polluting the new one (e.g. clicking "Reschedule" while
+            # mid-booking no longer causes "I couldn't understand that date").
             if self._wants_cancel(low):
-                return self._handle_cancel(user_message, hist)
+                return self._handle_cancel(user_message, [])
 
             if self._wants_reschedule(low):
-                return self._handle_reschedule(user_message, hist)
+                return self._handle_reschedule(user_message, [])
 
             if self._wants_booking(low):
-                return self._handle_booking(user_message, hist)
+                return self._handle_booking(user_message, [])
 
             # ── Continue ongoing flow (if no new explicit intent) ──
-            if self._in_cancel_flow(hist):
+            # Only continue the MOST RECENTLY started flow.
+            # This prevents old flow tags from hijacking when the user
+            # clicks back on a button from a previous flow.
+            active = self._detect_most_recent_flow(hist)
+            if active == 'cancel':
                 return self._handle_cancel(user_message, hist)
-
-            if self._in_reschedule_flow(hist):
+            if active == 'reschedule':
                 return self._handle_reschedule(user_message, hist)
-
-            if self._in_booking_flow(hist):
+            if active == 'booking':
                 return self._handle_booking(user_message, hist)
 
             # ── Fallback: general Q&A via Gemini ──
@@ -334,43 +477,120 @@ class DentalChatbotService:
         kw = ['book appointment', 'book an appointment', 'schedule appointment',
               'make an appointment', 'make appointment', 'set an appointment',
               'i want to book', 'want to book', 'want to schedule', 'reserve appointment',
-              'book a', 'schedule a', 'new appointment']
-        # Don't trigger booking if clearly trying to reschedule or cancel
-        return any(k in low for k in kw) and 'reschedule' not in low and 'cancel' not in low
+              'book a', 'schedule a', 'new appointment',
+              # Button-click variants
+              'book', 'schedule',
+              # Tagalog
+              'mag-book', 'magbook', 'pa-book', 'pabook', 'pa-schedule', 'paschedule',
+              'magpa-appointment', 'magpa appointment', 'gusto ko mag-book',
+              'gusto ko magbook', 'magpa-set', 'set appointment',
+              'paki-book', 'pakibook',
+              # Taglish (mixed)
+              'book ko', 'schedule ko', 'mag-book ako', 'magbook ako',
+              'gusto ko book', 'book na', 'schedule na',]
+        return any(k in low for k in kw) and 'reschedule' not in low and 'cancel' not in low and 'i-cancel' not in low
 
     @staticmethod
     def _wants_cancel(low):
         kw = ['cancel appointment', 'cancel my appointment', 'cancel an appointment',
-              'i want to cancel', 'want to cancel', 'cancel my', 'cancel the']
+              'i want to cancel', 'want to cancel', 'cancel my', 'cancel the',
+              # Button-click variants
+              'cancel',
+              # Tagalog
+              'i-cancel', 'ikansel', 'i-cancel ko', 'cancel ko',
+              'wag na', 'ayoko na', 'remove appointment',
+              'gusto ko i-cancel', 'paki-cancel', 'pakicancel',
+              # Taglish (mixed)
+              'cancel ko na', 'cancel na lang', 'i-cancel na',
+              'wag na yung', 'ayoko na yung',]
         return any(k in low for k in kw) and 'book' not in low and 'reschedule' not in low
 
     @staticmethod
     def _wants_reschedule(low):
         kw = ['reschedule', 'change appointment', 'move appointment',
               'change my appointment', 'reschedule my appointment',
-              'want to reschedule', 'i want to change', 'need to reschedule']
-        return any(k in low for k in kw) and 'cancel' not in low
+              'want to reschedule', 'i want to change', 'need to reschedule',
+              # Button-click variants
+              'reschedule appointment',
+              # Tagalog
+              'palitan ang schedule', 'palitan schedule', 'palit schedule',
+              'ilipat ang appointment', 'ilipat appointment', 'lipat schedule',
+              'resched', 'pa-resched', 'paresched',
+              'gusto ko i-reschedule', 'gusto ko mag-resched',
+              'paki-resched', 'pakiresched',
+              # Taglish (mixed)
+              'resched ko', 'resched na', 'change ko', 'palitan ko',
+              'resched ko yung', 'lipat ko', 'change ko yung',]
+        return any(k in low for k in kw) and 'cancel' not in low and 'i-cancel' not in low
+
+    @staticmethod
+    def _is_confirm_yes(low):
+        """Detect confirmation (English + Tagalog + Taglish)."""
+        kw = ['yes', 'confirm', 'proceed', 'yeah', 'yep', 'sure', 'go ahead',
+              'request cancel', 'yes cancel', 'yes, cancel', 'confirm cancel', 'yes, request',
+              # Tagalog
+              'oo', 'oo po', 'yes po', 'sige', 'sige po', 'okay', 'okay po',
+              'opo', 'g', 'go', 'tara', 'ok',
+              # Taglish
+              'okay na', 'sige na', 'go na', 'yes na', 'confirm na',]
+        return any(k in low for k in kw)
+
+    @staticmethod
+    def _is_confirm_no(low):
+        """Detect rejection / keep appointment (English + Tagalog + Taglish)."""
+        kw = ['no', 'nope', 'keep appointment', 'keep my appointment', 'nevermind',
+              'never mind', 'don\'t cancel', 'dont cancel', 'stay',
+              # Tagalog
+              'hindi', 'hindi po', 'huwag', 'wag', 'wag na lang',
+              'ayaw', 'ayaw ko', 'wag na po', 'cancel request',
+              # Taglish
+              'keep na lang', 'wag muna', 'stay na lang', 'huwag muna',]
+        return any(k in low for k in kw)
+
+    @staticmethod
+    def _flow_is_terminated(hist):
+        """True if the last assistant message ended a flow or blocked the user.
+        Any of these tags means the chatbot should return to idle/main-menu."""
+        last_msg = _last_assistant(hist, 1)
+        if not last_msg:
+            return False
+        return any(tag in last_msg[0] for tag in (
+            '[FLOW_COMPLETE]', '[PENDING_BLOCK]', '[APPROVAL_WELCOME]',
+        ))
 
     def _in_booking_flow(self, hist):
-        # Don't continue flow if last message indicates completion
-        last_msg = _last_assistant(hist, 1)
-        if last_msg and '[FLOW_COMPLETE]' in last_msg[0]:
+        if self._flow_is_terminated(hist):
             return False
         return _step_tag(hist, '[BOOK_STEP_')
 
     def _in_cancel_flow(self, hist):
-        # Don't continue flow if last message indicates completion
-        last_msg = _last_assistant(hist, 1)
-        if last_msg and '[FLOW_COMPLETE]' in last_msg[0]:
+        if self._flow_is_terminated(hist):
             return False
         return _step_tag(hist, '[CANCEL_STEP_')
 
     def _in_reschedule_flow(self, hist):
-        # Don't continue flow if last message indicates completion
-        last_msg = _last_assistant(hist, 1)
-        if last_msg and '[FLOW_COMPLETE]' in last_msg[0]:
+        if self._flow_is_terminated(hist):
             return False
         return _step_tag(hist, '[RESCHED_STEP_')
+
+    def _detect_most_recent_flow(self, hist):
+        """Find which flow was MOST RECENTLY active by scanning assistant
+        messages from newest to oldest. Returns 'booking', 'reschedule',
+        'cancel', or None. This ensures that if multiple flows have tags
+        in history, only the latest one is continued."""
+        if self._flow_is_terminated(hist):
+            return None
+        for m in reversed(hist or []):
+            if m.get('role') != 'assistant':
+                continue
+            content = m.get('content', '')
+            if '[CANCEL_STEP_' in content:
+                return 'cancel'
+            if '[RESCHED_STEP_' in content:
+                return 'reschedule'
+            if '[BOOK_STEP_' in content:
+                return 'booking'
+        return None
 
     # ══════════════════════════════════════════════════════════════════════
     # BOOKING FLOW  (5 steps)
@@ -382,6 +602,11 @@ class DentalChatbotService:
                 "You need to be logged in to book an appointment. "
                 "Please log in first and try again."
             )
+
+        # 🔒 PENDING REQUEST LOCK — Block booking if pending reschedule/cancellation exists
+        pending_block = self._check_pending_requests()
+        if pending_block:
+            return pending_block
 
         # Check if user is explicitly requesting a new booking
         # If they say "book appointment" etc., always start fresh
@@ -534,33 +759,18 @@ class DentalChatbotService:
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_4]')
 
         # ── STEP 5: Validate & Finalize ───────────────────────────────
-        # Check for pending reschedule or cancellation requests
-        pending_requests = Appointment.objects.filter(
-            patient=self.user,
-            status__in=['reschedule_requested', 'cancel_requested']
-        )
-        if pending_requests.exists():
-            request_type = "reschedule" if pending_requests.filter(status='reschedule_requested').exists() else "cancellation"
-            return self._reply(
-                f"⚠️ You have a pending **{request_type} request** that needs to be reviewed by our staff.\n\n"
-                "You cannot book a new appointment until your current request is approved or rejected.\n\n"
-                "Please wait for staff to process your request, or contact the clinic for immediate assistance.",
-                tag='[PENDING_REQUEST]'
-            )
-
-        # Weekly limit
+        # Once-a-Week Booking Rule
         if _patient_has_appointment_this_week(self.user, date):
-            iso = date.isocalendar()
             next_week = date + timedelta(days=(7 - date.weekday()))
             return self._reply(
-                "To ensure all patients receive care, we limit bookings to **once per week**.\n\n"
-                f"Your next available window starts **{_fmt_date(next_week)}**. "
+                "⚠️ **You can only book one appointment per week.**\n\n"
+                f"Your next available booking window starts **{_fmt_date(next_week)}**. "
                 "Would you like to pick a date in that week instead?",
                 [next_week.strftime('%B %d')],
                 tag='[BOOK_STEP_3]'
             )
 
-        # Double-booking guard
+        # Double-booking guard — dentist conflict
         conflict = Appointment.objects.filter(
             dentist=dentist, date=date, time=time_val,
             status__in=['confirmed', 'pending'],
@@ -568,6 +778,18 @@ class DentalChatbotService:
         if conflict:
             return self._reply(
                 "That slot was just booked! Please pick a different time.",
+                tag='[BOOK_STEP_3T]'
+            )
+
+        # Double-booking guard — patient overlap
+        patient_conflict = Appointment.objects.filter(
+            patient=self.user, date=date, time=time_val,
+            status__in=['confirmed', 'pending'],
+        ).exists()
+        if patient_conflict:
+            return self._reply(
+                "⚠️ You already have an appointment at this date and time. "
+                "A patient cannot have overlapping appointments. Please pick a different time.",
                 tag='[BOOK_STEP_3T]'
             )
 
@@ -614,14 +836,19 @@ class DentalChatbotService:
             # Continuing existing flow - but filter out stale data from before pending request errors
             # Find the last [PENDING_REQUEST] tag in history to avoid using old booking data
             filtered_hist = hist or []
-            last_pending_idx = -1
+            last_block_idx = -1
             for i, m in enumerate(filtered_hist):
-                if m.get('role') == 'assistant' and '[PENDING_REQUEST]' in m.get('content', ''):
-                    last_pending_idx = i
+                content = m.get('content', '')
+                if m.get('role') == 'assistant' and (
+                    '[PENDING_REQUEST]' in content
+                    or '[PENDING_BLOCK]' in content
+                    or '[APPROVAL_WELCOME]' in content
+                ):
+                    last_block_idx = i
             
-            # If there was a pending request error, only use messages AFTER it
-            if last_pending_idx >= 0:
-                filtered_hist = filtered_hist[last_pending_idx + 1:]
+            # If there was a pending block or approval reset, only use messages AFTER it
+            if last_block_idx >= 0:
+                filtered_hist = filtered_hist[last_block_idx + 1:]
             
             combined_user = ' '.join(
                 [m['content'] for m in filtered_hist if m['role'] == 'user'] + [msg]
@@ -680,6 +907,11 @@ class DentalChatbotService:
         if not self.is_authenticated:
             return self._reply("Please log in first to reschedule an appointment.")
 
+        # 🔒 PENDING REQUEST LOCK — Block reschedule if pending reschedule/cancellation exists
+        pending_block = self._check_pending_requests()
+        if pending_block:
+            return pending_block
+
         # Only show confirmed/pending appointments (not reschedule_requested)
         upcoming = Appointment.objects.filter(
             patient=self.user,
@@ -707,8 +939,14 @@ class DentalChatbotService:
         if _step_tag(hist, '[RESCHED_STEP_1]') and not _step_tag(hist, '[RESCHED_STEP_2]'):
             appt = self._match_appointment(msg, upcoming)
             if not appt:
+                qr = []
+                for a in upcoming:
+                    svc = a.service.name if a.service else 'Appointment'
+                    qr.append(f"{svc} – {_fmt_date(a.date)}")
                 return self._reply(
-                    "I couldn't match that appointment. Please select one from the list above.",
+                    "I wasn't able to identify which appointment you meant. "
+                    "Could you please select one from the options below?",
+                    qr,
                     tag='[RESCHED_STEP_1]'
                 )
 
@@ -752,7 +990,35 @@ class DentalChatbotService:
         if _step_tag(hist, '[RESCHED_STEP_2]') and not _step_tag(hist, '[RESCHED_STEP_3]'):
             date = _parse_date(msg)
             if not date:
-                return self._reply("I couldn't understand that date. Please try again (e.g. 'February 10').", tag='[RESCHED_STEP_2]')
+                # Re-show available dates instead of a dead-end error
+                appt = self._find_resched_appointment(hist, upcoming)
+                if appt:
+                    dentist = appt.dentist
+                    clinic = appt.clinic
+                    _today = datetime.now().date()
+                    _end = _today + timedelta(days=30)
+                    avails = DentistAvailability.objects.filter(
+                        dentist=dentist, date__gte=_today, date__lte=_end, is_available=True,
+                    )
+                    if clinic:
+                        avails = avails.filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True))
+                    dates = []
+                    for av in avails.order_by('date'):
+                        if _available_slots(dentist, av.date, clinic) and av.date != appt.date:
+                            dates.append(av.date)
+                        if len(dates) >= 8:
+                            break
+                    qr = [d.strftime('%B %d') for d in dates]
+                    return self._reply(
+                        "I wasn't able to read that date. Please select from the available dates below, "
+                        "or type a date like **February 15** or **bukas** (tomorrow).",
+                        qr,
+                        tag='[RESCHED_STEP_2]'
+                    )
+                return self._reply(
+                    "I wasn't able to read that date. Please type a date like **February 15** or **bukas** (tomorrow).",
+                    tag='[RESCHED_STEP_2]'
+                )
 
             appt = self._find_resched_appointment(hist, upcoming)
             if not appt:
@@ -777,7 +1043,11 @@ class DentalChatbotService:
         if _step_tag(hist, '[RESCHED_STEP_3]'):
             time_val = _parse_time(msg)
             if not time_val:
-                return self._reply("I couldn't understand that time. Please try again (e.g. '9:00 AM').", tag='[RESCHED_STEP_3]')
+                return self._reply(
+                    "I wasn't able to read that time. Please select from the options above, "
+                    "or type a time like **9:00 AM** or **2pm**.",
+                    tag='[RESCHED_STEP_3]'
+                )
 
             appt = self._find_resched_appointment(hist, upcoming)
             if not appt:
@@ -858,6 +1128,11 @@ class DentalChatbotService:
         if not self.is_authenticated:
             return self._reply("Please log in first to cancel an appointment.")
 
+        # 🔒 PENDING REQUEST LOCK — Block cancellation if pending reschedule/cancellation exists
+        pending_block = self._check_pending_requests()
+        if pending_block:
+            return pending_block
+
         upcoming = Appointment.objects.filter(
             patient=self.user,
             date__gte=datetime.now().date(),
@@ -869,11 +1144,19 @@ class DentalChatbotService:
 
         low = msg.lower()
 
-        # Confirm / Keep
-        if 'request cancel' in low or 'yes cancel' in low or 'yes, cancel' in low or 'confirm cancel' in low or 'yes, request' in low:
+        # Confirm / Keep — supports English + Tagalog
+        if self._is_confirm_yes(low) and _step_tag(hist, '[CANCEL_STEP_'):
             appt = self._find_cancel_appointment(hist, upcoming)
             if not appt:
-                return self._reply("I couldn't find which appointment to cancel. Please select one.", tag='[CANCEL_STEP_1]')
+                qr = []
+                for a in upcoming:
+                    svc_n = a.service.name if a.service else 'Appointment'
+                    qr.append(f"{svc_n} – {a.date.strftime('%B %d, %Y')}")
+                return self._reply(
+                    "I wasn't able to identify the appointment. Could you select one from the list?",
+                    qr,
+                    tag='[CANCEL_STEP_1]'
+                )
             appt.status = 'cancel_requested'
             appt.cancel_reason = 'Cancellation requested via AI Sage'
             appt.cancel_requested_at = datetime.now()
@@ -894,7 +1177,7 @@ class DentalChatbotService:
                 tag='[FLOW_COMPLETE]'
             )
 
-        if 'keep appointment' in low or 'keep my appointment' in low:
+        if self._is_confirm_no(low) and _step_tag(hist, '[CANCEL_STEP_'):
             return self._reply(
                 "No problem! Your appointment has been kept. Is there anything else I can help with?",
                 tag='[FLOW_COMPLETE]'
@@ -904,7 +1187,16 @@ class DentalChatbotService:
         if _step_tag(hist, '[CANCEL_STEP_1]'):
             appt = self._match_appointment(msg, upcoming)
             if not appt:
-                return self._reply("I couldn't match that appointment. Please select from the list.", tag='[CANCEL_STEP_1]')
+                qr = []
+                for a in upcoming:
+                    svc = a.service.name if a.service else 'Appointment'
+                    qr.append(f"{svc} – {a.date.strftime('%B %d, %Y')}")
+                return self._reply(
+                    "I wasn't able to identify which appointment you meant. "
+                    "Could you please select one from the options below?",
+                    qr,
+                    tag='[CANCEL_STEP_1]'
+                )
             svc = appt.service.name if appt.service else 'Appointment'
             return self._reply(
                 f"**Request Cancellation**\n\n"
@@ -1016,8 +1308,15 @@ class DentalChatbotService:
     def _system_prompt():
         return """You are "Sage", the AI concierge for Dorotheo Dental Clinic.
 
-PERSONALITY: Professional, calming, efficient. Proactive — don't just say "No availability," 
+PERSONALITY: Professional, calming, efficient. Proactive — don't just say "No availability,"
 suggest alternatives.
+
+LANGUAGE SUPPORT (CRITICAL):
+- You understand **English, Tagalog, AND Taglish** (mixed English-Tagalog).
+- Taglish examples: "Magbook ako tomorrow sa Bacoor", "Cancel ko yung Feb 5", "Resched ko sa Monday".
+- Respond in the same language style the user uses.
+- Treat Taglish as natural and valid — parse mixed sentences correctly.
+- If unclear, ask for clarification in the user's language style.
 
 WHAT YOU CAN HELP WITH:
 - Dental services and procedures information
@@ -1030,6 +1329,7 @@ RESTRICTIONS:
 - NEVER provide specific pricing — say "Pricing varies. We recommend booking a consultation."
 - ONLY answer questions related to Dorotheo Dental Clinic and dental care
 - If asked about non-dental topics, politely decline
+- NEVER say "I couldn't understand that" — instead ask clarification or suggest options
 
 CLINIC INFO:
 - Name: Dorotheo Dental and Diagnostic Center
