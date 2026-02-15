@@ -1,12 +1,21 @@
 from pathlib import Path
 import os
 import dj_database_url
+import sentry_sdk
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Django settings for Dorotheo Dental Clinic
+
+sentry_sdk.init(
+    dsn="https://781448b07a13e31e920ab805235c199e@o4510867383713792.ingest.us.sentry.io/4510867452067840",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -43,6 +52,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Audit middleware - must be after AuthenticationMiddleware
+    'api.middleware.AuditMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -222,3 +233,29 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
 # Email timeout (seconds)
 EMAIL_TIMEOUT = 10
+
+# ============================================
+# AUDIT LOGGING CONFIGURATION
+# ============================================
+
+# Enable/disable audit middleware globally
+AUDIT_MIDDLEWARE_ENABLED = os.environ.get('AUDIT_MIDDLEWARE_ENABLED', 'True') == 'True'
+
+# Enable async logging (requires Celery - implement in Task 4.8)
+AUDIT_ASYNC_LOGGING = os.environ.get('AUDIT_ASYNC_LOGGING', 'False') == 'True'
+
+# Audit log retention period (days) - 6 years for HIPAA compliance
+AUDIT_LOG_RETENTION_DAYS = int(os.environ.get('AUDIT_LOG_RETENTION_DAYS', str(365 * 6)))
+
+# Rate limiting (logs per user per minute)
+AUDIT_MAX_LOGS_PER_MINUTE = int(os.environ.get('AUDIT_MAX_LOGS_PER_MINUTE', '100'))
+
+# Paths to exclude from middleware logging
+AUDIT_SKIP_PATHS = [
+    '/api/login/',
+    '/api/logout/',
+    '/api/health/',
+    '/admin/',
+    '/static/',
+    '/media/',
+]

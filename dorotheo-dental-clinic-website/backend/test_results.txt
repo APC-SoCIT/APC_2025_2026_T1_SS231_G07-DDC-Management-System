@@ -1,0 +1,151 @@
+﻿python : Creating test database for alias 'default'...
+At line:1 char:136
++ ... e\backend'; python manage.py test api.test_audit_signals -v 1 --no-in ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Creating test d...as 'default'... 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+Found 30 test(s).
+Traceback (most recent call last):
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\manage.py", line 22, 
+in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\manage.py", line 18, 
+in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\__init__.py", line 442, in execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\__init__.py", line 436, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\commands\test.py", line 24, in run_from_argv
+    super().run_from_argv(argv)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\base.py", line 412, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\base.py", line 458, in execute
+    output = self.handle(*args, **options)
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\commands\test.py", line 68, in handle
+    failures = test_runner.run_tests(test_labels)
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\test\runner.py", line 1054, in run_tests
+    old_config = self.setup_databases(
+        aliases=databases,
+        serialized_aliases=suite.serialized_aliases,
+    )
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\test\runner.py", line 950, in setup_databases
+    return _setup_databases(
+        self.verbosity,
+    ...<5 lines>...
+        **kwargs,
+    )
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\test\utils.py", line 221, in setup_databases
+    connection.creation.create_test_db(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        verbosity=verbosity,
+        ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        serialize=serialize_alias,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\db\backends\base\creation.py", line 78, in create_test_db
+    call_command(
+    ~~~~~~~~~~~~^
+        "migrate",
+        ^^^^^^^^^^
+    ...<3 lines>...
+        run_syncdb=True,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\__init__.py", line 194, in call_command
+    return command.execute(*args, **defaults)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\base.py", line 458, in execute
+    output = self.handle(*args, **options)
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\base.py", line 106, in wrapper
+    res = handle_func(*args, **kwargs)
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\core\management\commands\migrate.py", line 356, in handle
+    post_migrate_state = executor.migrate(
+        targets,
+    ...<3 lines>...
+        fake_initial=fake_initial,
+    )
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\db\migrations\executor.py", line 135, in migrate
+    state = self._migrate_all_forwards(
+        state, plan, full_plan, fake=fake, fake_initial=fake_initial
+    )
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\db\migrations\executor.py", line 167, in _migrate_all_forwards
+    state = self.apply_migration(
+        state, migration, fake=fake, fake_initial=fake_initial
+    )
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\db\migrations\executor.py", line 252, in apply_migration
+    state = migration.apply(state, schema_editor)
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\db\migrations\migration.py", line 132, in apply
+    operation.database_forwards(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.app_label, schema_editor, old_state, project_state
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\venv\Lib\site-package
+s\django\db\migrations\operations\special.py", line 193, in database_forwards
+    self.code(from_state.apps, schema_editor)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ezekiel\Downloads\original repo\APC_2025_2026_T1_SS231_G07-DDC
+-Management-System\dorotheo-dental-clinic-website\backend\api\migrations\0024_a
+ssign_existing_data_to_main_clinic.py", line 27, in 
+create_main_clinic_and_assign_data
+    print(f"\u2713 Created Main Clinic (ID: {main_clinic.id})")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ezekiel\AppData\Local\Programs\Lib\encodings\cp1252.py", line 
+19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in 
+position 0: character maps to <undefined>

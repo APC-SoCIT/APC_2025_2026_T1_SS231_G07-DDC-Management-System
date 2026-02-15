@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta
 from django.utils import timezone
 
@@ -86,6 +87,134 @@ class User(AbstractUser):
         except Exception as e:
             # If appointments relationship doesn't exist yet, return None
             return None
+
+
+class AuditLog(models.Model):
+    """
+    HIPAA-compliant audit log model for tracking all access and modifications to patient data.
+    
+    This model is append-only - no updates or deletes are allowed after creation.
+    All patient record access, modifications, and authentication events must be logged here.
+    
+    Required by HIPAA Security Rule 45 CFR § 164.312(b) - Audit Controls.
+    """
+    
+    ACTION_CHOICES = [
+        ('CREATE', 'Create'),
+        ('READ', 'Read'),
+        ('UPDATE', 'Update'),
+        ('DELETE', 'Delete'),
+        ('LOGIN_SUCCESS', 'Login Success'),
+        ('LOGIN_FAILED', 'Login Failed'),
+        ('LOGOUT', 'Logout'),
+        ('EXPORT', 'Export'),
+        ('ACCESS', 'Access'),
+    ]
+    
+    log_id = models.AutoField(primary_key=True)
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='audit_logs_created',
+        help_text="User who performed the action. Null for failed login attempts."
+    )
+    action_type = models.CharField(
+        max_length=20,
+        choices=ACTION_CHOICES,
+        db_index=True,
+        help_text="Type of action performed"
+    )
+    target_table = models.CharField(
+        max_length=100,
+        db_index=True,
+        help_text="Database table/model name affected by the action"
+    )
+    target_record_id = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="ID of the specific record affected"
+    )
+    patient_id = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='audit_logs_about',
+        limit_choices_to={'user_type': 'patient'},
+        help_text="Patient whose data was accessed/modified (if applicable)"
+    )
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        help_text="When the action occurred"
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        help_text="IP address from which the action was performed"
+    )
+    user_agent = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Browser/client user agent string"
+    )
+    changes = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Before/after values for modifications. MUST NOT contain passwords or sensitive auth data."
+    )
+    reason = models.TextField(
+        blank=True,
+        default='',
+        help_text="Optional justification for the action"
+    )
+    
+    class Meta:
+        db_table = 'audit_logs'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp'], name='audit_timestamp_idx'),
+            models.Index(fields=['actor', '-timestamp'], name='audit_actor_time_idx'),
+            models.Index(fields=['patient_id', '-timestamp'], name='audit_patient_time_idx'),
+            models.Index(fields=['action_type', '-timestamp'], name='audit_action_time_idx'),
+            models.Index(fields=['target_table', 'target_record_id'], name='audit_target_idx'),
+        ]
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
+    
+    def __str__(self):
+        if self.actor:
+            # Use full name if available, otherwise use username
+            actor_name = self.actor.get_full_name() or self.actor.username
+        else:
+            actor_name = 'Anonymous'
+        return f"{actor_name} performed {self.action_type} on {self.target_table}:{self.target_record_id} at {self.timestamp}"
+    
+    def save(self, *args, **kwargs):
+        """
+        Override save to prevent updates to existing audit logs.
+        Audit logs are append-only for HIPAA compliance.
+        """
+        if self.pk is not None:
+            raise ValidationError(
+                "Audit logs cannot be modified after creation. "
+                "This is required for HIPAA compliance and audit trail integrity."
+            )
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        """
+        Override delete to prevent deletion of audit logs.
+        Audit logs must be retained for HIPAA compliance (minimum 6 years).
+        """
+        raise ValidationError(
+            "Audit logs cannot be deleted. "
+            "HIPAA requires audit logs to be retained for at least 6 years. "
+            "Use archive/retention policies instead of deletion."
+        )
 
 
 class Service(models.Model):
