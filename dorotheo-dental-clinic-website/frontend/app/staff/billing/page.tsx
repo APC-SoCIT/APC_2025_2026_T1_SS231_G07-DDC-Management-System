@@ -150,7 +150,7 @@ export default function StaffBillingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">
+          <h1 className="text-3xl font-sans font-bold text-[var(--color-primary)] mb-2">
             Billing
           </h1>
           <p className="text-[var(--color-text-muted)]">

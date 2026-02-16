@@ -84,7 +84,7 @@ export default function PatientBilling() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-[var(--color-primary)] mb-2">Billing & Payments</h1>
+  <h1 className="text-3xl font-sans font-bold text-[var(--color-primary)] mb-2">Billing & Payments</h1>
         <p className="text-[var(--color-text-muted)]">View your statement of accounts and payment history</p>
       </div>
 
