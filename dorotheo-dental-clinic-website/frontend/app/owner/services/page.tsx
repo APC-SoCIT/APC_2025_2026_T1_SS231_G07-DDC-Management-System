@@ -9,7 +9,7 @@ import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AlertModal from "@/components/alert-modal"
-import { getContrastColor } from "@/lib/utils"
+import { getReadableColor } from "@/lib/utils"
 
 interface Service {
   id: number
@@ -306,11 +306,11 @@ export default function ServicesPage() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">
                     <span 
-                      className="px-3 py-1 rounded-lg font-bold border"
+                      className="px-3 py-1 rounded-lg font-bold"
                       style={{ 
-                        backgroundColor: service.color, 
-                        color: getContrastColor(service.color),
-                        borderColor: service.color
+                        color: getReadableColor(service.color),
+                        backgroundColor: `${service.color}20`,
+                        border: `1.5px solid ${service.color}60`
                       }}
                     >
                       {service.name}
@@ -460,11 +460,11 @@ export default function ServicesPage() {
                         <div className="bg-gray-50 p-3 rounded-lg">
                           <p className="text-xs text-[var(--color-text-muted)] mb-2">Preview:</p>
                           <span 
-                            className="inline-block px-3 py-1 rounded-lg font-bold border text-sm"
+                            className="inline-block px-3 py-1 rounded-lg font-bold text-sm"
                             style={{ 
-                              backgroundColor: tempColor, 
-                              color: getContrastColor(tempColor),
-                              borderColor: tempColor
+                              color: getReadableColor(tempColor),
+                              backgroundColor: `${tempColor}20`,
+                              border: `1.5px solid ${tempColor}60`
                             }}
                           >
                             {formData.name || "Service Name"}

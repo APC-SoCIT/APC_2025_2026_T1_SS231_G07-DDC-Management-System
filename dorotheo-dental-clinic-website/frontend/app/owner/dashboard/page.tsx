@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getReadableColor } from "@/lib/utils"
 import Link from "next/link"
 
 interface Appointment {
@@ -315,7 +316,7 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ color: getReadableColor(apt.service_color || '#6B7280'), backgroundColor: `${apt.service_color || '#6B7280'}15`, border: `1px solid ${apt.service_color || '#6B7280'}50` }}>
                           {apt.service_name || "Consultation"}
                         </span>
                         <div className="flex flex-col gap-1 pt-2">
@@ -347,7 +348,7 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ color: getReadableColor(apt.service_color || '#6B7280'), backgroundColor: `${apt.service_color || '#6B7280'}15`, border: `1px solid ${apt.service_color || '#6B7280'}50` }}>
                           {apt.service_name || "Consultation"}
                         </span>
                         <div className="flex flex-col gap-1 pt-2">
@@ -378,7 +379,7 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ color: getReadableColor(apt.service_color || '#6B7280'), backgroundColor: `${apt.service_color || '#6B7280'}15`, border: `1px solid ${apt.service_color || '#6B7280'}50` }}>
                           {apt.service_name || "Consultation"}
                         </span>
                         <div className="flex flex-col gap-1 pt-2">
@@ -408,7 +409,7 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ color: getReadableColor(apt.service_color || '#6B7280'), backgroundColor: `${apt.service_color || '#6B7280'}15`, border: `1px solid ${apt.service_color || '#6B7280'}50` }}>
                           {apt.service_name || "Consultation"}
                         </span>
                       </div>

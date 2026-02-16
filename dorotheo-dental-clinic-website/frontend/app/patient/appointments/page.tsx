@@ -6,6 +6,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getReadableColor } from "@/lib/utils"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import AlertModal from "@/components/alert-modal"
@@ -995,31 +996,6 @@ export default function PatientAppointments() {
     return matchesSearch && matchesStatus
   })
 
-  // Helper function to darken a hex color for better text readability
-  const darkenColor = (hex: string, percent: number = 40): string => {
-    // Remove the hash if present
-    const color = hex.replace('#', '')
-    
-    // Parse RGB values
-    const r = parseInt(color.substring(0, 2), 16)
-    const g = parseInt(color.substring(2, 4), 16)
-    const b = parseInt(color.substring(4, 6), 16)
-    
-    // Darken by reducing each component
-    const darkenAmount = 1 - (percent / 100)
-    const newR = Math.round(r * darkenAmount)
-    const newG = Math.round(g * darkenAmount)
-    const newB = Math.round(b * darkenAmount)
-    
-    // Convert back to hex
-    const toHex = (n: number) => {
-      const hex = n.toString(16)
-      return hex.length === 1 ? '0' + hex : hex
-    }
-    
-    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
@@ -1208,9 +1184,9 @@ export default function PatientAppointments() {
                         <span 
                           className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                           style={{ 
-                            color: darkenColor(apt.service_color || '#10b981', 40),
+                            color: getReadableColor(apt.service_color || '#10b981'),
                             backgroundColor: `${apt.service_color || '#10b981'}15`,
-                            border: `1px solid ${apt.service_color || '#10b981'}40`
+                            border: `1px solid ${apt.service_color || '#10b981'}50`
                           }}
                         >
                           {apt.service_name || "General Consultation"}
