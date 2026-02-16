@@ -42,27 +42,27 @@ const getClinicColorStyle = (clinicName: string): { backgroundColor: string; col
   
   if (lowerName.includes('bacoor') || lowerName.includes('main')) {
     return {
-      backgroundColor: 'rgba(20, 184, 166, 0.85)', // teal-500 at 85%
-      color: '#f0fdfa', // teal-50
-      borderColor: '#14b8a6' // teal-500
+      backgroundColor: 'rgba(20, 184, 166, 0.20)', // teal-500 at 20%
+      color: '#0f766e', // teal-700
+      borderColor: 'rgba(20, 184, 166, 0.4)' // teal-500 at 40%
     };
   } else if (lowerName.includes('alabang')) {
     return {
-      backgroundColor: 'rgba(59, 130, 246, 0.85)', // blue-500 at 85%
-      color: '#eff6ff', // blue-50
-      borderColor: '#3b82f6' // blue-500
+      backgroundColor: 'rgba(59, 130, 246, 0.20)', // blue-500 at 20%
+      color: '#1d4ed8', // blue-700
+      borderColor: 'rgba(59, 130, 246, 0.4)' // blue-500 at 40%
     };
   } else if (lowerName.includes('poblacion') || lowerName.includes('makati')) {
     return {
-      backgroundColor: 'rgba(168, 85, 247, 0.85)', // purple-500 at 85%
-      color: '#faf5ff', // purple-50
-      borderColor: '#a855f7' // purple-500
+      backgroundColor: 'rgba(168, 85, 247, 0.20)', // purple-500 at 20%
+      color: '#7e22ce', // purple-700
+      borderColor: 'rgba(168, 85, 247, 0.4)' // purple-500 at 40%
     };
   } else if (lowerName.includes('branch')) {
     return {
-      backgroundColor: 'rgba(249, 115, 22, 0.85)', // orange-500 at 85%
-      color: '#fff7ed', // orange-50
-      borderColor: '#f97316' // orange-500
+      backgroundColor: 'rgba(249, 115, 22, 0.20)', // orange-500 at 20%
+      color: '#c2410c', // orange-700
+      borderColor: 'rgba(249, 115, 22, 0.4)' // orange-500 at 40%
     };
   }
   
