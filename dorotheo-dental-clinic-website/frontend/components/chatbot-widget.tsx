@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { MessageCircle, X, Send, Loader2, Trash2, Calendar, RefreshCw, XCircle, Mic, MicOff } from "lucide-react"
+import { MessageCircle, X, Send, Loader2, Trash2, Calendar, RefreshCw, XCircle } from "lucide-react"
 import { chatbotQuery } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import ReactMarkdown from 'react-markdown'
@@ -34,9 +34,7 @@ export default function ChatbotWidget() {
   const [isTyping, setIsTyping] = useState(false)
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isListening, setIsListening] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const recognitionRef = useRef<any>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
 
   // Load chat history from localStorage on mount and when user changes
@@ -142,49 +140,6 @@ export default function ChatbotWidget() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
-
-  // Initialize speech recognition (only once)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition()
-        recognitionRef.current.continuous = false
-        recognitionRef.current.interimResults = false
-        recognitionRef.current.lang = 'en-US'
-
-        recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript
-          setInputMessage(transcript)
-          setIsListening(false)
-        }
-
-        recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error)
-          setIsListening(false)
-        }
-
-        recognitionRef.current.onend = () => {
-          setIsListening(false)
-        }
-      }
-    }
-  }, [])
-
-  const toggleVoiceInput = () => {
-    if (!recognitionRef.current) {
-      alert('Voice recognition is not supported in your browser. Please use Chrome or Edge.')
-      return
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop()
-      setIsListening(false)
-    } else {
-      recognitionRef.current.start()
-      setIsListening(true)
-    }
-  }
 
   const handleSendMessage = async (message?: string) => {
     const messageText = message || inputMessage.trim()
@@ -425,28 +380,15 @@ export default function ChatbotWidget() {
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && !isTyping && !isListening && handleSendMessage()}
-                placeholder={isListening ? "Listening..." : "Ask Sage about dental care..."}
-                disabled={isTyping || isListening}
+                onKeyPress={(e) => e.key === "Enter" && !isTyping && handleSendMessage()}
+                placeholder="Ask Sage about dental care..."
+                disabled={isTyping}
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm disabled:opacity-50"
               />
               <button
-                onClick={toggleVoiceInput}
-                className={`rounded-full p-2.5 transition-all ${
-                  isListening 
-                    ? 'bg-red-500 text-white animate-pulse' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-                disabled={isTyping}
-                aria-label={isListening ? "Stop recording" : "Start voice input"}
-                title={isListening ? "Stop recording" : "Voice input (English, Tagalog, or Taglish)"}
-              >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-              </button>
-              <button
                 onClick={() => handleSendMessage()}
                 className="bg-[var(--color-primary)] text-white rounded-full p-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
-                disabled={!inputMessage.trim() || isTyping || isListening}
+                disabled={!inputMessage.trim() || isTyping}
                 aria-label="Send message"
               >
                 <Send className="w-5 h-5" />
