@@ -5,6 +5,7 @@ AI Sage – Dental Scheduling Master with Smart Routing
 
 import google.generativeai as genai
 import os
+from dotenv import load_dotenv
 import re
 from datetime import datetime, timedelta, time as time_obj
 from django.db.models import Q
@@ -332,7 +333,7 @@ class DentalChatbotService:
     Cancellation (soft), and general Q&A via Gemini.
     """
 
-    MODEL_NAME = "gemini-2.5-flash"
+    MODEL_NAME = "models/gemini-2.5-flash"
 
     RESTRICTED_KW = [
         'password', 'admin', 'database', 'secret', 'token', 'credential',
@@ -345,7 +346,8 @@ class DentalChatbotService:
     def __init__(self, user=None):
         self.user = user
         self.is_authenticated = user is not None
-        api_key = os.environ.get('GEMINI_API_KEY')
+        load_dotenv()  # This loads the variables from .env
+        api_key = os.getenv('GEMINI_API_KEY')
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
         genai.configure(api_key=api_key)
@@ -1237,69 +1239,194 @@ class DentalChatbotService:
     # GEMINI Q&A  (general dental / clinic questions)
     # ══════════════════════════════════════════════════════════════════════
 
+    def _direct_answer(self, msg):
+        """Handle common questions directly from database without calling Gemini."""
+        low = msg.lower()
+        
+        # Services question
+        if any(phrase in low for phrase in ['what service', 'what dental service', 'services do you offer', 'what do you offer']):
+            svcs = Service.objects.all().order_by('name')
+            if not svcs.exists():
+                return self._reply("We currently don't have services listed. Please contact the clinic directly.")
+            
+            lines = ["🦷 **Our Dental Services:**\n"]
+            for s in svcs:
+                lines.append(f"• **{s.name}**\n")
+            
+            lines.append("💙 Would you like to book an appointment?")
+            return self._reply('\n'.join(lines))
+        
+        # Dentists question
+        if any(phrase in low for phrase in ['who are the dentist', 'who are dentist', 'available dentist', 'list of dentist']):
+            dents = _dentists_qs().order_by('last_name')
+            if not dents.exists():
+                return self._reply("We currently don't have dentist information available. Please contact the clinic directly.")
+            
+            lines = ["👨‍⚕️ **Our Dental Team:**\n"]
+            today = datetime.now().date()
+            
+            for d in dents:
+                # Skip dentists with no name
+                full_name = d.get_full_name().strip()
+                if not full_name:
+                    continue
+                    
+                avail_today = DentistAvailability.objects.filter(
+                    dentist=d, date=today, is_available=True
+                ).exists()
+                
+                if avail_today:
+                    lines.append(f"✅ **Dr. {full_name}** - Available today\n")
+                else:
+                    lines.append(f"• **Dr. {full_name}**\n")
+            
+            lines.append("💙 Ready to book? Say 'Book Appointment' to schedule your visit!")
+            return self._reply('\n'.join(lines))
+        
+        # Clinic hours question
+        if any(phrase in low for phrase in ['clinic hour', 'what are your hour', 'when are you open', 'operating hour', 'business hour']):
+            clinics = ClinicLocation.objects.all().order_by('name')
+            if not clinics.exists():
+                return self._reply("We currently don't have clinic location information available.")
+            
+            lines = ["📍 **Clinic Locations & Hours**\n"]
+            
+            clinic_list = list(clinics)
+            for i, c in enumerate(clinic_list):
+                lines.append(f"**{c.name}**")
+                lines.append(f"📍 {c.address}")
+                lines.append(f"📞 {c.phone}")
+                
+                # Add extra spacing between clinics, but not after the last one
+                if i < len(clinic_list) - 1:
+                    lines.append("\n")
+            
+            lines.append("\n🕒 **Operating Hours:**")
+            lines.append("• **Monday - Friday:** 8:00 AM - 6:00 PM")
+            lines.append("• **Saturday:** 9:00 AM - 3:00 PM")
+            lines.append("• **Sunday:** Closed")
+            
+            lines.append("\n💙 Need to schedule an appointment? Just say 'Book Appointment'!")
+            return self._reply('\n'.join(lines))
+        
+        return None  # No direct answer found
+
     def _gemini_answer(self, msg, hist):
-        system = self._system_prompt()
-        context = self._build_context(msg)
+        # Try direct answer first (for common questions)
+        direct = self._direct_answer(msg)
+        if direct:
+            return direct
+        
+        # Fallback to Gemini for complex questions
+        try:
+            system = self._system_prompt()
+            context = self._build_context(msg)
 
-        prompt = f"{system}\n\n"
-        if context:
-            prompt += f"{context}\n\n"
-        if hist:
-            prompt += "Conversation History:\n"
-            for m in hist[-6:]:
-                role = "User" if m['role'] == 'user' else "Assistant"
-                prompt += f"{role}: {m['content']}\n"
-            prompt += "\n"
-        prompt += f"User: {msg}\n\nAssistant:"
+            prompt = f"{system}\n\n"
+            
+            # Emphasize context if available
+            if context:
+                prompt += "IMPORTANT - Use this real-time data from our database to answer:\n"
+                prompt += f"{context}\n\n"
+                prompt += "NOTE: Only use the information provided above. Do not make up services, dentists, or hours.\n\n"
+            
+            if hist:
+                prompt += "Conversation History:\n"
+                for m in hist[-6:]:
+                    role = "User" if m['role'] == 'user' else "Assistant"
+                    prompt += f"{role}: {m['content']}\n"
+                prompt += "\n"
+            
+            prompt += f"User: {msg}\n\nAssistant:"
 
-        resp = self.model.generate_content(
-            prompt,
-            generation_config={"temperature": 0.3, "max_output_tokens": 500, "top_p": 0.8, "top_k": 40},
-            safety_settings={
-                'HARASSMENT': 'BLOCK_NONE', 'HATE_SPEECH': 'BLOCK_NONE',
-                'SEXUALLY_EXPLICIT': 'BLOCK_NONE', 'DANGEROUS_CONTENT': 'BLOCK_NONE',
-            },
-        )
-        text = self._sanitize(resp.text)
-        return self._reply(text)
+            resp = self.model.generate_content(
+                prompt,
+                generation_config={"temperature": 0.2, "max_output_tokens": 600, "top_p": 0.9, "top_k": 40},
+                safety_settings={
+                    'HARASSMENT': 'BLOCK_NONE', 'HATE_SPEECH': 'BLOCK_NONE',
+                    'SEXUALLY_EXPLICIT': 'BLOCK_NONE', 'DANGEROUS_CONTENT': 'BLOCK_NONE',
+                },
+            )
+            text = self._sanitize(resp.text)
+            return self._reply(text)
+        except Exception as e:
+            # If Gemini fails, try to give a helpful response based on context
+            context = self._build_context(msg)
+            if context:
+                return self._reply(f"Here's the information I found:\n\n{context}")
+            return self._reply(
+                "I'm having trouble processing your question right now. "
+                "Please try asking about our services, dentists, or clinic hours, "
+                "or contact the clinic directly for assistance."
+            )
 
     # ── context builder ───────────────────────────────────────────────────
 
     def _build_context(self, msg):
+        """Build context from database based on user's question."""
         low = msg.lower()
         parts = []
-        if any(w in low for w in ['service', 'treatment', 'procedure', 'offer']):
+        
+        # Services - trigger on broader keywords
+        if any(w in low for w in ['service', 'treatment', 'procedure', 'offer', 'provide', 'do you do', 'available']):
             svcs = Service.objects.all()
-            if svcs:
-                lines = ["Our Dental Services:"]
+            if svcs.exists():
+                lines = ["=== AVAILABLE DENTAL SERVICES ==="]
                 for s in svcs:
-                    lines.append(f"- {s.name} ({s.category}): {s.description}")
+                    lines.append(f"• {s.name} ({s.category})")
+                    if s.description:
+                        lines.append(f"  Description: {s.description}")
                 parts.append('\n'.join(lines))
-        if any(w in low for w in ['dentist', 'doctor', 'dr', 'staff', 'who']):
+        
+        # Dentists - enhanced with availability info
+        if any(w in low for w in ['dentist', 'doctor', 'dr', 'staff', 'who', 'available today', 'work today']):
             dents = _dentists_qs()
-            if dents:
-                lines = ["Our Dentists:"]
+            if dents.exists():
+                lines = ["=== OUR DENTISTS ==="]
+                today = datetime.now().date()
                 for d in dents:
-                    lines.append(f"- Dr. {d.get_full_name()}")
+                    lines.append(f"• Dr. {d.get_full_name()}")
+                    # Check if available today
+                    if 'today' in low or 'available' in low:
+                        avail_today = DentistAvailability.objects.filter(
+                            dentist=d, date=today, is_available=True
+                        ).exists()
+                        if avail_today:
+                            lines.append(f"  Status: Available today")
+                        else:
+                            lines.append(f"  Status: Not available today")
                 parts.append('\n'.join(lines))
-        if any(w in low for w in ['clinic', 'location', 'branch', 'where']):
+        
+        # Clinic info and hours
+        if any(w in low for w in ['clinic', 'location', 'branch', 'where', 'hour', 'hours', 'time', 'schedule', 'open', 'address']):
             clinics = ClinicLocation.objects.all()
-            if clinics:
-                lines = ["Our Clinic Locations:"]
+            if clinics.exists():
+                lines = ["=== CLINIC LOCATIONS & HOURS ==="]
                 for c in clinics:
-                    lines.append(f"- {c.name}: {c.address} | Phone: {c.phone}")
+                    lines.append(f"• {c.name}")
+                    lines.append(f"  Address: {c.address}")
+                    lines.append(f"  Phone: {c.phone}")
+                lines.append("\nOperating Hours:")
+                lines.append("• Monday - Friday: 8:00 AM - 6:00 PM")
+                lines.append("• Saturday: 9:00 AM - 3:00 PM")
+                lines.append("• Sunday: Closed")
                 parts.append('\n'.join(lines))
-        if self.is_authenticated and any(w in low for w in ['my appointment', 'my booking']):
+        
+        # User's appointments
+        if self.is_authenticated and any(w in low for w in ['my appointment', 'my booking', 'my schedule']):
             appts = Appointment.objects.filter(
                 patient=self.user,
                 status__in=['confirmed', 'pending', 'reschedule_requested'],
             ).order_by('date', 'time')[:5]
-            if appts:
-                lines = ["Your Upcoming Appointments:"]
+            if appts.exists():
+                lines = ["=== YOUR UPCOMING APPOINTMENTS ==="]
                 for a in appts:
                     svc = a.service.name if a.service else 'General'
-                    lines.append(f"- {_fmt_date_full(a.date)} at {_fmt_time(a.time)} – {svc} with Dr. {a.dentist.get_full_name()}")
+                    lines.append(f"• {_fmt_date_full(a.date)} at {_fmt_time(a.time)}")
+                    lines.append(f"  Service: {svc}")
+                    lines.append(f"  Dentist: Dr. {a.dentist.get_full_name()}")
                 parts.append('\n'.join(lines))
+        
         return '\n\n'.join(parts) if parts else ''
 
     # ── system prompt ─────────────────────────────────────────────────────

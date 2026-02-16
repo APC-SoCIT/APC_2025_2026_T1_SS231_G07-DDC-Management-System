@@ -28,6 +28,7 @@ __pycache__/
 *.so
 .Python
 env/
+db.sqlite3
 venv/
 .venv/
 ENV/
