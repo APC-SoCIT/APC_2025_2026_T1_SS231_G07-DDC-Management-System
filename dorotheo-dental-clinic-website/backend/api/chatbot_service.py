@@ -1240,11 +1240,9 @@ class DentalChatbotService:
     # ══════════════════════════════════════════════════════════════════════
 
     def _direct_answer(self, msg):
-        """Handle common questions directly from database without calling Gemini."""
-        low = msg.lower()
-        
-        # Services question
-        if any(phrase in low for phrase in ['what service', 'what dental service', 'services do you offer', 'what do you offer']):
+        """Handle ONLY quick reply button questions with hardcoded answers."""
+        # Only exact matches for quick reply buttons
+        if msg.strip() == "What dental services do you offer?":
             svcs = Service.objects.all().order_by('name')
             if not svcs.exists():
                 return self._reply("We currently don't have services listed. Please contact the clinic directly.")
@@ -1256,8 +1254,7 @@ class DentalChatbotService:
             lines.append("💙 Would you like to book an appointment?")
             return self._reply('\n'.join(lines))
         
-        # Dentists question
-        if any(phrase in low for phrase in ['who are the dentist', 'who are dentist', 'available dentist', 'list of dentist']):
+        if msg.strip() == "Who are the dentists?":
             dents = _dentists_qs().order_by('last_name')
             if not dents.exists():
                 return self._reply("We currently don't have dentist information available. Please contact the clinic directly.")
@@ -1266,16 +1263,15 @@ class DentalChatbotService:
             today = datetime.now().date()
             
             for d in dents:
-                # Skip dentists with no name
                 full_name = d.get_full_name().strip()
                 if not full_name:
                     continue
                     
-                avail_today = DentistAvailability.objects.filter(
+                is_available = DentistAvailability.objects.filter(
                     dentist=d, date=today, is_available=True
                 ).exists()
                 
-                if avail_today:
+                if is_available:
                     lines.append(f"✅ **Dr. {full_name}** - Available today\n")
                 else:
                     lines.append(f"• **Dr. {full_name}**\n")
@@ -1283,8 +1279,7 @@ class DentalChatbotService:
             lines.append("💙 Ready to book? Say 'Book Appointment' to schedule your visit!")
             return self._reply('\n'.join(lines))
         
-        # Clinic hours question
-        if any(phrase in low for phrase in ['clinic hour', 'what are your hour', 'when are you open', 'operating hour', 'business hour']):
+        if msg.strip() == "What are your clinic hours?":
             clinics = ClinicLocation.objects.all().order_by('name')
             if not clinics.exists():
                 return self._reply("We currently don't have clinic location information available.")
@@ -1297,7 +1292,6 @@ class DentalChatbotService:
                 lines.append(f"📍 {c.address}")
                 lines.append(f"📞 {c.phone}")
                 
-                # Add extra spacing between clinics, but not after the last one
                 if i < len(clinic_list) - 1:
                     lines.append("\n")
             
@@ -1309,7 +1303,7 @@ class DentalChatbotService:
             lines.append("\n💙 Need to schedule an appointment? Just say 'Book Appointment'!")
             return self._reply('\n'.join(lines))
         
-        return None  # No direct answer found
+        return None  # Not a quick reply button - let Gemini handle it
 
     def _gemini_answer(self, msg, hist):
         # Try direct answer first (for common questions)
@@ -1317,12 +1311,24 @@ class DentalChatbotService:
         if direct:
             return direct
         
+        # Detect user's language for response matching
+        low = msg.lower()
+        tagalog_words = ['ano', 'sino', 'saan', 'kailan', 'paano', 'magkano', 'meron', 'ba', 'ko', 'mo', 'nga', 'po', 'yung', 'mga', 'sa', 'ng', 'na', 'naman', 'lang']
+        tagalog_count = sum(1 for word in tagalog_words if word in low)
+        is_tagalog = tagalog_count >= 2
+        
         # Fallback to Gemini for complex questions
         try:
             system = self._system_prompt()
             context = self._build_context(msg)
 
             prompt = f"{system}\n\n"
+            
+            # Language instruction
+            if is_tagalog:
+                prompt += "LANGUAGE INSTRUCTION: The user is speaking Tagalog or Taglish. You MUST respond primarily in Tagalog/Taglish, not English.\n\n"
+            else:
+                prompt += "LANGUAGE INSTRUCTION: The user is speaking English. Respond in clear English.\n\n"
             
             # Emphasize context if available
             if context:
@@ -1343,73 +1349,192 @@ class DentalChatbotService:
                 prompt,
                 generation_config={"temperature": 0.2, "max_output_tokens": 600, "top_p": 0.9, "top_k": 40},
                 safety_settings={
-                    'HARASSMENT': 'BLOCK_NONE', 'HATE_SPEECH': 'BLOCK_NONE',
-                    'SEXUALLY_EXPLICIT': 'BLOCK_NONE', 'DANGEROUS_CONTENT': 'BLOCK_NONE',
+                    'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+                    'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+                    'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                    'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
                 },
             )
             text = self._sanitize(resp.text)
             return self._reply(text)
         except Exception as e:
-            # If Gemini fails, try to give a helpful response based on context
+            # Log the actual error for debugging (don't show to user)
+            error_type = type(e).__name__
+            
+            # Check if it's a rate limit error
+            is_rate_limit = 'quota' in str(e).lower() or '429' in str(e) or 'ResourceExhausted' in error_type
+            
+            # If Gemini fails, format the context nicely as fallback
             context = self._build_context(msg)
             if context:
-                return self._reply(f"Here's the information I found:\n\n{context}")
-            return self._reply(
-                "I'm having trouble processing your question right now. "
-                "Please try asking about our services, dentists, or clinic hours, "
-                "or contact the clinic directly for assistance."
-            )
+                formatted = self._format_context_fallback(context, is_tagalog)
+                return self._reply(formatted)
+            
+            # Generic fallback if no context available
+            if is_tagalog:
+                return self._reply(
+                    "Pasensya na po, may konting problema ako sa pagsagot ngayon. "
+                    "Maaari po ba kayong magtanong ulit tungkol sa aming mga serbisyo, dentista, o clinic hours?"
+                )
+            else:
+                return self._reply(
+                    "I'm having trouble processing your question right now. "
+                    "Please try asking about our services, dentists, or clinic hours, "
+                    "or contact the clinic directly for assistance."
+                )
+
+    # ── fallback formatter ────────────────────────────────────────────────
+
+    @staticmethod
+    def _format_context_fallback(context, is_tagalog):
+        """Format raw database context into a nice user-friendly response."""
+        lines = []
+        
+        # Split context by section headers
+        if "=== AVAILABLE DENTAL SERVICES ===" in context:
+            if is_tagalog:
+                lines.append("🦷 **Mga Dental Services Namin:**\n")
+            else:
+                lines.append("🦷 **Our Dental Services:**\n")
+            
+            # Extract services section
+            services_section = context.split("=== AVAILABLE DENTAL SERVICES ===")[1]
+            if "===" in services_section:
+                services_section = services_section.split("===")[0]
+            
+            # Parse service lines
+            for line in services_section.strip().split('\n'):
+                line = line.strip()
+                if line.startswith('•'):
+                    # Extract just the service name (before category)
+                    service_name = line.split('(Category:')[0].strip()
+                    lines.append(service_name)
+            lines.append("")
+        
+        if "=== OUR DENTISTS ===" in context:
+            if is_tagalog:
+                lines.append("👨‍⚕️ **Mga Dentista Namin:**\n")
+            else:
+                lines.append("👨‍⚕️ **Our Dentists:**\n")
+            
+            # Extract dentists section
+            dentists_section = context.split("=== OUR DENTISTS ===")[1]
+            if "===" in dentists_section:
+                dentists_section = dentists_section.split("===")[0]
+            
+            # Parse dentist lines
+            for line in dentists_section.strip().split('\n'):
+                line = line.strip()
+                if line.startswith('•'):
+                    lines.append(line)
+            lines.append("")
+        
+        if "=== CLINIC LOCATIONS & HOURS ===" in context:
+            if is_tagalog:
+                lines.append("📍 **Mga Branch at Oras:**\n")
+            else:
+                lines.append("📍 **Clinic Locations & Hours:**\n")
+            
+            # Extract clinic section
+            clinic_section = context.split("=== CLINIC LOCATIONS & HOURS ===")[1]
+            if "===" in clinic_section:
+                clinic_section = clinic_section.split("===")[0]
+            
+            # Add clinic info (already formatted)
+            lines.append(clinic_section.strip())
+            lines.append("")
+        
+        # Add call to action
+        if is_tagalog:
+            lines.append("💙 May gusto ka pa bang malaman o mag-book ng appointment?")
+        else:
+            lines.append("💙 Would you like to know more or book an appointment?")
+        
+        return '\n'.join(lines)
 
     # ── context builder ───────────────────────────────────────────────────
 
     def _build_context(self, msg):
-        """Build context from database based on user's question."""
+        """Build comprehensive context from database for Gemini AI to answer intelligently."""
         low = msg.lower()
         parts = []
+        today = datetime.now().date()
         
-        # Services - trigger on broader keywords
-        if any(w in low for w in ['service', 'treatment', 'procedure', 'offer', 'provide', 'do you do', 'available']):
-            svcs = Service.objects.all()
+        # Check what user is actually asking about
+        asking_about_dentist = any(w in low for w in ['dentist', 'doctor', 'dr', 'doktor', 'sino', 'who', 'whos', "who's", 'available'])
+        asking_about_service = any(w in low for w in ['service', 'treatment', 'procedure', 'serbisyo', 'gawin', 'ginagawa', 'have', 'offer', 'do you', 'meron', 'may', 'cleaning', 'extraction', 'braces', 'checkup', 'filling', 'pasta', 'bunot', 'linis'])
+        asking_about_clinic = any(w in low for w in ['clinic', 'location', 'branch', 'where', 'saan', 'hour', 'oras', 'open', 'hours', 'time', 'kailan'])
+        
+        # Only include services if specifically asking about services (not just because "available" or "what" appears)
+        if asking_about_service or (not asking_about_dentist and not asking_about_clinic and any(w in low for w in ['what do you offer', 'anong serbisyo', 'what services'])):
+            svcs = Service.objects.all().order_by('category', 'name')
             if svcs.exists():
                 lines = ["=== AVAILABLE DENTAL SERVICES ==="]
                 for s in svcs:
-                    lines.append(f"• {s.name} ({s.category})")
+                    svc_line = f"• {s.name}"
+                    if s.category:
+                        svc_line += f" (Category: {s.category})"
                     if s.description:
-                        lines.append(f"  Description: {s.description}")
+                        svc_line += f" - {s.description}"
+                    lines.append(svc_line)
                 parts.append('\n'.join(lines))
         
-        # Dentists - enhanced with availability info
-        if any(w in low for w in ['dentist', 'doctor', 'dr', 'staff', 'who', 'available today', 'work today']):
-            dents = _dentists_qs()
+        # Dentists with intelligent date/availability parsing (prioritize if asking about dentists)
+        if asking_about_dentist or any(w in low for w in ['available', 'work', 'next week', 'tomorrow', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'ngayon', 'today', 'bukas']):
+            dents = _dentists_qs().order_by('last_name')
             if dents.exists():
                 lines = ["=== OUR DENTISTS ==="]
-                today = datetime.now().date()
+                
+                # Parse date from question
+                check_date = _parse_date(msg)
+                
+                # Determine date range for availability check
+                if 'next week' in low or 'susunod na linggo' in low:
+                    start_date = today + timedelta(days=(7 - today.weekday()))
+                    end_date = start_date + timedelta(days=4)
+                    date_context = "next week (Monday-Friday)"
+                elif check_date and check_date != today:
+                    start_date = check_date
+                    end_date = check_date
+                    date_context = _fmt_date(check_date)
+                else:
+                    start_date = today
+                    end_date = today
+                    date_context = "today"
+                
+                lines.append(f"\nAvailability for: {date_context}")
+                
                 for d in dents:
-                    lines.append(f"• Dr. {d.get_full_name()}")
-                    # Check if available today
-                    if 'today' in low or 'available' in low:
-                        avail_today = DentistAvailability.objects.filter(
-                            dentist=d, date=today, is_available=True
-                        ).exists()
-                        if avail_today:
-                            lines.append(f"  Status: Available today")
-                        else:
-                            lines.append(f"  Status: Not available today")
+                    full_name = d.get_full_name().strip()
+                    if not full_name:
+                        continue
+                    
+                    # Check availability in the date range
+                    availability = DentistAvailability.objects.filter(
+                        dentist=d,
+                        date__gte=start_date,
+                        date__lte=end_date,
+                        is_available=True
+                    ).exists()
+                    
+                    status = "✅ AVAILABLE" if availability else "❌ Not available"
+                    lines.append(f"• Dr. {full_name} - {status}")
+                
                 parts.append('\n'.join(lines))
         
-        # Clinic info and hours
-        if any(w in low for w in ['clinic', 'location', 'branch', 'where', 'hour', 'hours', 'time', 'schedule', 'open', 'address']):
-            clinics = ClinicLocation.objects.all()
+        # Clinic info and hours (only if asking about clinic/location)
+        if asking_about_clinic or any(w in low for w in ['address', 'contact', 'phone', 'schedule', 'time']):
+            clinics = ClinicLocation.objects.all().order_by('name')
             if clinics.exists():
                 lines = ["=== CLINIC LOCATIONS & HOURS ==="]
                 for c in clinics:
-                    lines.append(f"• {c.name}")
-                    lines.append(f"  Address: {c.address}")
-                    lines.append(f"  Phone: {c.phone}")
-                lines.append("\nOperating Hours:")
-                lines.append("• Monday - Friday: 8:00 AM - 6:00 PM")
-                lines.append("• Saturday: 9:00 AM - 3:00 PM")
-                lines.append("• Sunday: Closed")
+                    lines.append(f"\n📍 {c.name}")
+                    lines.append(f"   Address: {c.address}")
+                    lines.append(f"   Phone: {c.phone}")
+                lines.append("\n⏰ Operating Hours:")
+                lines.append("   • Monday - Friday: 8:00 AM - 6:00 PM")
+                lines.append("   • Saturday: 9:00 AM - 3:00 PM")
+                lines.append("   • Sunday: Closed")
                 parts.append('\n'.join(lines))
         
         # User's appointments
@@ -1425,6 +1550,7 @@ class DentalChatbotService:
                     lines.append(f"• {_fmt_date_full(a.date)} at {_fmt_time(a.time)}")
                     lines.append(f"  Service: {svc}")
                     lines.append(f"  Dentist: Dr. {a.dentist.get_full_name()}")
+                    lines.append(f"  Clinic: {a.clinic.name if a.clinic else 'TBD'}")
                 parts.append('\n'.join(lines))
         
         return '\n\n'.join(parts) if parts else ''
@@ -1438,36 +1564,38 @@ class DentalChatbotService:
 PERSONALITY: Professional, calming, efficient. Proactive — don't just say "No availability,"
 suggest alternatives.
 
-LANGUAGE SUPPORT (CRITICAL):
-- You understand **English, Tagalog, AND Taglish** (mixed English-Tagalog).
-- Taglish examples: "Magbook ako tomorrow sa Bacoor", "Cancel ko yung Feb 5", "Resched ko sa Monday".
-- Respond in the same language style the user uses.
-- Treat Taglish as natural and valid — parse mixed sentences correctly.
-- If unclear, ask for clarification in the user's language style.
+LANGUAGE MATCHING (CRITICAL - MOST IMPORTANT RULE):
+- **MATCH THE USER'S LANGUAGE EXACTLY**
+- If user speaks Tagalog/Taglish → Respond in Tagalog/Taglish
+- If user speaks English → Respond in English
+- Taglish examples: "Magbook ako tomorrow sa Bacoor", "Cancel ko yung Feb 5", "Sino available ngayon?"
+- DO NOT mix languages - if they speak Tagalog, DON'T respond in English
+
+FORMATTING (REQUIRED):
+- Use emojis to make responses friendly: 🦷 (services), 👨‍⚕️ (dentists), 📍 (locations)
+- Use **bold** for names and important info
+- Use bullet points (•) for lists
+- Keep responses conversational and warm
+- Add line breaks between sections for readability
 
 WHAT YOU CAN HELP WITH:
 - Dental services and procedures information
-- General dental health questions
+- General dental health questions  
+- Dentist availability (check the database context provided)
 - Clinic hours, locations, and contact info
-- Appointment booking, rescheduling, and cancellation (handled by structured flows)
+- Appointment booking guidance (tell them to say "Book Appointment")
 
 RESTRICTIONS:
 - NEVER share passwords, credentials, admin access, or private staff data
 - NEVER provide specific pricing — say "Pricing varies. We recommend booking a consultation."
 - ONLY answer questions related to Dorotheo Dental Clinic and dental care
 - If asked about non-dental topics, politely decline
-- NEVER say "I couldn't understand that" — instead ask clarification or suggest options
 
 CLINIC INFO:
 - Name: Dorotheo Dental and Diagnostic Center
 - Founded: 2001 by Dr. Marvin F. Dorotheo
 - Hours: Mon-Fri 8AM-6PM, Sat 9AM-3PM, Sun Closed
-- Services: Preventive, restorative, orthodontics, oral surgery, cosmetic dentistry
-
-FORMATTING:
-- Use **bold** only for headings and numbered items
-- Keep responses concise and helpful
-- Use bullet points (•) for lists"""
+- Services: Preventive, restorative, orthodontics, oral surgery, cosmetic dentistry"""
 
     # ── safety ────────────────────────────────────────────────────────────
 
