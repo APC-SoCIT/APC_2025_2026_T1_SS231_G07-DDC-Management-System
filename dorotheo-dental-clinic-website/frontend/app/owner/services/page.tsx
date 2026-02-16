@@ -120,6 +120,16 @@ export default function ServicesPage() {
         data.append("clinic_ids", clinicId.toString())
       })
 
+      console.log("Submitting service with data:", {
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        duration: formData.duration,
+        color: formData.color,
+        selectedClinics: formData.selectedClinics,
+        hasImage: !!formData.image
+      })
+
       if (editingService) {
         // Update existing service
         const updatedService = await api.updateService(editingService.id, data, token)
@@ -137,12 +147,26 @@ export default function ServicesPage() {
       setIsModalOpen(false)
     } catch (error) {
       console.error("Failed to save service:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to save service. Please try again."
+      
+      // If it's an authentication error, suggest logging out and back in
+      const isAuthError = errorMessage.includes("session has expired") || errorMessage.includes("Invalid token")
+      
       setAlertModal({
         isOpen: true,
         type: "error",
-        title: "Failed to Save",
-        message: "Failed to save service. Please try again."
+        title: isAuthError ? "Authentication Error" : "Failed to Save",
+        message: isAuthError ? `${errorMessage}\n\nClick OK to refresh the page.` : errorMessage
       })
+      
+      // If auth error, clear the invalid token and ask user to log in again
+      if (isAuthError) {
+        setTimeout(() => {
+          localStorage.removeItem("token")
+          localStorage.removeItem("user")
+          window.location.href = "/login"
+        }, 3000)
+      }
     }
   }
 

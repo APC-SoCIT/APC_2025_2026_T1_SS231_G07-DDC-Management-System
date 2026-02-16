@@ -135,6 +135,7 @@ CORS_ALLOWED_ORIGINS = [
     'https://dorothedentallossc.com.ph',
     'https://www.dorothedentallossc.com.ph',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:8000',
 ]
 
