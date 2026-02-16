@@ -241,8 +241,8 @@ EMAIL_TIMEOUT = 10
 # Enable/disable audit middleware globally
 AUDIT_MIDDLEWARE_ENABLED = os.environ.get('AUDIT_MIDDLEWARE_ENABLED', 'True') == 'True'
 
-# Enable async logging (requires Celery - implement in Task 4.8)
-AUDIT_ASYNC_LOGGING = os.environ.get('AUDIT_ASYNC_LOGGING', 'False') == 'True'
+# Enable async logging using ThreadPoolExecutor (not Celery) for non-blocking audit writes
+AUDIT_ASYNC_LOGGING = True  # Enabled by default for performance
 
 # Audit log retention period (days) - 6 years for HIPAA compliance
 AUDIT_LOG_RETENTION_DAYS = int(os.environ.get('AUDIT_LOG_RETENTION_DAYS', str(365 * 6)))
