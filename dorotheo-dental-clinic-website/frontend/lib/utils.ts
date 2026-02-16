@@ -69,3 +69,50 @@ export function getReadableColor(hexColor: string): string {
   
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
+
+/**
+ * Get service badge styles with special handling for white and black colors
+ * @param hexColor - Hex color string (e.g., "#ffffff" or "ffffff")
+ * @returns Object with backgroundColor, color, and borderColor for the badge
+ */
+export function getServiceBadgeStyle(hexColor: string): { 
+  backgroundColor: string
+  color: string
+  borderColor: string 
+} {
+  // Remove # if present and normalize
+  const hex = hexColor.replace('#', '').toLowerCase()
+  
+  // Convert to RGB to check luminance
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  
+  // Special handling for very light colors (white, near-white)
+  if (luminance > 0.95) {
+    return {
+      backgroundColor: 'rgba(31, 41, 55, 0.4)', // gray-800 at 40% opacity
+      color: '#f9fafb', // gray-50 (light text)
+      borderColor: 'rgba(75, 85, 99, 0.4)' // gray-600 at 40% opacity
+    }
+  }
+  
+  // Special handling for very dark colors (black, near-black)
+  if (luminance < 0.1) {
+    return {
+      backgroundColor: '#e5e7eb', // gray-200
+      color: '#1f2937', // gray-800 (dark text)
+      borderColor: '#9ca3af' // gray-400
+    }
+  }
+  
+  // Default: transparent background with darkened text
+  return {
+    backgroundColor: `${hexColor}20`,
+    color: getReadableColor(hexColor),
+    borderColor: `${hexColor}60`
+  }
+}

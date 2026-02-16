@@ -9,7 +9,7 @@ import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AlertModal from "@/components/alert-modal"
-import { getReadableColor } from "@/lib/utils"
+import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
 
 interface Service {
   id: number
@@ -308,9 +308,8 @@ export default function ServicesPage() {
                     <span 
                       className="px-3 py-1 rounded-lg font-bold"
                       style={{ 
-                        color: getReadableColor(service.color),
-                        backgroundColor: `${service.color}20`,
-                        border: `1.5px solid ${service.color}60`
+                        ...getServiceBadgeStyle(service.color),
+                        border: `1.5px solid ${getServiceBadgeStyle(service.color).borderColor}`
                       }}
                     >
                       {service.name}
@@ -462,9 +461,8 @@ export default function ServicesPage() {
                           <span 
                             className="inline-block px-3 py-1 rounded-lg font-bold text-sm"
                             style={{ 
-                              color: getReadableColor(tempColor),
-                              backgroundColor: `${tempColor}20`,
-                              border: `1.5px solid ${tempColor}60`
+                              ...getServiceBadgeStyle(tempColor),
+                              border: `1.5px solid ${getServiceBadgeStyle(tempColor).borderColor}`
                             }}
                           >
                             {formData.name || "Service Name"}

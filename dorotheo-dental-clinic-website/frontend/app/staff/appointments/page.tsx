@@ -23,7 +23,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
-import { getReadableColor } from "@/lib/utils"
+import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
@@ -1401,9 +1401,8 @@ export default function StaffAppointments() {
                       <span 
                         className="inline-block px-2 py-0.5 rounded-lg font-medium text-xs whitespace-nowrap"
                         style={{ 
-                          color: getReadableColor(apt.service_color || '#10b981'),
-                          backgroundColor: `${apt.service_color || '#10b981'}15`,
-                          border: `1px solid ${apt.service_color || '#10b981'}50`
+                          ...getServiceBadgeStyle(apt.service_color || '#10b981'),
+                          border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
                         }}
                       >
                         {apt.service_name || "General Consultation"}
