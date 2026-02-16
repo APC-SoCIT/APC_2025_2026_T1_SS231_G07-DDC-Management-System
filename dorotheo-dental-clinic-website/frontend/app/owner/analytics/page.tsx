@@ -72,13 +72,13 @@ export default function OwnerAnalytics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Analytics Dashboard</h1>
-          <p className="text-[var(--color-text-muted)]">Revenue and expenses overview</p>
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Analytics Dashboard</h1>
+          <p className="text-sm sm:text-base text-[var(--color-text-muted)]">Revenue and expenses overview</p>
         </div>
 
-        <div className="flex gap-2 bg-white border border-[var(--color-border)] rounded-lg p-1">
+        <div className="flex gap-1 sm:gap-2 bg-white border border-[var(--color-border)] rounded-lg p-1 overflow-x-auto">
           {[
             { id: "daily", label: "Daily" },
             { id: "weekly", label: "Weekly" },
@@ -88,7 +88,7 @@ export default function OwnerAnalytics() {
             <button
               key={filter.id}
               onClick={() => setTimeFilter(filter.id as any)}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md font-medium transition-colors whitespace-nowrap text-sm sm:text-base ${
                 timeFilter === filter.id
                   ? "bg-[var(--color-primary)] text-white"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"

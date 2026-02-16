@@ -514,18 +514,18 @@ export default function NotificationBell() {
           />
           
           {/* Notifications Panel */}
-          <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[80vh] sm:max-h-[600px] overflow-hidden flex flex-col">
+          <div className="fixed sm:absolute left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-0 mt-2 w-[calc(100vw-1rem)] max-w-[400px] sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[80vh] sm:max-h-[600px] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="px-3 sm:px-4 py-3 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm sm:text-base text-gray-900">Notifications</h3>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="font-semibold text-sm sm:text-base text-gray-900 flex-shrink truncate">Notifications</h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}
                     disabled={loading}
-                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap flex-shrink-0"
                   >
-                    Mark all as read
+                    Mark all
                   </button>
                 )}
               </div>
@@ -554,8 +554,7 @@ export default function NotificationBell() {
                     className="text-xs sm:text-sm text-red-600 hover:text-red-800 disabled:opacity-50 flex items-center gap-1"
                   >
                     <X className="w-3 h-3" />
-                    <span className="hidden sm:inline">Clear all notifications</span>
-                    <span className="sm:hidden">Clear all</span>
+                    <span>Clear all</span>
                   </button>
                 )
               )}
@@ -577,9 +576,9 @@ export default function NotificationBell() {
                       className="px-3 sm:px-4 py-3 border-b border-gray-100 bg-pink-50 hover:bg-pink-100 transition-colors"
                     >
                       <div className="flex items-start gap-2 sm:gap-3">
-                        <span className="text-xl sm:text-2xl">🎉</span>
+                        <span className="text-xl sm:text-2xl flex-shrink-0">🎉</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-medium text-gray-900">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900 break-words">
                             {birthday.name}'s birthday is today!
                           </p>
                           <p className="text-xs text-gray-600 mt-1">
@@ -613,11 +612,11 @@ export default function NotificationBell() {
                         </div>
 
                         {/* Message */}
-                        <p className="text-sm text-gray-900 mb-2">{notif.message}</p>
+                        <p className="text-sm text-gray-900 mb-2 break-words">{notif.message}</p>
 
                         {/* Appointment Details */}
                         {notif.appointment_details && (
-                          <div className="text-xs text-gray-600 space-y-1 mb-2">
+                          <div className="text-xs text-gray-600 space-y-1 mb-2 break-words">
                             <p><strong>Patient:</strong> {notif.appointment_details.patient_name}</p>
                             <p><strong>Current Date:</strong> {new Date(notif.appointment_details.date).toLocaleDateString()} at {notif.appointment_details.time}</p>
                             {notif.appointment_details.requested_date && (
@@ -636,7 +635,7 @@ export default function NotificationBell() {
                           <>
                             {/* Show buttons only if still in requested state */}
                             {notif.appointment_details.status === (notif.notification_type === 'reschedule_request' ? 'reschedule_requested' : 'cancel_requested') ? (
-                              <div className="flex gap-2 mb-2">
+                              <div className="flex flex-wrap gap-2 mb-2">
                                 <button
                                   onClick={() => {
                                     if (notif.notification_type === 'reschedule_request') {
@@ -648,7 +647,7 @@ export default function NotificationBell() {
                                   disabled={processingId === notif.id}
                                   className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
-                                  <Check className="w-3 h-3" />
+                                  <Check className="w-3 h-3 flex-shrink-0" />
                                   Approve
                                 </button>
                                 <button
@@ -662,7 +661,7 @@ export default function NotificationBell() {
                                   disabled={processingId === notif.id}
                                   className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <X className="w-3 h-3 flex-shrink-0" />
                                   Reject
                                 </button>
                               </div>
@@ -708,7 +707,7 @@ export default function NotificationBell() {
                         <button
                           onClick={() => handleMarkAsRead(notif.id)}
                           disabled={loading}
-                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap disabled:opacity-50"
+                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap disabled:opacity-50 flex-shrink-0"
                         >
                           Mark read
                         </button>
