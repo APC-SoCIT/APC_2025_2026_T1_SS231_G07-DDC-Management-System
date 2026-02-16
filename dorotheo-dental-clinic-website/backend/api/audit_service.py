@@ -16,9 +16,15 @@ tokens, and authentication credentials before logging.
 
 from django.core.exceptions import ValidationError
 from django.forms.models import model_to_dict
+from django.conf import settings
 import logging
+import concurrent.futures
+import threading
 
 logger = logging.getLogger(__name__)
+
+# Thread pool executor for async audit logging (max 2 workers to avoid database contention)
+_audit_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix='audit_log')
 
 # Sensitive fields that should NEVER be logged
 # These are stripped from all audit log data to comply with HIPAA security requirements
@@ -149,9 +155,125 @@ def sanitize_data(data):
     return sanitized
 
 
+def _write_audit_log_entry(actor_id, action_type, target_table, target_record_id, 
+                           patient_id_val, ip_address, user_agent, changes, reason):
+    """
+    Internal function that performs the actual database write for audit logs.
+    This runs in a background thread when async logging is enabled.
+    
+    Args:
+        actor_id: ID of User who performed the action (can be None)
+        action_type: Action type string
+        target_table: Name of the model/table affected
+        target_record_id: ID of the specific record affected
+        patient_id_val: ID of patient User (can be None)
+        ip_address: IP address string
+        user_agent: User agent string
+        changes: Dictionary of changes (pre-sanitized)
+        reason: String justification
+    
+    Returns:
+        AuditLog: The created audit log instance, or None if creation failed
+    """
+    import time
+    max_retries = 3
+    retry_delay = 0.1  # 100ms
+    
+    for attempt in range(max_retries):
+        try:
+            # Import here to avoid circular dependency
+            from api.models import AuditLog
+            from django import db
+            from django.db import OperationalError, IntegrityError
+            from django.contrib.auth import get_user_model
+            
+            # Close old database connections (important for thread safety)
+            db.close_old_connections()
+            
+            # Use _id suffix to assign ForeignKey by ID without fetching objects
+            # This avoids SELECT queries that can cause SQLite table locks in tests
+            audit_log = AuditLog.objects.create(
+                actor_id=actor_id,  # Direct ID assignment
+                action_type=action_type,
+                target_table=target_table,
+                target_record_id=target_record_id,
+                patient_id_id=patient_id_val,  # Note: patient_id field uses _id suffix
+                ip_address=ip_address,
+                user_agent=user_agent,
+                changes=changes,
+                reason=reason
+            )
+            
+            logger.debug(f"Audit log created: {action_type} on {target_table}:{target_record_id} by actor_id={actor_id}")
+            return audit_log
+        
+        except IntegrityError as e:
+            if 'FOREIGN KEY constraint failed' in str(e):
+                # In async/threaded context, the referenced user might not be visible yet
+                # due to transaction isolation (especially in tests)
+                User = get_user_model()
+                
+                # Check if actor exists in this thread's database connection
+                if actor_id and not User.objects.filter(id=actor_id).exists():
+                    logger.warning(
+                        f"Cannot create audit log: actor_id={actor_id} does not exist in worker thread. "
+                        f"This can happen in tests with async logging due to transaction isolation."
+                    )
+                    return None
+                
+                # Check if patient exists
+                if patient_id_val and not User.objects.filter(id=patient_id_val).exists():
+                    logger.warning(
+                        f"Cannot create audit log: patient_id={patient_id_val} does not exist in worker thread. "
+                        f"This can happen in tests with async logging due to transaction isolation."
+                    )
+                    return None
+                
+                # If both exist but we still got IntegrityError, something else is wrong
+                logger.error(
+                    f"IntegrityError creating audit log even though foreign keys exist: {str(e)}",
+                    exc_info=True
+                )
+                return None
+            else:
+                # Different IntegrityError (not foreign key)
+                logger.error(f"IntegrityError creating audit log: {str(e)}", exc_info=True)
+                return None
+            
+        except OperationalError as e:
+            if 'database table is locked' in str(e) or 'database is locked' in str(e):
+                # SQLite table lock - retry with exponential backoff
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    logger.warning(f"SQLite lock detected, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"Failed to create audit log after {max_retries} retries: {str(e)}")
+                    return None
+            else:
+                # Not a lock error, don't retry
+                logger.error(f"Failed to create audit log in worker thread: {str(e)}", exc_info=True)
+                return None
+                
+        except Exception as e:
+            # Log the error but don't crash the application
+            logger.error(f"Failed to create audit log in worker thread: {str(e)}", exc_info=True)
+            return None
+        finally:
+            # Close connections after thread work
+            db.close_old_connections()
+    
+    return None
+
+
 def create_audit_log(actor, action_type, target_table, target_record_id, **kwargs):
     """
     Create an audit log entry with proper error handling.
+    
+    This is the main function for creating audit logs. When async logging is enabled,
+    it offloads the database write to a background thread, allowing the HTTP response
+    to return immediately without waiting for the audit log to be written.
     
     This is the main function for creating audit logs. It handles all database
     operations and ensures that audit logging failures never crash the application.
@@ -169,7 +291,7 @@ def create_audit_log(actor, action_type, target_table, target_record_id, **kwarg
             - reason: String justification for the action
     
     Returns:
-        AuditLog: The created audit log instance, or None if creation failed
+        AuditLog: The created audit log instance (sync mode), or None (async mode)
     
     Error Handling:
         - Automatically sanitizes 'changes' dictionary to remove sensitive data
@@ -204,29 +326,40 @@ def create_audit_log(actor, action_type, target_table, target_record_id, **kwarg
         ... )
     """
     try:
-        # Import here to avoid circular dependency
-        from api.models import AuditLog
+        # Extract IDs in main thread (safer than passing model instances to threads)
+        actor_id = actor.id if actor else None
+        patient_id_val = kwargs.get('patient_id').id if kwargs.get('patient_id') else None
         
-        # Sanitize changes dictionary to remove sensitive data
+        # Sanitize changes dictionary in main thread (CPU work done before threading)
         changes = kwargs.get('changes')
         if changes:
-            kwargs['changes'] = sanitize_data(changes)
+            changes = sanitize_data(changes)
+        else:
+            changes = None
         
-        # Create the audit log entry
-        audit_log = AuditLog.objects.create(
-            actor=actor,
-            action_type=action_type,
-            target_table=target_table,
-            target_record_id=target_record_id,
-            patient_id=kwargs.get('patient_id'),
-            ip_address=kwargs.get('ip_address'),
-            user_agent=kwargs.get('user_agent', ''),
-            changes=kwargs.get('changes'),
-            reason=kwargs.get('reason', '')
-        )
+        # Extract other parameters
+        ip_address = kwargs.get('ip_address')
+        user_agent = kwargs.get('user_agent', '')
+        reason = kwargs.get('reason', '')
         
-        logger.info(f"Audit log created: {action_type} on {target_table}:{target_record_id} by {actor}")
-        return audit_log
+        # Check if async logging is enabled
+        async_enabled = getattr(settings, 'AUDIT_ASYNC_LOGGING', False)
+        
+        if async_enabled:
+            # Submit to thread pool for non-blocking write
+            _audit_executor.submit(
+                _write_audit_log_entry,
+                actor_id, action_type, target_table, target_record_id,
+                patient_id_val, ip_address, user_agent, changes, reason
+            )
+            # Return None immediately (fire-and-forget)
+            return None
+        else:
+            # Synchronous mode - call directly and return result
+            return _write_audit_log_entry(
+                actor_id, action_type, target_table, target_record_id,
+                patient_id_val, ip_address, user_agent, changes, reason
+            )
         
     except Exception as e:
         # Log the error but don't crash the application

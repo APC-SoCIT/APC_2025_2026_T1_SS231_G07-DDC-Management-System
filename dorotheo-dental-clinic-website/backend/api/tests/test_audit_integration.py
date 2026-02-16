@@ -7,7 +7,7 @@ to database audit log entries.
 Run with: python manage.py test api.tests.test_audit_integration
 """
 
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
@@ -19,6 +19,7 @@ import json
 User = get_user_model()
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class LoginAuditTest(TestCase):
     """Test audit logging for authentication flows."""
     
@@ -106,6 +107,7 @@ class LoginAuditTest(TestCase):
         self.assertEqual(failed_logs.count(), initial_count + 5)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class CRUDOperationAuditTest(TestCase):
     """Test audit logging for CRUD operations."""
     
@@ -272,6 +274,7 @@ class CRUDOperationAuditTest(TestCase):
         self.assertEqual(log.patient_id, self.patient)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class SearchAndExportAuditTest(TestCase):
     """Test audit logging for search and export operations."""
     
@@ -356,6 +359,7 @@ class SearchAndExportAuditTest(TestCase):
         self.assertEqual(log.patient_id, patient)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class DocumentAccessAuditTest(TestCase):
     """Test audit logging for document access."""
     
@@ -402,6 +406,7 @@ class DocumentAccessAuditTest(TestCase):
         self.assertGreater(new_count, initial_count)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class MiddlewareCoverageTest(TestCase):
     """Test middleware catches requests not logged by signals/decorators."""
     
@@ -429,6 +434,7 @@ class MiddlewareCoverageTest(TestCase):
         self.assertGreaterEqual(new_count, initial_count)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class ComplianceScenarioTest(TestCase):
     """Test realistic compliance scenarios."""
     

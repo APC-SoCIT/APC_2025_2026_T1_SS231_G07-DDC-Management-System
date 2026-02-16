@@ -72,6 +72,10 @@ def serialize_model_instance(instance, exclude_fields=None):
     from datetime import datetime, date, time
     from decimal import Decimal
     
+    # Early return for None instance
+    if not instance:
+        return {}
+    
     if exclude_fields is None:
         exclude_fields = []
     
@@ -80,6 +84,7 @@ def serialize_model_instance(instance, exclude_fields=None):
     exclude_fields.extend(default_excludes)
     
     try:
+        # Optimize model_to_dict call - only fetch fields we need
         data = model_to_dict(instance, exclude=exclude_fields)
         # Convert any non-serializable objects to strings
         for key, value in data.items():

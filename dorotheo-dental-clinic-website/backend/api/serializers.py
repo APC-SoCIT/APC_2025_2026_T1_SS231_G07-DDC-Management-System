@@ -26,7 +26,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'user_type', 
+        fields = ['id', 'username', 'email', 'password', 'first_name', 'last_name', 'user_type', 
                   'role', 'phone', 'address', 'birthday', 'age', 'profile_picture', 
                   'is_active_patient', 'is_archived', 'assigned_clinic', 'assigned_clinic_name', 
                   'created_at', 'last_appointment_date']
@@ -152,6 +152,24 @@ class UserSerializer(serializers.ModelSerializer):
             if today < eighteenth_birthday:
                 raise serializers.ValidationError("Staff member must be at least 18 years old")
         
+        return value
+    
+    def validate_password(self, value):
+        """Validate password strength using Django's password validators"""
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        
+        # Create a temporary user object for validation context
+        # We try to use the initial data to populate the user for similarity checks
+        user = User(**{
+            k: v for k, v in self.initial_data.items() 
+            if k in [f.name for f in User._meta.get_fields()]
+        })
+
+        try:
+            validate_password(value, user=user)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
         return value
     
     def validate(self, data):

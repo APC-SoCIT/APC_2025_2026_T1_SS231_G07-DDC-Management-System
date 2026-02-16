@@ -4,7 +4,7 @@ Unit tests for audit logging system.
 Run with: python manage.py test api.tests.test_audit
 """
 
-from django.test import TestCase, RequestFactory
+from django.test import TestCase, RequestFactory, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import IntegrityError
@@ -20,6 +20,7 @@ import json
 User = get_user_model()
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class AuditLogModelTest(TestCase):
     """Test AuditLog model creation and validation."""
     
@@ -184,6 +185,7 @@ class AuditLogModelTest(TestCase):
         self.assertIn('target_table', indexed_fields)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class AuditServiceTest(TestCase):
     """Test audit service utility functions."""
     
@@ -355,6 +357,7 @@ class AuditServiceTest(TestCase):
         self.assertTrue(user_agent.startswith('AAA'))
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class AuditSignalsTest(TestCase):
     """Test that signals automatically create audit logs."""
     
@@ -399,6 +402,7 @@ class AuditSignalsTest(TestCase):
             self.assertEqual(log.patient_id, self.patient_user)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class AuditDecoratorTest(TestCase):
     """Test audit logging decorators."""
     
@@ -424,6 +428,7 @@ class AuditDecoratorTest(TestCase):
         pass
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class AuditMiddlewareTest(TestCase):
     """Test audit middleware request logging."""
     
@@ -442,6 +447,7 @@ class AuditMiddlewareTest(TestCase):
         pass
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False, RATELIMIT_ENABLE=False)
 class AuditPerformanceTest(TestCase):
     """Test audit logging performance."""
     

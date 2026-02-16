@@ -13,7 +13,7 @@ Tests verify that:
 9. Patient viewing own records logged with self as actor
 """
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import get_user_model
@@ -29,6 +29,7 @@ from django.utils import timezone
 User = get_user_model()
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False)
 class TestReadAuditLogging(TestCase):
     """Integration tests for READ operation audit logging."""
     
@@ -388,6 +389,7 @@ class TestReadAuditLogging(TestCase):
         self.assertEqual(logs.count(), 0)
 
 
+@override_settings(AUDIT_ASYNC_LOGGING=False)
 class TestExportAuditLogging(TestCase):
     """Test audit logging for data exports."""
     
