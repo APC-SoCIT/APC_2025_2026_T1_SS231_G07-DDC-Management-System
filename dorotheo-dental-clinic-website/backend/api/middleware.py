@@ -67,6 +67,10 @@ class AuditMiddleware(MiddlewareMixin):
         if not request.path.startswith('/api/'):
             return response
         
+        # Skip OPTIONS and HEAD requests (CORS preflight and metadata checks)
+        if request.method in ['OPTIONS', 'HEAD']:
+            return response
+        
         # Skip if unauthenticated
         if not hasattr(request, 'user') or not request.user.is_authenticated:
             return response
