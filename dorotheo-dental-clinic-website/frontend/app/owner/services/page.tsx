@@ -9,6 +9,7 @@ import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AlertModal from "@/components/alert-modal"
+import { getContrastColor } from "@/lib/utils"
 
 interface Service {
   id: number
@@ -307,9 +308,9 @@ export default function ServicesPage() {
                     <span 
                       className="px-3 py-1 rounded-lg font-bold border"
                       style={{ 
-                        backgroundColor: `${service.color}20`, 
-                        color: service.color,
-                        borderColor: `${service.color}50`
+                        backgroundColor: service.color, 
+                        color: getContrastColor(service.color),
+                        borderColor: service.color
                       }}
                     >
                       {service.name}
@@ -454,6 +455,20 @@ export default function ServicesPage() {
                         />
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-mono text-[var(--color-text-muted)]">{tempColor}</span>
+                        </div>
+                        {/* Preview how the service badge will look */}
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-xs text-[var(--color-text-muted)] mb-2">Preview:</p>
+                          <span 
+                            className="inline-block px-3 py-1 rounded-lg font-bold border text-sm"
+                            style={{ 
+                              backgroundColor: tempColor, 
+                              color: getContrastColor(tempColor),
+                              borderColor: tempColor
+                            }}
+                          >
+                            {formData.name || "Service Name"}
+                          </span>
                         </div>
                         <div className="flex gap-2">
                           <button
