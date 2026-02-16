@@ -13,7 +13,7 @@ from .models import (
     Service, Appointment, User, DentistAvailability,
     ClinicLocation, BlockedTimeSlot,
 )
-from .views import create_appointment_notification
+from .views import create_appointment_notification, create_patient_notification
 
 # ── Utility helpers ────────────────────────────────────────────────────────
 
@@ -806,6 +806,12 @@ class DentalChatbotService:
             status='confirmed',
             notes='Automatically booked by AI Sage',
         )
+        
+        # Send notification to staff/owner
+        create_appointment_notification(appt, 'new_appointment')
+        
+        # Send notification to patient
+        create_patient_notification(appt, 'appointment_confirmed')
 
         return self._reply(
             f"✅ **Appointment Booked Successfully!**\n\n"

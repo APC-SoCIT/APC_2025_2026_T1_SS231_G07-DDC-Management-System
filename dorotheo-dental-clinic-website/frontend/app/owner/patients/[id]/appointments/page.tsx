@@ -381,7 +381,16 @@ export default function PatientAppointmentsPage() {
   }
 
   const formatDentistName = (dentist: Staff) => {
-    return `Dr. ${dentist.first_name} ${dentist.last_name}`
+    const fullName = `${dentist.first_name || ''} ${dentist.last_name || ''}`.trim()
+    // Return empty string if no name available - these should be filtered out
+    if (!fullName) {
+      return ''
+    }
+    // Only add "Dr." if it's not already in the name
+    if (fullName.toLowerCase().startsWith('dr.') || fullName.toLowerCase().startsWith('dr ')) {
+      return fullName
+    }
+    return `Dr. ${fullName}`
   }
 
   const getStatusColor = (status: string) => {
@@ -1096,11 +1105,17 @@ export default function PatientAppointmentsPage() {
                       required
                     >
                       <option value="">Select a dentist first...</option>
-                      {staff.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {formatDentistName(s)}
-                        </option>
-                      ))}
+                      {staff
+                        .filter((s) => {
+                          // Filter out dentists with empty names
+                          const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim()
+                          return fullName.length > 0
+                        })
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {formatDentistName(s)}
+                          </option>
+                        ))}
                     </select>
                     {newAppointment.dentist && (
                       <p className="text-xs text-green-600 mt-1">

@@ -269,8 +269,16 @@ export default function OwnerAppointments() {
 
   // Format dentist name with Dr. prefix
   const formatDentistName = (dentist: Staff) => {
-    const prefix = dentist.first_name.startsWith('Dr.') ? '' : 'Dr. '
-    return `${prefix}${dentist.first_name} ${dentist.last_name}`
+    const fullName = `${dentist.first_name || ''} ${dentist.last_name || ''}`.trim()
+    // Return empty string if no name available - these should be filtered out
+    if (!fullName) {
+      return ''
+    }
+    // Only add "Dr." if it's not already in the name
+    if (fullName.toLowerCase().startsWith('dr.') || fullName.toLowerCase().startsWith('dr ')) {
+      return fullName
+    }
+    return `Dr. ${fullName}`
   }
 
   // Format time from HH:MM:SS or HH:MM to 12-hour format (e.g., "1:00 PM")
@@ -1982,11 +1990,17 @@ export default function OwnerAppointments() {
                       disabled={!newAppointment.clinic}
                     >
                       <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select clinic first"}</option>
-                      {staff.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {formatDentistName(s)}
-                        </option>
-                      ))}
+                      {staff
+                        .filter((s) => {
+                          // Filter out dentists with empty names
+                          const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim()
+                          return fullName.length > 0
+                        })
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {formatDentistName(s)}
+                          </option>
+                        ))}
                     </select>
                     {!newAppointment.clinic && (
                       <p className="text-xs text-amber-600 mt-1">
