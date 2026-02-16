@@ -117,7 +117,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Changed from IsAuthenticated to allow browsing
+        'rest_framework.permissions.AllowAny',  # Public by default - sensitive endpoints have explicit IsAuthenticated
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -132,7 +132,8 @@ REST_FRAMEWORK = {
 # Cannot use CORS_ALLOW_ALL_ORIGINS with CORS_ALLOW_CREDENTIALS due to browser security
 CORS_ALLOWED_ORIGINS = [
     'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
-    'https://*.vercel.app',
+    'https://dorothedentallossc.com.ph',
+    'https://www.dorothedentallossc.com.ph',
     'http://localhost:3000',
     'http://localhost:8000',
 ]
@@ -169,12 +170,11 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # CSRF Settings for Railway deployment
 CSRF_TRUSTED_ORIGINS = [
-    'https://*.railway.app',
-    'https://*.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:8000',
+    'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
     'https://dorothedentallossc.com.ph',
     'https://www.dorothedentallossc.com.ph',
+    'http://localhost:3000',
+    'http://localhost:8000',
 ]
 
 # Add any custom domains from environment variable
@@ -259,3 +259,12 @@ AUDIT_SKIP_PATHS = [
     '/static/',
     '/media/',
 ]
+
+# ============================================
+# SESSION CONFIGURATION
+# ============================================
+
+# Session timeout - 15 minutes
+SESSION_COOKIE_AGE = 900  # 15 minutes in seconds
+SESSION_SAVE_EVERY_REQUEST = True  # Reset session timer on every request
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Clear session on browser close

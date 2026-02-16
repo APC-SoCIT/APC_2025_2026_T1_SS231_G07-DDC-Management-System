@@ -20,26 +20,45 @@ class Command(BaseCommand):
         
         try:
             with transaction.atomic():
-                # 1. Create/Update Main Clinic (Bacoor) - GREEN
-                main_clinic, main_created = ClinicLocation.objects.update_or_create(
+                # Delete old "Main Clinic" entry if it exists
+                ClinicLocation.objects.filter(name="Main Clinic").delete()
+                
+                # Delete old long-name entries to avoid duplicates
+                ClinicLocation.objects.filter(
+                    name__in=[
+                        "Dorotheo Dental Clinic - Bacoor (Main)",
+                        "Dorotheo Dental Clinic - Bacoor",
+                        "Dorotheo Dental Clinic - Alabang",
+                        "Dorotheo Dental Clinic - Poblacion"
+                    ]
+                ).exclude(id__in=[1, 2, 3]).delete()
+                
+                # Delete any duplicate clinic entries (keep only IDs 1, 2, 3)
+                deleted_count = ClinicLocation.objects.exclude(id__in=[1, 2, 3]).delete()[0]
+                if deleted_count > 0:
+                    self.stdout.write(self.style.WARNING(f"🗑️  Cleaned up {deleted_count} duplicate/old clinic entries"))
+                
+                # 1. Create/Update Bacoor Clinic - GREEN
+                bacoor_clinic, bacoor_created = ClinicLocation.objects.update_or_create(
                     id=1,
                     defaults={
-                        'name': "Dorotheo Dental Clinic - Bacoor (Main)",
+                        'name': "Bacoor",
                         'address': "Unit 5, 2nd Floor, SM City Bacoor, Tirona Highway, Bacoor, Cavite 4102",
                         'phone': "+63 46 417 1234"
                     }
                 )
-                if main_created:
-                    self.stdout.write(self.style.SUCCESS(f"✓ Created Main Clinic (Bacoor) - ID: {main_clinic.id}"))
+                if bacoor_created:
+                    self.stdout.write(self.style.SUCCESS(f"✓ Created Bacoor Clinic - ID: {bacoor_clinic.id}"))
                     self.stdout.write(self.style.WARNING(f"  Color: GREEN 🟢"))
                 else:
-                    self.stdout.write(self.style.WARNING(f"✓ Updated Main Clinic (Bacoor) - ID: {main_clinic.id}"))
+                    self.stdout.write(self.style.WARNING(f"✓ Updated Bacoor Clinic - ID: {bacoor_clinic.id}"))
                     self.stdout.write(self.style.WARNING(f"  Color: GREEN 🟢"))
 
-                # 2. Create Alabang Branch - BLUE
-                alabang_clinic, alabang_created = ClinicLocation.objects.get_or_create(
-                    name="Dorotheo Dental Clinic - Alabang",
+                # 2. Create/Update Alabang Branch - BLUE
+                alabang_clinic, alabang_created = ClinicLocation.objects.update_or_create(
+                    id=2,
                     defaults={
+                        'name': "Alabang",
                         'address': "Ground Floor, Festival Mall, Filinvest City, Alabang, Muntinlupa City 1781",
                         'phone': "+63 2 8809 5678"
                     }
@@ -48,13 +67,14 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(f"✓ Created Alabang Clinic - ID: {alabang_clinic.id}"))
                     self.stdout.write(self.style.WARNING(f"  Color: BLUE 🔵"))
                 else:
-                    self.stdout.write(self.style.WARNING(f"✓ Alabang Clinic already exists - ID: {alabang_clinic.id}"))
+                    self.stdout.write(self.style.WARNING(f"✓ Updated Alabang Clinic - ID: {alabang_clinic.id}"))
                     self.stdout.write(self.style.WARNING(f"  Color: BLUE 🔵"))
 
-                # 3. Create Poblacion Branch - PURPLE
-                poblacion_clinic, poblacion_created = ClinicLocation.objects.get_or_create(
-                    name="Dorotheo Dental Clinic - Poblacion",
+                # 3. Create/Update Poblacion Branch - PURPLE
+                poblacion_clinic, poblacion_created = ClinicLocation.objects.update_or_create(
+                    id=3,
                     defaults={
+                        'name': "Poblacion",
                         'address': "2nd Floor, Poblacion Commercial Center, 5678 P. Burgos Street, Poblacion, Makati City 1210",
                         'phone': "+63 2 8888 9012"
                     }
@@ -63,7 +83,7 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(f"✓ Created Poblacion Clinic - ID: {poblacion_clinic.id}"))
                     self.stdout.write(self.style.WARNING(f"  Color: PURPLE 🟣"))
                 else:
-                    self.stdout.write(self.style.WARNING(f"✓ Poblacion Clinic already exists - ID: {poblacion_clinic.id}"))
+                    self.stdout.write(self.style.WARNING(f"✓ Updated Poblacion Clinic - ID: {poblacion_clinic.id}"))
                     self.stdout.write(self.style.WARNING(f"  Color: PURPLE 🟣"))
 
                 self.stdout.write('')
@@ -74,7 +94,7 @@ class Command(BaseCommand):
                 all_clinics = ClinicLocation.objects.all()
                 for clinic in all_clinics:
                     color_indicator = ''
-                    if 'bacoor' in clinic.name.lower() or 'main' in clinic.name.lower():
+                    if 'bacoor' in clinic.name.lower():
                         color_indicator = '🟢 GREEN'
                     elif 'alabang' in clinic.name.lower():
                         color_indicator = '🔵 BLUE'
@@ -98,7 +118,7 @@ class Command(BaseCommand):
                     if services.exists():
                         for service in services:
                             # Add all clinics to each service
-                            service.clinics.add(main_clinic, alabang_clinic, poblacion_clinic)
+                            service.clinics.add(bacoor_clinic, alabang_clinic, poblacion_clinic)
                         
                         self.stdout.write(self.style.SUCCESS(f"✓ Assigned {services.count()} services to all 3 clinics"))
                     else:
@@ -110,7 +130,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS('=' * 70))
                 self.stdout.write('')
                 self.stdout.write(self.style.WARNING('📝 Note: Clinic colors are automatically assigned by the frontend based on names:'))
-                self.stdout.write(self.style.WARNING('   • Names containing "Bacoor" or "Main" → GREEN 🟢'))
+                self.stdout.write(self.style.WARNING('   • Names containing "Bacoor" → GREEN 🟢'))
                 self.stdout.write(self.style.WARNING('   • Names containing "Alabang" → BLUE 🔵'))
                 self.stdout.write(self.style.WARNING('   • Names containing "Poblacion" or "Makati" → PURPLE 🟣'))
                 self.stdout.write('')
