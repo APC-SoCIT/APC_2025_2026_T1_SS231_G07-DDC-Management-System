@@ -3,6 +3,7 @@ import { Geist, Playfair_Display } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth"
 import { ClinicProvider } from "@/lib/clinic-context"
+import { SessionTimeout } from "@/components/ui/session-timeout"
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${playfair.variable}`}>
       <body>
         <AuthProvider>
+          <SessionTimeout />
           <ClinicProvider>
             {children}
           </ClinicProvider>

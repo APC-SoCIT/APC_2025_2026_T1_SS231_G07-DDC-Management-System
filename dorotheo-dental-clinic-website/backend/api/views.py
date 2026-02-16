@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import authenticate
+from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
@@ -270,8 +271,8 @@ def create_patient_notification(appointment, notification_type, custom_message=N
     return notification
 
 
-@api_view(['POST'])
 @permission_classes([AllowAny])
+@api_view(['POST'])
 def register(request):
     logger.info("[Django] Registration request received: %s", request.data)
     
@@ -289,8 +290,9 @@ def register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
 @permission_classes([AllowAny])
+@api_view(['POST'])
+@ratelimit(key='ip', rate='5/m', block=True)
 def login(request):
     username = request.data.get('username')
     password = request.data.get('password')
@@ -374,8 +376,8 @@ def logout(request):
     return Response({'message': 'Logged out successfully'})
 
 
-@api_view(['POST'])
 @permission_classes([AllowAny])
+@api_view(['POST'])
 def request_password_reset(request):
     """Request a password reset token"""
     email = request.data.get('email')
@@ -433,8 +435,8 @@ def request_password_reset(request):
         })
 
 
-@api_view(['POST'])
 @permission_classes([AllowAny])
+@api_view(['POST'])
 def reset_password(request):
     """Reset password using token"""
     token = request.data.get('token')
@@ -501,6 +503,7 @@ def current_user(request):
 class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """
@@ -884,6 +887,7 @@ class ServiceViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='Appointment')
     def retrieve(self, request, pk=None):
@@ -1623,6 +1627,7 @@ class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class DentalRecordViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = DentalRecord.objects.all()
     serializer_class = DentalRecordSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='DentalRecord')
     def retrieve(self, request, pk=None):
@@ -1655,6 +1660,7 @@ class DentalRecordViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class DocumentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='Document')
     def retrieve(self, request, pk=None):
@@ -1696,6 +1702,7 @@ class DocumentViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all().order_by('name')
     serializer_class = InventoryItemSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = InventoryItem.objects.all().order_by('name')
@@ -1706,6 +1713,42 @@ class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(clinic_id=clinic_id)
         
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        """Only staff and owners can create inventory items"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can create inventory items'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        """Only staff and owners can update inventory items"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can update inventory items'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Only staff and owners can partially update inventory items"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can update inventory items'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """Only staff and owners can delete inventory items"""
+        if request.user.user_type not in ['staff', 'owner']:
+            return Response(
+                {'error': 'Only staff and owners can delete inventory items'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
 
     def create_low_stock_notification(self, inventory_item):
         """Create notification for low stock inventory item"""
@@ -1792,6 +1835,7 @@ class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class BillingViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = Billing.objects.all()
     serializer_class = BillingSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='Billing')
     def retrieve(self, request, pk=None):
@@ -1848,6 +1892,7 @@ class ClinicLocationViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class TreatmentPlanViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = TreatmentPlan.objects.all()
     serializer_class = TreatmentPlanSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='TreatmentPlan')
     def retrieve(self, request, pk=None):
@@ -1866,6 +1911,7 @@ class TreatmentPlanViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class TeethImageViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = TeethImage.objects.all()
     serializer_class = TeethImageSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='TeethImage')
     def retrieve(self, request, pk=None):
@@ -1986,6 +2032,7 @@ def analytics(request):
 class StaffAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = StaffAvailability.objects.all()
     serializer_class = StaffAvailabilitySerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Filter by staff member and/or clinic if specified"""
@@ -2016,6 +2063,13 @@ class StaffAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
             return Response(
                 {'error': 'staff_id is required'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Permission check: Only owner or the staff member themselves can update availability
+        if request.user.user_type != 'owner' and request.user.id != staff_id:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         try:
@@ -2100,6 +2154,7 @@ class DentistAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = DentistAvailability.objects.all()
     serializer_class = DentistAvailabilitySerializer
     pagination_class = None  # Disable pagination to show all availability dates
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Filter by dentist, clinic, and date range if specified"""
@@ -2155,6 +2210,13 @@ class DentistAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
             return Response(
                 {'error': 'dentist_id is required'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Permission check: Only owner or the dentist themselves can update availability
+        if request.user.user_type != 'owner' and request.user.id != dentist_id:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         try:
@@ -2235,6 +2297,13 @@ class DentistAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
             return Response(
                 {'error': 'dentist_id and dates are required'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Permission check: Only owner or the dentist themselves can delete availability
+        if request.user.user_type != 'owner' and request.user.id != dentist_id:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         queryset = DentistAvailability.objects.filter(
@@ -2440,6 +2509,7 @@ class AppointmentNotificationViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class PatientIntakeFormViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = PatientIntakeForm.objects.all()
     serializer_class = PatientIntakeFormSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='PatientIntakeForm')
     def retrieve(self, request, pk=None):
@@ -2477,6 +2547,7 @@ class PatientIntakeFormViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class FileAttachmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = FileAttachment.objects.all()
     serializer_class = FileAttachmentSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Filter based on user role"""
@@ -2510,6 +2581,7 @@ class FileAttachmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class ClinicalNoteViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = ClinicalNote.objects.all()
     serializer_class = ClinicalNoteSerializer
+    permission_classes = [IsAuthenticated]
 
     @log_patient_access(action_type='READ', target_table='ClinicalNote')
     def retrieve(self, request, pk=None):
@@ -2548,6 +2620,7 @@ class ClinicalNoteViewSet(AuditContextMixin, viewsets.ModelViewSet):
 class TreatmentAssignmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
     queryset = TreatmentAssignment.objects.all()
     serializer_class = TreatmentAssignmentSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Filter based on user role"""
@@ -2593,8 +2666,8 @@ class TreatmentAssignmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-@api_view(['POST'])
 @permission_classes([AllowAny])  # Can be used by both authenticated and anonymous users
+@api_view(['POST'])
 def chatbot_query(request):
     """
     Handle chatbot queries using Ollama LLM.
