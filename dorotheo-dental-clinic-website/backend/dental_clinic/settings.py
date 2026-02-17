@@ -124,8 +124,10 @@ else:
 # CACHING CONFIGURATION
 # ============================================
 
-# Azure Cache for Redis (production)
-if os.environ.get('REDIS_URL'):
+# Redis caching (ONLY if explicitly enabled)
+# Note: For Supabase deployments, database sessions are often faster than Redis
+# due to Supabase's optimized Transaction Pooler (port 6543)
+if os.environ.get('REDIS_URL') and os.environ.get('ENABLE_REDIS_CACHE') == 'True':
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
@@ -135,9 +137,13 @@ if os.environ.get('REDIS_URL'):
             },
         }
     }
-    # Use Redis for session storage (better performance and scalability)
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-    SESSION_CACHE_ALIAS = 'default'
+    # Only use Redis for sessions if latency is low (<5ms) and explicitly enabled
+    if os.environ.get('ENABLE_REDIS_SESSIONS') == 'True':
+        SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+        SESSION_CACHE_ALIAS = 'default'
+    else:
+        # Use database sessions (faster with Supabase)
+        SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 else:
     # Local memory cache (development)
     CACHES = {
@@ -145,6 +151,8 @@ else:
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         }
     }
+    # Use database sessions in production (optimal for Supabase)
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
