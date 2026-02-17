@@ -445,24 +445,24 @@ export default function StaffDashboard() {
       </div>
 
       {/* Interactive Calendar - Full Width */}
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-[var(--color-primary)]">Appointment Calendar</h2>
-            <div className="flex items-center gap-2">
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-[var(--color-primary)]">Appointment Calendar</h2>
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
               <button 
                 onClick={previousMonth}
-                className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
-              <span className="font-semibold text-[var(--color-text)] min-w-[180px] text-center">
+              <span className="font-semibold text-[var(--color-text)] min-w-[140px] sm:min-w-[180px] text-center text-sm sm:text-base px-2">
                 {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </span>
               <button 
                 onClick={nextMonth}
-                className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>

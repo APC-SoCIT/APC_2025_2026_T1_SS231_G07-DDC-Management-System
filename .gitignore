@@ -68,3 +68,6 @@ out/
 # pnpm-lock.yaml
 # package-lock.json
 # yarn.lock
+
+# Database file
+dorotheo-dental-clinic-website/backend/db.sqlite3

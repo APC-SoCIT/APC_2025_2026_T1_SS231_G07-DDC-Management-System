@@ -269,44 +269,44 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 lg:p-8 pb-20 lg:pb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 lg:mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Services Management</h1>
-          <p className="text-[var(--color-text-muted)]">Add, edit, or remove dental services</p>
+          <h1 className="text-2xl lg:text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Services Management</h1>
+          <p className="text-sm lg:text-base text-[var(--color-text-muted)]">Add, edit, or remove dental services</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          className="flex items-center justify-center gap-2 px-4 lg:px-6 py-2.5 lg:py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors text-sm lg:text-base w-full sm:w-auto"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
           Add Service
         </button>
       </div>
 
       {services.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-[var(--color-border)]">
-          <p className="text-[var(--color-text-muted)] text-lg mb-4">No services yet</p>
+          <p className="text-[var(--color-text-muted)] text-base lg:text-lg mb-4">No services yet</p>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+            className="px-4 lg:px-6 py-2.5 lg:py-3 text-sm lg:text-base bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
           >
             Add Your First Service
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{services.map((service) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">{services.map((service) => (
           <div
             key={service.id}
             className="bg-white rounded-xl shadow-sm border border-[var(--color-border)] overflow-hidden"
           >
-            <img src={service.image || "/placeholder.svg"} alt={service.name} className="w-full h-48 object-cover" />
-            <div className="p-6">
+            <img src={service.image || "/placeholder.svg"} alt={service.name} className="w-full h-40 lg:h-48 object-cover" />
+            <div className="p-4 lg:p-6">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-xl font-semibold mb-1">
+                  <h3 className="text-lg lg:text-xl font-semibold mb-1">
                     <span 
-                      className="px-3 py-1 rounded-lg font-bold"
+                      className="px-2 lg:px-3 py-1 rounded-lg text-sm lg:text-base font-bold border"
                       style={{ 
                         ...getServiceBadgeStyle(service.color),
                         border: `1.5px solid ${getServiceBadgeStyle(service.color).borderColor}`
@@ -316,10 +316,10 @@ export default function ServicesPage() {
                     </span>
                   </h3>
                   <div className="flex items-center gap-2 flex-wrap mt-2">
-                    <span className="inline-block px-3 py-1 bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-xs rounded-full">
+                    <span className="inline-block px-2 lg:px-3 py-1 bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-xs rounded-full">
                       {categories.find((c) => c.value === service.category)?.label}
                     </span>
-                    <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-full">
+                    <span className="inline-block px-2 lg:px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-full">
                       {formatDuration(service.duration)}
                     </span>
                   </div>
@@ -341,20 +341,20 @@ export default function ServicesPage() {
                   )}
                 </div>
               </div>
-              <p className="text-[var(--color-text-muted)] text-sm mb-4">{service.description}</p>
+              <p className="text-[var(--color-text-muted)] text-xs lg:text-sm mb-4">{service.description}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleEdit(service)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[var(--color-primary)] text-[var(--color-primary)] rounded-lg hover:bg-[var(--color-primary)]/5 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1 lg:gap-2 px-3 lg:px-4 py-2 text-xs lg:text-sm border border-[var(--color-primary)] text-[var(--color-primary)] rounded-lg hover:bg-[var(--color-primary)]/5 transition-colors"
                 >
-                  <Pencil className="w-4 h-4" />
+                  <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(service.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1 lg:gap-2 px-3 lg:px-4 py-2 text-xs lg:text-sm border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
                   Delete
                 </button>
               </div>
