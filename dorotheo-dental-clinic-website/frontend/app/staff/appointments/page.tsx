@@ -1398,15 +1398,20 @@ export default function StaffAppointments() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <span 
-                        className="inline-block px-2 py-0.5 rounded-lg font-medium text-xs whitespace-nowrap"
-                        style={{ 
-                          ...getServiceBadgeStyle(apt.service_color || '#10b981'),
-                          border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
-                        }}
-                      >
-                        {apt.service_name || "General Consultation"}
-                      </span>
+                      {(() => {
+                        const badgeStyle = getServiceBadgeStyle(apt.service_color || '#10b981');
+                        return (
+                          <span 
+                            className="inline-block px-2 py-0.5 rounded-lg font-medium text-xs whitespace-nowrap"
+                            style={{ 
+                              ...badgeStyle,
+                              border: `1px solid ${badgeStyle.borderColor}`
+                            }}
+                          >
+                            {apt.service_name || "General Consultation"}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{apt.date}</td>
                     <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>

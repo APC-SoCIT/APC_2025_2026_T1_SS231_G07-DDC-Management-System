@@ -83,6 +83,16 @@ export function getServiceBadgeStyle(hexColor: string): {
   // Remove # if present and normalize
   const hex = hexColor.replace('#', '').toLowerCase()
   
+  // Validate hex color format
+  if (hex.length !== 6 || !/^[0-9a-f]{6}$/.test(hex)) {
+    // Return default gray if invalid
+    return {
+      backgroundColor: 'rgba(107, 114, 128, 0.2)',
+      color: '#374151',
+      borderColor: 'rgba(107, 114, 128, 0.6)'
+    }
+  }
+  
   // Convert to RGB to check luminance
   const r = parseInt(hex.substring(0, 2), 16)
   const g = parseInt(hex.substring(2, 4), 16)
