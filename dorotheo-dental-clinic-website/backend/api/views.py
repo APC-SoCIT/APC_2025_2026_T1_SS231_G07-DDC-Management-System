@@ -835,6 +835,21 @@ class ServiceViewSet(AuditContextMixin, viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [AllowAny]
 
+    def perform_create(self, serializer):
+        """
+        Override to handle both authenticated and anonymous service creation.
+        Services can be created by anyone (AllowAny), but we only log audit
+        context if the user is properly authenticated.
+        """
+        try:
+            # Call parent's perform_create which handles audit context injection
+            # for authenticated users. For anonymous users, it will just save normally.
+            super().perform_create(serializer)
+        except Exception as e:
+            # If there's an issue with the parent's perform_create, fall back to simple save
+            logger.error(f"Error in audit context injection for service creation: {e}")
+            serializer.save()
+
     def get_queryset(self):
         queryset = Service.objects.all().order_by('name')
         

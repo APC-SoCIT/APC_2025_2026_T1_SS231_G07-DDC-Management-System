@@ -108,7 +108,51 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
       body: data,
     })
-    if (!response.ok) throw new Error("Failed to create service")
+    if (!response.ok) {
+      // Try to parse error response
+      let errorData: any = {}
+      const contentType = response.headers.get("content-type")
+      
+      try {
+        if (contentType?.includes("application/json")) {
+          errorData = await response.json()
+        } else {
+          const textError = await response.text()
+          console.error("Non-JSON error response:", textError)
+          errorData = { error: textError }
+        }
+      } catch (e) {
+        console.error("Failed to parse error response:", e)
+      }
+      
+      console.error("Create service failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData: errorData
+      })
+      
+      // Handle authentication errors
+      if (response.status === 401) {
+        throw new Error("Your session has expired. Please log out and log in again.")
+      }
+      
+      // Extract error message
+      let errorMessage = "Failed to create service"
+      if (errorData.detail) {
+        errorMessage = errorData.detail
+      } else if (errorData.error) {
+        errorMessage = errorData.error
+      } else if (typeof errorData === 'object' && Object.keys(errorData).length > 0) {
+        // Handle field-specific errors
+        const errors = Object.entries(errorData).map(([field, msgs]) => {
+          const messages = Array.isArray(msgs) ? msgs.join(", ") : msgs
+          return `${field}: ${messages}`
+        }).join("; ")
+        if (errors) errorMessage = errors
+      }
+      
+      throw new Error(errorMessage)
+    }
     return response.json()
   },
 

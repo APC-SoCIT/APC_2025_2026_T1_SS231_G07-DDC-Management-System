@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getReadableColor, getServiceBadgeStyle } from '@/lib/utils'
 import Link from "next/link"
 
 interface Appointment {
@@ -313,9 +314,14 @@ export default function StaffDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                         <div className="flex flex-col gap-1 pt-2">
                           <button onClick={() => handlePatientStatusChange(apt.id, 'waiting')} className="px-3 py-1 rounded text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors max-w-[120px]">Waiting</button>
                           <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
@@ -345,9 +351,14 @@ export default function StaffDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                         <div className="flex flex-col gap-1 pt-2">
                           <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
                           <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
@@ -376,9 +387,14 @@ export default function StaffDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                         <div className="flex flex-col gap-1 pt-2">
                           <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
                         </div>
@@ -406,9 +422,14 @@ export default function StaffDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))
@@ -576,3 +597,5 @@ export default function StaffDashboard() {
     </div>
   )
 }
+
+

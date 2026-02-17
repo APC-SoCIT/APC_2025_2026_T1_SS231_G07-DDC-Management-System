@@ -169,10 +169,19 @@ REST_FRAMEWORK = {
 
 # CORS Configuration - Use specific allowed origins when credentials are needed
 # Cannot use CORS_ALLOW_ALL_ORIGINS with CORS_ALLOW_CREDENTIALS due to browser security
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:8000'
-).split(',')
+CORS_ALLOWED_ORIGINS = [
+    'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
+    'https://dorothedentallossc.com.ph',
+    'https://www.dorothedentallossc.com.ph',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:8000',
+]
+
+# Allow additional origins from environment variable
+custom_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if custom_cors_origins:
+    CORS_ALLOWED_ORIGINS.extend(custom_cors_origins.split(','))
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
