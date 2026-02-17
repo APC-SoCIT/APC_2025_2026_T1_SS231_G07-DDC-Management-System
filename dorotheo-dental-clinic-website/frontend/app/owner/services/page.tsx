@@ -9,6 +9,7 @@ import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AlertModal from "@/components/alert-modal"
+import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
 
 interface Service {
   id: number
@@ -120,6 +121,16 @@ export default function ServicesPage() {
         data.append("clinic_ids", clinicId.toString())
       })
 
+      console.log("Submitting service with data:", {
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        duration: formData.duration,
+        color: formData.color,
+        selectedClinics: formData.selectedClinics,
+        hasImage: !!formData.image
+      })
+
       if (editingService) {
         // Update existing service
         const updatedService = await api.updateService(editingService.id, data, token)
@@ -137,12 +148,26 @@ export default function ServicesPage() {
       setIsModalOpen(false)
     } catch (error) {
       console.error("Failed to save service:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to save service. Please try again."
+      
+      // If it's an authentication error, suggest logging out and back in
+      const isAuthError = errorMessage.includes("session has expired") || errorMessage.includes("Invalid token")
+      
       setAlertModal({
         isOpen: true,
         type: "error",
-        title: "Failed to Save",
-        message: "Failed to save service. Please try again."
+        title: isAuthError ? "Authentication Error" : "Failed to Save",
+        message: isAuthError ? `${errorMessage}\n\nClick OK to refresh the page.` : errorMessage
       })
+      
+      // If auth error, clear the invalid token and ask user to log in again
+      if (isAuthError) {
+        setTimeout(() => {
+          localStorage.removeItem("token")
+          localStorage.removeItem("user")
+          window.location.href = "/login"
+        }, 3000)
+      }
     }
   }
 
@@ -281,11 +306,10 @@ export default function ServicesPage() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">
                     <span 
-                      className="px-3 py-1 rounded-lg font-bold border"
+                      className="px-3 py-1 rounded-lg font-bold"
                       style={{ 
-                        backgroundColor: `${service.color}20`, 
-                        color: service.color,
-                        borderColor: `${service.color}50`
+                        ...getServiceBadgeStyle(service.color),
+                        border: `1.5px solid ${getServiceBadgeStyle(service.color).borderColor}`
                       }}
                     >
                       {service.name}
@@ -430,6 +454,19 @@ export default function ServicesPage() {
                         />
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-mono text-[var(--color-text-muted)]">{tempColor}</span>
+                        </div>
+                        {/* Preview how the service badge will look */}
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-xs text-[var(--color-text-muted)] mb-2">Preview:</p>
+                          <span 
+                            className="inline-block px-3 py-1 rounded-lg font-bold text-sm"
+                            style={{ 
+                              ...getServiceBadgeStyle(tempColor),
+                              border: `1.5px solid ${getServiceBadgeStyle(tempColor).borderColor}`
+                            }}
+                          >
+                            {formData.name || "Service Name"}
+                          </span>
                         </div>
                         <div className="flex gap-2">
                           <button

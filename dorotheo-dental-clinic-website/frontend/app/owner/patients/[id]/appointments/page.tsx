@@ -7,6 +7,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getServiceBadgeStyle } from "@/lib/utils"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 import UnifiedDocumentUpload from "@/components/unified-document-upload"
@@ -414,22 +415,6 @@ export default function PatientAppointmentsPage() {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  const darkenColor = (color: string, percent: number) => {
-    const num = parseInt(color.replace("#", ""), 16)
-    const amt = Math.round(2.55 * percent)
-    const R = (num >> 16) - amt
-    const G = ((num >> 8) & 0x00ff) - amt
-    const B = (num & 0x0000ff) - amt
-    return `#${(
-      0x1000000 +
-      (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-      (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-      (B < 255 ? (B < 1 ? 0 : B) : 255)
-    )
-      .toString(16)
-      .slice(1)}`
-  }
-
   const fetchDocumentsAndImages = async (appointmentId: number) => {
     setLoadingFiles(prev => ({ ...prev, [appointmentId]: true }))
 
@@ -582,9 +567,8 @@ export default function PatientAppointmentsPage() {
                           <span 
                             className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                             style={{ 
-                              color: darkenColor(apt.service_color || '#10b981', 40),
-                              backgroundColor: `${apt.service_color || '#10b981'}15`,
-                              border: `1px solid ${apt.service_color || '#10b981'}40`
+                              ...getServiceBadgeStyle(apt.service_color || '#10b981'),
+                              border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
                             }}
                           >
                             {apt.service_name || "General Consultation"}
@@ -833,9 +817,8 @@ export default function PatientAppointmentsPage() {
                           <span 
                             className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                             style={{ 
-                              color: darkenColor(apt.service_color || '#10b981', 40),
-                              backgroundColor: `${apt.service_color || '#10b981'}15`,
-                              border: `1px solid ${apt.service_color || '#10b981'}40`
+                              ...getServiceBadgeStyle(apt.service_color || '#10b981'),
+                              border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
                             }}
                           >
                             {apt.service_name || "General Consultation"}
