@@ -1,4 +1,4 @@
-# Backend First-Time Setup
+# Backend First-Time Setup (backend/README.md)
 
 ## 🚀 Quick Start (Automated Setup)
 
@@ -198,25 +198,4 @@ backend/
 ├── db.sqlite3            # SQLite database
 ├── manage.py             # Django management script
 ├── requirements.txt      # Python dependencies
-├── setup.ps1             # Windows PowerShell setup
-├── setup.bat             # Windows CMD setup
-└── setup.sh              # Linux/Mac/Git Bash setup
 ```
-
----
-
-## 🆘 Need Help?
-
-1. Check `project-documentation/setup-guides/BACKEND_SETUP.md`
-2. Check `project-documentation/deployment-guides/` for deployment guides
-3. Open an issue on GitHub
-
----
-
-## ✅ Next Steps After Setup
-
-1. ✅ Backend is running locally
-2. 🔲 Set up frontend (see `../frontend/README.md`)
-3. 🔲 Test API endpoints
-4. 🔲 Connect frontend to backend
-5. 🔲 Configure environment variables for production

@@ -113,7 +113,8 @@ if os.environ.get('AZURE_ACCOUNT_NAME'):
     AZURE_ACCOUNT_NAME = os.environ['AZURE_ACCOUNT_NAME']
     AZURE_ACCOUNT_KEY = os.environ.get('AZURE_ACCOUNT_KEY')
     AZURE_CONTAINER = os.environ.get('AZURE_CONTAINER', 'media')
-    DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+    # Use custom storage backend with Cache-Control headers
+    DEFAULT_FILE_STORAGE = 'api.storage.CachedAzureStorage'
     MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
 else:
     # Local file storage (development)

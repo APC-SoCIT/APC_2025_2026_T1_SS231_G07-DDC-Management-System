@@ -1,4 +1,4 @@
-# Frontend Setup Guide
+# Frontend Setup Guide (frontend/SETUP.md)
 
 ## Prerequisites
 
@@ -68,7 +68,6 @@ frontend/
 │   └── utils.ts          # Helper functions
 ├── public/               # Static assets
 └── styles/              # Global styles
-
 ```
 
 ## Tech Stack
@@ -102,12 +101,6 @@ lsof -ti:3000 | xargs kill -9
 # Or run on a different port
 PORT=3001 npm run dev
 ```
-
-### API Connection Issues
-
-1. Verify the backend is running on the correct port (default: 8000)
-2. Check your `.env.local` has the correct `NEXT_PUBLIC_API_URL`
-3. Ensure CORS is configured in the backend settings
 
 ## Development Workflow
 

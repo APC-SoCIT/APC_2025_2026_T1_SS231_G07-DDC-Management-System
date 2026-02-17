@@ -141,6 +141,7 @@ Other users will see "Permission Denied" if they try to access.
 - **All Time**: Complete database history
 
 ### Queries Run
+
 ```python
 # Total logs
 AuditLog.objects.count()
