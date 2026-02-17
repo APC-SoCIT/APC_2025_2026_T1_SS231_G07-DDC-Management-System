@@ -494,9 +494,9 @@ export default function NotificationBell() {
           setIsOpen(!isOpen)
           if (!isOpen) fetchNotifications()
         }}
-        className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+        className="relative p-2 hover:bg-gray-100 lg:hover:bg-gray-100 hover:bg-white/20 rounded-full transition-colors"
       >
-        <Bell className="w-6 h-6 text-gray-700" />
+        <Bell className="w-6 h-6 text-white lg:text-gray-700" />
         {(unreadCount + birthdayNotifications.length) > 0 && (
           <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
             {(unreadCount + birthdayNotifications.length) > 9 ? '9+' : (unreadCount + birthdayNotifications.length)}
