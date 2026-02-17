@@ -30,13 +30,6 @@ export function InvoiceStep3Review({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold">Review Invoice Before Sending</h2>
-        <p className="text-sm text-muted-foreground">
-          Please verify all details before creating the invoice
-        </p>
-      </div>
-
       {/* Patient & Appointment Info */}
       <Card>
         <CardHeader>
@@ -233,7 +226,7 @@ export function InvoiceStep3Review({
         <Button variant="outline" onClick={onBack}>
           ← Back to Edit
         </Button>
-        <Button onClick={onConfirm} size="lg" className="min-w-[200px]">
+        <Button onClick={onConfirm} size="lg" className="min-w-[200px] bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white">
           Confirm & Send Invoice →
         </Button>
       </div>

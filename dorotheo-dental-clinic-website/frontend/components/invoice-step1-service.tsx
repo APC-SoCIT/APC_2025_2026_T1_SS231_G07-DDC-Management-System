@@ -51,13 +51,6 @@ export function InvoiceStep1Service({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold">Create Invoice - Service Details</h2>
-        <p className="text-sm text-muted-foreground">
-          Review the appointment information and service charge
-        </p>
-      </div>
-
       {/* Appointment Information */}
       <Card>
         <CardHeader>
@@ -148,7 +141,7 @@ export function InvoiceStep1Service({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={handleNext}>
+        <Button onClick={handleNext} className="bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white">
           Next: Add Items
         </Button>
       </div>
