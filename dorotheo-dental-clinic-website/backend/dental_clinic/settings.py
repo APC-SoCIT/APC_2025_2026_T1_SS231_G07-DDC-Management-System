@@ -104,8 +104,47 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# ============================================
+# MEDIA FILES CONFIGURATION
+# ============================================
+
+# Azure Blob Storage for media files (production)
+if os.environ.get('AZURE_ACCOUNT_NAME'):
+    AZURE_ACCOUNT_NAME = os.environ['AZURE_ACCOUNT_NAME']
+    AZURE_ACCOUNT_KEY = os.environ.get('AZURE_ACCOUNT_KEY')
+    AZURE_CONTAINER = os.environ.get('AZURE_CONTAINER', 'media')
+    DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+    MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
+else:
+    # Local file storage (development)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+
+# ============================================
+# CACHING CONFIGURATION
+# ============================================
+
+# Azure Cache for Redis (production)
+if os.environ.get('REDIS_URL'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': os.environ['REDIS_URL'],
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+        }
+    }
+    # Use Redis for session storage (better performance and scalability)
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'default'
+else:
+    # Local memory cache (development)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -130,18 +169,10 @@ REST_FRAMEWORK = {
 
 # CORS Configuration - Use specific allowed origins when credentials are needed
 # Cannot use CORS_ALLOW_ALL_ORIGINS with CORS_ALLOW_CREDENTIALS due to browser security
-CORS_ALLOWED_ORIGINS = [
-    'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
-    'https://dorothedentallossc.com.ph',
-    'https://www.dorothedentallossc.com.ph',
-    'http://localhost:3000',
-    'http://localhost:8000',
-]
-
-# Allow additional origins from environment variable
-custom_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-if custom_cors_origins:
-    CORS_ALLOWED_ORIGINS.extend(custom_cors_origins.split(','))
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://localhost:8000'
+).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -169,18 +200,10 @@ CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight requests for 24 hours
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # CSRF Settings for Railway deployment
-CSRF_TRUSTED_ORIGINS = [
-    'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
-    'https://dorothedentallossc.com.ph',
-    'https://www.dorothedentallossc.com.ph',
-    'http://localhost:3000',
-    'http://localhost:8000',
-]
-
-# Add any custom domains from environment variable
-custom_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
-if custom_origins:
-    CSRF_TRUSTED_ORIGINS.extend(custom_origins.split(','))
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://localhost:8000'
+).split(',')
 
 # More permissive CSRF settings for development
 CSRF_COOKIE_HTTPONLY = False
