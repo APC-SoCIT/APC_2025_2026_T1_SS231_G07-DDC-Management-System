@@ -49,7 +49,7 @@ export function ClinicSelector({ showAllOption = false, className }: ClinicSelec
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className={cn("justify-between min-w-[200px]", className)}>
+        <Button variant="outline" className={cn("justify-between min-w-[200px] bg-white", className)}>
           <div className="flex items-center">
             <Building2 className="mr-2 h-4 w-4" />
             <span className="truncate">{displayText}</span>
@@ -57,7 +57,7 @@ export function ClinicSelector({ showAllOption = false, className }: ClinicSelec
           <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
+      <DropdownMenuContent align="end" className="w-[200px] bg-white">
         {showAllOption && (
           <DropdownMenuItem
             onClick={() => setSelectedClinic("all")}
