@@ -64,5 +64,5 @@ out/
 # package-lock.json
 # yarn.lock
 
-# Database file
-dorotheo-dental-clinic-website/backend/db.sqlite3
+# Database file (commented out to share test data)
+# dorotheo-dental-clinic-website/backend/db.sqlite3
