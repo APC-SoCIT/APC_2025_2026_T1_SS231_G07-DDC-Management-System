@@ -322,7 +322,6 @@ export function AddInventoryModal({
           {/* Unit Cost */}
           <div className="space-y-2">
             <Label htmlFor="unit_cost" className="flex items-center gap-1">
-              <DollarSign className="w-4 h-4" />
               Unit Cost (₱) <span className="text-destructive">*</span>
             </Label>
             <Input
