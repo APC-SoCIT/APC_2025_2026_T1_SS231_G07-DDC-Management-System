@@ -7,6 +7,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getServiceBadgeStyle } from "@/lib/utils"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 import UnifiedDocumentUpload from "@/components/unified-document-upload"
@@ -423,22 +424,6 @@ export default function PatientAppointmentsPage() {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  const darkenColor = (color: string, percent: number) => {
-    const num = parseInt(color.replace("#", ""), 16)
-    const amt = Math.round(2.55 * percent)
-    const R = (num >> 16) - amt
-    const G = ((num >> 8) & 0x00ff) - amt
-    const B = (num & 0x0000ff) - amt
-    return `#${(
-      0x1000000 +
-      (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-      (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-      (B < 255 ? (B < 1 ? 0 : B) : 255)
-    )
-      .toString(16)
-      .slice(1)}`
-  }
-
   const fetchDocumentsAndImages = async (appointmentId: number) => {
     setLoadingFiles(prev => ({ ...prev, [appointmentId]: true }))
 
@@ -470,6 +455,32 @@ export default function PatientAppointmentsPage() {
 
     setExpandedRow(appointmentId)
     await fetchDocumentsAndImages(appointmentId)
+  }
+
+  const handleDownloadImage = (imageUrl: string, filename: string) => {
+    fetch(imageUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      })
+      .catch(error => {
+        console.error('Download failed:', error)
+        // Fallback to direct link
+        const link = document.createElement('a')
+        link.href = imageUrl
+        link.download = filename
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      })
   }
 
   if (isLoading) {
@@ -591,9 +602,8 @@ export default function PatientAppointmentsPage() {
                           <span 
                             className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                             style={{ 
-                              color: darkenColor(apt.service_color || '#10b981', 40),
-                              backgroundColor: `${apt.service_color || '#10b981'}15`,
-                              border: `1px solid ${apt.service_color || '#10b981'}40`
+                              ...getServiceBadgeStyle(apt.service_color || '#10b981'),
+                              border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
                             }}
                           >
                             {apt.service_name || "General Consultation"}
@@ -842,9 +852,8 @@ export default function PatientAppointmentsPage() {
                           <span 
                             className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                             style={{ 
-                              color: darkenColor(apt.service_color || '#10b981', 40),
-                              backgroundColor: `${apt.service_color || '#10b981'}15`,
-                              border: `1px solid ${apt.service_color || '#10b981'}40`
+                              ...getServiceBadgeStyle(apt.service_color || '#10b981'),
+                              border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
                             }}
                           >
                             {apt.service_name || "General Consultation"}
@@ -1334,25 +1343,24 @@ export default function PatientAppointmentsPage() {
           onClick={() => setSelectedImage(null)}
         >
           <div
-            className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col"
+            className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+            <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between flex-shrink-0">
               <div>
-                <h2 className="text-2xl font-bold text-[var(--color-primary)]">Dental Image</h2>
+                <h2 className="text-xl font-bold text-[var(--color-primary)]">Dental Pictures - {new Date(selectedImage.uploaded_at).toLocaleDateString()}</h2>
                 {selectedImage.notes && (
                   <p className="text-sm text-gray-500 mt-1">{selectedImage.notes}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={selectedImage.image_url}
-                  download={`dental-image-${selectedImage.id}.jpg`}
+                <button
+                  onClick={() => handleDownloadImage(selectedImage.image_url, `dental-image-${new Date(selectedImage.uploaded_at).toLocaleDateString()}.jpg`)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                   title="Download"
                 >
                   <Download className="w-5 h-5" />
-                </a>
+                </button>
                 <button
                   onClick={() => setSelectedImage(null)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1361,11 +1369,11 @@ export default function PatientAppointmentsPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-hidden p-4">
+            <div className="flex-1 overflow-auto p-6 min-h-0">
               <img
                 src={selectedImage.image_url}
                 alt="Dental image"
-                className="w-full h-full object-contain"
+                className="w-full h-auto max-h-full object-contain mx-auto"
               />
             </div>
           </div>

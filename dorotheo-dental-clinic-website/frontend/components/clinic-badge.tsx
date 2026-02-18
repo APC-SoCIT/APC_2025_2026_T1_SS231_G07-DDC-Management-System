@@ -30,24 +30,48 @@ const getShortClinicName = (clinicName: string): string => {
   return shortName.trim() || clinicName;
 };
 
-// Color mapping for different clinics
-const getClinicColor = (clinicName: string): string => {
-  if (!clinicName) return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700';
+// Color mapping for different clinics - returns style object with darker bg and light text
+const getClinicColorStyle = (clinicName: string): { backgroundColor: string; color: string; borderColor: string } => {
+  if (!clinicName) return {
+    backgroundColor: 'rgba(107, 114, 128, 0.15)',
+    color: '#374151',
+    borderColor: 'rgba(107, 114, 128, 0.3)'
+  };
   
   const lowerName = clinicName.toLowerCase();
   
   if (lowerName.includes('bacoor') || lowerName.includes('main')) {
-    return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700';
+    return {
+      backgroundColor: 'rgba(20, 184, 166, 0.20)', // teal-500 at 20%
+      color: '#0f766e', // teal-700
+      borderColor: 'rgba(20, 184, 166, 0.4)' // teal-500 at 40%
+    };
   } else if (lowerName.includes('alabang')) {
-    return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-700';
+    return {
+      backgroundColor: 'rgba(59, 130, 246, 0.20)', // blue-500 at 20%
+      color: '#1d4ed8', // blue-700
+      borderColor: 'rgba(59, 130, 246, 0.4)' // blue-500 at 40%
+    };
   } else if (lowerName.includes('poblacion') || lowerName.includes('makati')) {
-    return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-700';
+    return {
+      backgroundColor: 'rgba(168, 85, 247, 0.20)', // purple-500 at 20%
+      color: '#7e22ce', // purple-700
+      borderColor: 'rgba(168, 85, 247, 0.4)' // purple-500 at 40%
+    };
   } else if (lowerName.includes('branch')) {
-    return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-700';
+    return {
+      backgroundColor: 'rgba(249, 115, 22, 0.20)', // orange-500 at 20%
+      color: '#c2410c', // orange-700
+      borderColor: 'rgba(249, 115, 22, 0.4)' // orange-500 at 40%
+    };
   }
   
   // Default color
-  return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700';
+  return {
+    backgroundColor: 'rgba(107, 114, 128, 0.15)',
+    color: '#374151',
+    borderColor: 'rgba(107, 114, 128, 0.3)'
+  };
 };
 
 export function ClinicBadge({ 
@@ -69,7 +93,7 @@ export function ClinicBadge({
     lg: 'h-4 w-4',
   };
 
-  const clinicColor = variant === 'outline' ? getClinicColor(clinic.name) : '';
+  const clinicStyle = variant === 'outline' ? getClinicColorStyle(clinic.name) : undefined;
   const displayName = getShortClinicName(clinic.name);
 
   return (
@@ -77,10 +101,10 @@ export function ClinicBadge({
       variant={variant}
       className={cn(
         sizeClasses[size],
-        variant === 'outline' && clinicColor,
         'inline-flex items-center gap-1 font-medium border',
         className
       )}
+      style={clinicStyle}
       title={clinic.name} // Show full name on hover
     >
       {showIcon && <Building2 className={iconSizes[size]} />}

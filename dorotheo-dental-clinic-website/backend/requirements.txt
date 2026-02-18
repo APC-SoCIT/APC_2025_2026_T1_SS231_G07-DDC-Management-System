@@ -15,3 +15,6 @@ requests==2.31.0
 schedule==1.2.0
 sentry-sdk==2.19.2
 django-ratelimit==4.1.0
+django-storages[azure]==1.14.2
+azure-storage-blob==12.19.0
+django-redis==5.4.0

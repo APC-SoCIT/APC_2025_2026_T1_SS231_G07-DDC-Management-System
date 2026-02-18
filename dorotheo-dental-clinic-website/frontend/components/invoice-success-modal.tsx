@@ -37,7 +37,7 @@ export function InvoiceSuccessModal({
   }
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-white dark:bg-gray-900">
         <DialogTitle className="sr-only">
           Invoice Created Successfully
         </DialogTitle>

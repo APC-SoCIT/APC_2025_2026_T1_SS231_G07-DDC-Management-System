@@ -38,7 +38,7 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--color-primary)] border-b border-[var(--color-primary)] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-10 w-auto object-contain" />
         </div>
@@ -48,7 +48,7 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
           <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-10 h-10 bg-[var(--color-primary)] rounded-full flex items-center justify-center"
+              className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
             >
               <User className="w-5 h-5 text-white" />
             </button>
@@ -63,7 +63,7 @@ export default function StaffLayout({ children }: Readonly<{ children: React.Rea
               </div>
             )}
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-white">
             {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>

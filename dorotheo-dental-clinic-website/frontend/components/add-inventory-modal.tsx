@@ -1,10 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Package, DollarSign, Boxes, AlertTriangle } from "lucide-react"
 import { api } from "@/lib/api"
@@ -180,18 +177,18 @@ export function AddInventoryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogHeader className="border-b border-[var(--color-border)] pb-4">
+          <DialogTitle className="flex items-center gap-2 text-2xl font-display text-[var(--color-primary)]">
             <Package className="w-5 h-5" />
             Add Inventory Item
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-[var(--color-text-muted)]">
             Add a new item to your clinic's inventory. All fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           {/* Error Display */}
           {error && (
             <Alert variant="destructive">
@@ -201,17 +198,17 @@ export function AddInventoryModal({
           )}
 
           {/* Clinic Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="clinic" className="flex items-center gap-1">
-              Clinic <span className="text-destructive">*</span>
-            </Label>
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+              Clinic *
+            </label>
             <select
               id="clinic"
               name="clinic"
               value={formData.clinic}
               onChange={handleInputChange}
               disabled={loading}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
               required
             >
               <option value="">Select Clinic...</option>
@@ -224,33 +221,35 @@ export function AddInventoryModal({
           </div>
 
           {/* Item Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name" className="flex items-center gap-1">
-              Item Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+              Item Name *
+            </label>
+            <input
+              type="text"
               id="name"
               name="name"
               value={formData.name}
               onChange={handleInputChange}
               placeholder="e.g., Dental Floss, Toothpaste, Gloves..."
               disabled={loading}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
               required
             />
           </div>
 
           {/* Category */}
-          <div className="space-y-2">
-            <Label htmlFor="category" className="flex items-center gap-1">
-              Category <span className="text-destructive">*</span>
-            </Label>
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+              Category *
+            </label>
             <select
               id="category"
               name="category"
               value={formData.category}
               onChange={handleInputChange}
               disabled={loading}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
               required
             >
               <option value="">Select Category...</option>
@@ -264,120 +263,129 @@ export function AddInventoryModal({
 
           {/* Quantity and Min Stock Row */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity" className="flex items-center gap-1">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5 flex items-center gap-1">
                 <Boxes className="w-4 h-4" />
-                Quantity <span className="text-destructive">*</span>
-              </Label>
-              <Input
+                Quantity *
+              </label>
+              <input
+                type="number"
                 id="quantity"
                 name="quantity"
-                type="number"
                 min="0"
                 value={formData.quantity}
                 onChange={handleInputChange}
                 placeholder="0"
                 disabled={loading}
+                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
                 required
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="min_stock" className="flex items-center gap-1">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5 flex items-center gap-1">
                 <AlertTriangle className="w-4 h-4" />
-                Min Stock Level <span className="text-destructive">*</span>
-              </Label>
-              <Input
+                Min Stock Level *
+              </label>
+              <input
+                type="number"
                 id="min_stock"
                 name="min_stock"
-                type="number"
                 min="0"
                 value={formData.min_stock}
                 onChange={handleInputChange}
                 placeholder="10"
                 disabled={loading}
+                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
                 required
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">
                 Alert when stock falls below this level
               </p>
             </div>
           </div>
 
           {/* Supplier */}
-          <div className="space-y-2">
-            <Label htmlFor="supplier">
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
               Supplier (Optional)
-            </Label>
-            <Input
+            </label>
+            <input
+              type="text"
               id="supplier"
               name="supplier"
               value={formData.supplier}
               onChange={handleInputChange}
               placeholder="e.g., ABC Medical Supplies"
               disabled={loading}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
             />
           </div>
 
           {/* Unit Cost */}
-          <div className="space-y-2">
-            <Label htmlFor="unit_cost" className="flex items-center gap-1">
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5 flex items-center gap-1">
               <DollarSign className="w-4 h-4" />
-              Unit Cost (₱) <span className="text-destructive">*</span>
-            </Label>
-            <Input
+              Unit Cost (₱) *
+            </label>
+            <input
+              type="number"
               id="unit_cost"
               name="unit_cost"
-              type="number"
               step="0.01"
               min="0.01"
               value={formData.unit_cost}
               onChange={handleInputChange}
               placeholder="0.00"
               disabled={loading}
+              className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
               required
             />
           </div>
 
           {/* Total Cost Display */}
-          <div className="p-4 bg-primary/5 rounded-lg border">
+          <div className="p-4 bg-[var(--color-background)] rounded-lg border border-[var(--color-border)]">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm text-muted-foreground">Total Cost</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-[var(--color-text)]">Total Cost</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
                   {formData.quantity || 0} units × ₱{formData.unit_cost || "0.00"}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-primary">₱{totalCost}</p>
+                <p className="text-2xl font-bold text-[var(--color-text)]">₱{totalCost}</p>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <DialogFooter className="gap-2">
-            <Button
+          <div className="flex gap-3 pt-4 border-t border-[var(--color-border)]">
+            <button
               type="button"
-              variant="outline"
               onClick={handleClose}
               disabled={loading}
+              className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium disabled:opacity-50"
             >
               Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            >
               {loading ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <span className="animate-spin">⏳</span>
                   Adding...
                 </>
               ) : (
                 <>
-                  <Package className="w-4 h-4 mr-2" />
+                  <Package className="w-4 h-4" />
                   Add Item
                 </>
               )}
-            </Button>
-          </DialogFooter>
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

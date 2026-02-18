@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getReadableColor, getServiceBadgeStyle } from '@/lib/utils'
 import Link from "next/link"
 
 interface Appointment {
@@ -315,9 +316,14 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                         <div className="flex flex-col gap-1 pt-2">
                           <button onClick={() => handlePatientStatusChange(apt.id, 'waiting')} className="px-3 py-1 rounded text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors max-w-[120px]">Waiting</button>
                           <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
@@ -347,9 +353,14 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                         <div className="flex flex-col gap-1 pt-2">
                           <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
                           <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
@@ -378,9 +389,14 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                         <div className="flex flex-col gap-1 pt-2">
                           <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
                         </div>
@@ -408,9 +424,14 @@ export default function OwnerDashboard() {
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: apt.service_color || '#6B7280' }}>
-                          {apt.service_name || "Consultation"}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getServiceBadgeStyle(apt.service_color || '#6B7280');
+                          return (
+                            <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ ...badgeStyle, border: `1px solid ${badgeStyle.borderColor}` }}>
+                              {apt.service_name || "Consultation"}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))
@@ -426,24 +447,24 @@ export default function OwnerDashboard() {
       </div>
 
       {/* Interactive Calendar - Full Width */}
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-[var(--color-primary)]">Appointment Calendar</h2>
-            <div className="flex items-center gap-2">
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-[var(--color-primary)]">Appointment Calendar</h2>
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
               <button 
                 onClick={previousMonth}
-                className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
-              <span className="font-semibold text-[var(--color-text)] min-w-[180px] text-center">
+              <span className="font-semibold text-[var(--color-text)] min-w-[140px] sm:min-w-[180px] text-center text-sm sm:text-base px-2">
                 {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </span>
               <button 
                 onClick={nextMonth}
-                className="p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-[var(--color-background)] rounded-lg transition-colors"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>

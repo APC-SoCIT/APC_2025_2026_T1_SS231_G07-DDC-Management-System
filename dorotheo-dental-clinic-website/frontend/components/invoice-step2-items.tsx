@@ -193,15 +193,8 @@ export function InvoiceStep2Items({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold">Add Treatment Items</h2>
-        <p className="text-sm text-muted-foreground">
-          Select inventory items used during the treatment
-        </p>
-      </div>
-
       {/* Current Total */}
-      <Card className="bg-primary/5">
+      <Card className="bg-[var(--color-primary)]/10">
         <CardContent className="pt-6">
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">Current Invoice Total:</span>
@@ -372,7 +365,7 @@ export function InvoiceStep2Items({
           <Button variant="outline" onClick={onNext}>
             Skip Items
           </Button>
-          <Button onClick={onNext}>
+          <Button onClick={onNext} className="bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white">
             Continue to Review →
           </Button>
         </div>

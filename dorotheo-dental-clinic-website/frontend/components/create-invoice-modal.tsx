@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog"
 import { InvoiceStep1Service } from "./invoice-step1-service"
 import { InvoiceStep2Items } from "./invoice-step2-items"
 import { InvoiceStep3Review } from "./invoice-step3-review"
@@ -9,13 +9,13 @@ import { InvoiceSuccessModal } from "./invoice-success-modal"
 import {
 Dialog as ConfirmDialog,
   DialogContent as ConfirmDialogContent,
-  DialogDescription,
+  DialogDescription as ConfirmDialogDescription,
   DialogFooter,
-  DialogHeader,
+  DialogHeader as ConfirmDialogHeader,
   DialogTitle as ConfirmDialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, FileText, ClipboardList, Package, Eye } from "lucide-react"
 import { createInvoice } from "@/lib/api"
 import { InvoiceData, InvoiceItem, InvoiceTotals } from "@/lib/types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -145,10 +145,19 @@ export function CreateInvoiceModal({
     <>
       {/* Main Modal */}
       <Dialog open={isOpen && !showSuccess} onOpenChange={handleClose}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogTitle className="sr-only">
-            Create Invoice - Step {step} of 3
-          </DialogTitle>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900">
+          {/* Green Header */}
+          <DialogHeader className="bg-[var(--color-primary)] text-white -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+            <DialogTitle className="flex items-center gap-2 text-2xl font-display text-white">
+              <FileText className="w-6 h-6" />
+              Create Invoice
+            </DialogTitle>
+            <DialogDescription className="text-white/80">
+              {step === 1 && "Review the appointment information and service charge"}
+              {step === 2 && "Add additional items to the invoice"}
+              {step === 3 && "Review and confirm invoice details"}
+            </DialogDescription>
+          </DialogHeader>
           
           {/* Check if invoice already exists */}
           {appointmentHasInvoice ? (
@@ -167,37 +176,54 @@ export function CreateInvoiceModal({
           ) : (
             <>
               {/* Progress Indicator */}
-              <div className="flex items-center justify-center mb-6 pb-6 border-b">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center mt-6 pb-6 border-b">
+                <div className="flex items-center gap-4">
                   {/* Step 1 */}
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-colors ${
-                    step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    1
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-full font-semibold transition-colors ${
+                      step >= 1 ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      <ClipboardList className="w-5 h-5" />
+                    </div>
+                    <span className={`text-xs font-medium ${step >= 1 ? 'text-[var(--color-primary)]' : 'text-gray-400'}`}>
+                      Service Details
+                    </span>
                   </div>
-                  <div className="w-20 h-1 bg-muted">
+                  
+                  <div className="w-16 h-1 bg-gray-200">
                     <div 
-                      className={`h-full transition-all duration-300 ${step >= 2 ? 'bg-primary w-full' : 'w-0'}`} 
+                      className={`h-full transition-all duration-300 ${step >= 2 ? 'bg-[var(--color-primary)] w-full' : 'w-0'}`} 
                     />
                   </div>
 
                   {/* Step 2 */}
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-colors ${
-                    step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    2
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-full font-semibold transition-colors ${
+                      step >= 2 ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      <Package className="w-5 h-5" />
+                    </div>
+                    <span className={`text-xs font-medium ${step >= 2 ? 'text-[var(--color-primary)]' : 'text-gray-400'}`}>
+                      Add Items
+                    </span>
                   </div>
-                  <div className="w-20 h-1 bg-muted">
+                  
+                  <div className="w-16 h-1 bg-gray-200">
                     <div 
-                      className={`h-full transition-all duration-300 ${step >= 3 ? 'bg-primary w-full' : 'w-0'}`} 
+                      className={`h-full transition-all duration-300 ${step >= 3 ? 'bg-[var(--color-primary)] w-full' : 'w-0'}`} 
                     />
                   </div>
 
                   {/* Step 3 */}
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-colors ${
-                    step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    3
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-full font-semibold transition-colors ${
+                      step >= 3 ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      <Eye className="w-5 h-5" />
+                    </div>
+                    <span className={`text-xs font-medium ${step >= 3 ? 'text-[var(--color-primary)]' : 'text-gray-400'}`}>
+                      Review
+                    </span>
                   </div>
                 </div>
               </div>
@@ -255,15 +281,18 @@ export function CreateInvoiceModal({
 
       {/* Confirmation Dialog */}
       <ConfirmDialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <ConfirmDialogContent>
-          <DialogHeader>
-            <ConfirmDialogTitle>Confirm Invoice Creation?</ConfirmDialogTitle>
-            <DialogDescription>
+        <ConfirmDialogContent className="bg-white dark:bg-gray-900">
+          <ConfirmDialogHeader className="bg-[var(--color-primary)] text-white -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+            <ConfirmDialogTitle className="flex items-center gap-2 text-xl text-white">
+              <AlertCircle className="w-5 h-5" />
+              Confirm Invoice Creation?
+            </ConfirmDialogTitle>
+            <ConfirmDialogDescription className="text-white/80">
               This action will create and send the invoice. Please review the details below.
-            </DialogDescription>
-          </DialogHeader>
+            </ConfirmDialogDescription>
+          </ConfirmDialogHeader>
 
-          <div className="space-y-3 py-4">
+          <div className="space-y-3 py-4 mt-4">
             <div className="space-y-2 text-sm">
               <p className="font-medium">This action will:</p>
               <ul className="space-y-1 ml-4">
@@ -275,10 +304,10 @@ export function CreateInvoiceModal({
               </ul>
             </div>
 
-            <div className="p-4 bg-accent rounded-lg">
+            <div className="p-4 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Amount:</span>
-                <span className="text-2xl font-bold text-primary">
+                <span className="text-2xl font-bold text-[var(--color-primary)]">
                   ₱{totals.total_due.toFixed(2)}
                 </span>
               </div>
@@ -303,7 +332,7 @@ export function CreateInvoiceModal({
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="min-w-[150px]"
+              className="min-w-[150px] bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white"
             >
               {isSubmitting ? (
                 <>

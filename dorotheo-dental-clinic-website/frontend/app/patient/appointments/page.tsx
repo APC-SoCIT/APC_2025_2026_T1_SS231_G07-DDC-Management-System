@@ -6,6 +6,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
+import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import AlertModal from "@/components/alert-modal"
@@ -999,31 +1000,6 @@ export default function PatientAppointments() {
     return matchesSearch && matchesStatus
   })
 
-  // Helper function to darken a hex color for better text readability
-  const darkenColor = (hex: string, percent: number = 40): string => {
-    // Remove the hash if present
-    const color = hex.replace('#', '')
-    
-    // Parse RGB values
-    const r = parseInt(color.substring(0, 2), 16)
-    const g = parseInt(color.substring(2, 4), 16)
-    const b = parseInt(color.substring(4, 6), 16)
-    
-    // Darken by reducing each component
-    const darkenAmount = 1 - (percent / 100)
-    const newR = Math.round(r * darkenAmount)
-    const newG = Math.round(g * darkenAmount)
-    const newB = Math.round(b * darkenAmount)
-    
-    // Convert back to hex
-    const toHex = (n: number) => {
-      const hex = n.toString(16)
-      return hex.length === 1 ? '0' + hex : hex
-    }
-    
-    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
@@ -1212,9 +1188,8 @@ export default function PatientAppointments() {
                         <span 
                           className="inline-block px-3 py-1 rounded-lg font-medium whitespace-nowrap"
                           style={{ 
-                            color: darkenColor(apt.service_color || '#10b981', 40),
-                            backgroundColor: `${apt.service_color || '#10b981'}15`,
-                            border: `1px solid ${apt.service_color || '#10b981'}40`
+                            ...getServiceBadgeStyle(apt.service_color || '#10b981'),
+                            border: `1px solid ${getServiceBadgeStyle(apt.service_color || '#10b981').borderColor}`
                           }}
                         >
                           {apt.service_name || "General Consultation"}
@@ -2159,25 +2134,47 @@ export default function PatientAppointments() {
           onClick={() => setSelectedImage(null)}
         >
           <div
-            className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col"
+            className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+            <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between flex-shrink-0">
               <div>
-                <h2 className="text-2xl font-bold text-[var(--color-primary)]">Dental Image</h2>
+                <h2 className="text-xl font-bold text-[var(--color-primary)]">Dental Pictures - {new Date(selectedImage.uploaded_at).toLocaleDateString()}</h2>
                 {selectedImage.notes && (
                   <p className="text-sm text-gray-500 mt-1">{selectedImage.notes}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={selectedImage.image_url}
-                  download={`dental-image-${selectedImage.id}.jpg`}
+                <button
+                  onClick={() => {
+                    fetch(selectedImage.image_url)
+                      .then(response => response.blob())
+                      .then(blob => {
+                        const url = window.URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.download = `dental-image-${new Date(selectedImage.uploaded_at).toLocaleDateString()}.jpg`
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        window.URL.revokeObjectURL(url)
+                      })
+                      .catch(error => {
+                        console.error('Download failed:', error)
+                        const link = document.createElement('a')
+                        link.href = selectedImage.image_url
+                        link.download = `dental-image-${new Date(selectedImage.uploaded_at).toLocaleDateString()}.jpg`
+                        link.target = '_blank'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                      })
+                  }}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                   title="Download"
                 >
                   <Download className="w-5 h-5" />
-                </a>
+                </button>
                 <button
                   onClick={() => setSelectedImage(null)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -2186,11 +2183,11 @@ export default function PatientAppointments() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-hidden p-4">
+            <div className="flex-1 overflow-auto p-6 min-h-0">
               <img
                 src={selectedImage.image_url}
                 alt="Dental image"
-                className="w-full h-full object-contain"
+                className="w-full h-auto max-h-full object-contain mx-auto"
               />
             </div>
           </div>

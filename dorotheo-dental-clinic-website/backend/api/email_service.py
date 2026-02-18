@@ -348,11 +348,8 @@ class EmailService:
                 <strong>⏰ Please Note:</strong><br>
                 • Arrive 10 minutes before your scheduled time<br>
                 • Bring a valid ID and your previous dental records (if any)<br>
-                • If you need to reschedule or cancel, please contact us at least 24 hours in advance
-            </div>
-            
-            <div style="text-align: center;">
-                <a href="{appointment_url}" class="button">View Appointment Details</a>
+                • If you need to reschedule or cancel, please contact us at least 24 hours in advance<br>
+                • You can view your appointment details anytime by logging in to the patient portal
             </div>
             
             <div class="divider"></div>
@@ -506,11 +503,7 @@ class EmailService:
                 </div>''' if reason else ''}
             </div>
             
-            <p>We understand that schedules can change. If you'd like to book a new appointment, we're here to help!</p>
-            
-            <div style="text-align: center;">
-                <a href="{appointment_url}" class="button">Book New Appointment</a>
-            </div>
+            <p>We understand that schedules can change. If you'd like to book a new appointment, please log in to the patient portal or contact us directly.</p>
             
             <div class="divider"></div>
             
@@ -751,11 +744,7 @@ class EmailService:
                 <strong>💳 Payment Options:</strong><br>
                 • <strong>At the Clinic:</strong> Cash, Credit/Debit Card, GCash, Maya<br>
                 • <strong>Bank Transfer:</strong> Contact us for account details<br>
-                • <strong>Online Portal:</strong> Visit our website for secure payment
-            </div>
-            
-            <div style="text-align: center;">
-                <a href="{billing_url}" class="button">Pay Now</a>
+                • <strong>Online Portal:</strong> Log in to the patient portal for secure payment
             </div>
             
             <div class="divider"></div>
@@ -917,11 +906,7 @@ class EmailService:
                 <strong>💳 Payment Options:</strong><br>
                 • <strong>At the Clinic:</strong> Cash, Credit/Debit Card, GCash, Maya<br>
                 • <strong>Bank Transfer:</strong> Contact us for account details<br>
-                • <strong>Online Portal:</strong> Visit our website for secure payment
-            </div>
-            
-            <div style="text-align: center;">
-                <a href="{billing_url}" class="button">Pay Now</a>
+                • <strong>Online Portal:</strong> Log in to the patient portal for secure payment
             </div>
             
             <p>If you have already made this payment, please disregard this reminder or contact us to confirm receipt.</p>
@@ -1003,12 +988,8 @@ class EmailService:
             <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;">
                 <p style="margin: 0; color: #856404;">
                     <strong>⚡ Action Required:</strong><br>
-                    Please reorder this item immediately to maintain adequate stock levels and prevent service disruptions.
+                    Please reorder this item immediately to maintain adequate stock levels and prevent service disruptions. Log in to the staff portal to manage inventory.
                 </p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{inventory_url}" class="button">View Inventory Dashboard</a>
             </div>
             
             <div class="divider"></div>
@@ -1106,12 +1087,8 @@ class EmailService:
             <div style="background-color: #e7f3ff; border-left: 4px solid #0f4c3a; padding: 20px; margin: 20px 0; border-radius: 4px;">
                 <p style="margin: 0; color: #0c3d2e;">
                     <strong>⚡ Action Required:</strong><br>
-                    Please review this appointment request in the staff portal and confirm or adjust the booking as needed.
+                    Please log in to the staff portal and review this appointment request to confirm or adjust the booking as needed.
                 </p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{staff_appointments_url}" class="button">Open Staff Portal</a>
             </div>
             
             <div class="divider"></div>

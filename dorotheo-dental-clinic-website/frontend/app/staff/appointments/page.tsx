@@ -23,6 +23,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
+import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
 import AppointmentSuccessModal from "@/components/appointment-success-modal"
 import ConfirmationModal from "@/components/confirmation-modal"
 import BlockTimeModal from "@/components/block-time-modal"
@@ -1014,30 +1015,6 @@ export default function StaffAppointments() {
     }
   }
 
-  const darkenColor = (hex: string, percent: number = 40): string => {
-    // Remove the hash if present
-    const color = hex.replace('#', '')
-    
-    // Parse RGB values
-    const r = parseInt(color.substring(0, 2), 16)
-    const g = parseInt(color.substring(2, 4), 16)
-    const b = parseInt(color.substring(4, 6), 16)
-    
-    // Darken by reducing each component
-    const darkenAmount = 1 - (percent / 100)
-    const newR = Math.round(r * darkenAmount)
-    const newG = Math.round(g * darkenAmount)
-    const newB = Math.round(b * darkenAmount)
-    
-    // Convert back to hex
-    const toHex = (n: number) => {
-      const hex = n.toString(16)
-      return hex.length === 1 ? '0' + hex : hex
-    }
-    
-    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`
-  }
-
   const handleCancelAppointment = async (appointment: Appointment) => {
     if (!token) return
     
@@ -1162,7 +1139,7 @@ export default function StaffAppointments() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
+          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
           <p className="text-[var(--color-text-muted)]">Manage patient appointments and schedules</p>
         </div>
         <div className="flex gap-3">
@@ -1429,16 +1406,20 @@ export default function StaffAppointments() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <span 
-                        className="inline-block px-2 py-0.5 rounded-lg font-medium text-xs whitespace-nowrap"
-                        style={{ 
-                          color: darkenColor(apt.service_color || '#10b981', 40),
-                          backgroundColor: `${apt.service_color || '#10b981'}15`,
-                          border: `1px solid ${apt.service_color || '#10b981'}40`
-                        }}
-                      >
-                        {apt.service_name || "General Consultation"}
-                      </span>
+                      {(() => {
+                        const badgeStyle = getServiceBadgeStyle(apt.service_color || '#10b981');
+                        return (
+                          <span 
+                            className="inline-block px-2 py-0.5 rounded-lg font-medium text-xs whitespace-nowrap"
+                            style={{ 
+                              ...badgeStyle,
+                              border: `1px solid ${badgeStyle.borderColor}`
+                            }}
+                          >
+                            {apt.service_name || "General Consultation"}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{apt.date}</td>
                     <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{formatTime(apt.time)}</td>

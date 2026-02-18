@@ -104,8 +104,56 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# ============================================
+# MEDIA FILES CONFIGURATION
+# ============================================
+
+# Azure Blob Storage for media files (production)
+if os.environ.get('AZURE_ACCOUNT_NAME'):
+    AZURE_ACCOUNT_NAME = os.environ['AZURE_ACCOUNT_NAME']
+    AZURE_ACCOUNT_KEY = os.environ.get('AZURE_ACCOUNT_KEY')
+    AZURE_CONTAINER = os.environ.get('AZURE_CONTAINER', 'media')
+    # Use custom storage backend with Cache-Control headers
+    DEFAULT_FILE_STORAGE = 'api.storage.CachedAzureStorage'
+    MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
+else:
+    # Local file storage (development)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+
+# ============================================
+# CACHING CONFIGURATION
+# ============================================
+
+# Redis caching (ONLY if explicitly enabled)
+# Note: For Supabase deployments, database sessions are often faster than Redis
+# due to Supabase's optimized Transaction Pooler (port 6543)
+if os.environ.get('REDIS_URL') and os.environ.get('ENABLE_REDIS_CACHE') == 'True':
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': os.environ['REDIS_URL'],
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+        }
+    }
+    # Only use Redis for sessions if latency is low (<5ms) and explicitly enabled
+    if os.environ.get('ENABLE_REDIS_SESSIONS') == 'True':
+        SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+        SESSION_CACHE_ALIAS = 'default'
+    else:
+        # Use database sessions (faster with Supabase)
+        SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+else:
+    # Local memory cache (development)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+    # Use database sessions in production (optimal for Supabase)
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -135,8 +183,23 @@ CORS_ALLOWED_ORIGINS = [
     'https://dorothedentallossc.com.ph',
     'https://www.dorothedentallossc.com.ph',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:8000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8000',
 ]
+
+# In development, allow CORS from any origin for mobile testing
+if DEBUG:
+    # Allow all origins in development for mobile device access
+    CORS_ALLOW_ALL_ORIGINS = False  # Keep False to use CORS_ALLOWED_ORIGIN_REGEXES
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://192\.168\.\d{1,3}\.\d{1,3}:\d+$",  # Local network IPs
+        r"^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$",  # Private network IPs
+        r"^http://172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}:\d+$",  # Private network IPs
+        r"^http://localhost:\d+$",
+        r"^http://127\.0\.0\.1:\d+$",
+    ]
 
 # Allow additional origins from environment variable
 custom_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
@@ -170,12 +233,26 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # CSRF Settings for Railway deployment
 CSRF_TRUSTED_ORIGINS = [
-    'https://apc-2025-2026-t1-ss-231-g07-ddc-man-xi.vercel.app',
-    'https://dorothedentallossc.com.ph',
-    'https://www.dorothedentallossc.com.ph',
+    'https://*.railway.app',
+    'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:8000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8000',
+    'https://dorothedentallossc.com.ph',
+    'https://www.dorothedentallossc.com.ph',
 ]
+
+# In development, add local network IP patterns for mobile testing
+if DEBUG:
+    # Add common local network IP ranges
+    import re
+    # These will be validated by Django's CSRF middleware
+    CSRF_TRUSTED_ORIGINS.extend([
+        'http://192.168.0.0',
+        'http://192.168.1.0',
+        'http://10.0.0.0',
+    ])
 
 # Add any custom domains from environment variable
 custom_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
