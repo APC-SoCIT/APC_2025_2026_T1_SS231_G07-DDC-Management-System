@@ -124,12 +124,12 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-[60] h-screen w-64 bg-[var(--color-primary)] border-r border-[var(--color-border)] transition-transform ${
+        className={`fixed top-0 left-0 z-[60] h-screen w-60 bg-[var(--color-primary)] border-r border-[var(--color-border)] transition-transform ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
         <div className="flex flex-col h-full bg-white">
-          <div className="py-6 bg-[var(--color-primary)]">
+          <div className="w-[calc(100%+1px)] py-6 bg-[var(--color-primary)]">
             <div className="flex items-center justify-center">
               <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-14 w-auto object-contain" />
             </div>
