@@ -48,9 +48,11 @@ export default function Services() {
       try {
         setIsLoading(true)
         const data = await api.getServices()
-        setServices(data)
+        // Ensure data is always an array
+        setServices(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error("Failed to fetch services:", error)
+        setServices([]) // Set empty array on error
       } finally {
         setIsLoading(false)
       }

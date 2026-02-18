@@ -94,7 +94,9 @@ export const api = {
   getServices: async (clinicId?: number) => {
     const params = clinicId ? `?clinic_id=${clinicId}` : '';
     const response = await fetch(`${API_BASE_URL}/services/${params}`)
-    return response.json()
+    const data = await response.json()
+    // Handle paginated response - return results array if present, otherwise return data
+    return Array.isArray(data) ? data : (data.results || [])
   },
 
   createService: async (data: FormData, token: string) => {
@@ -131,7 +133,9 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${params}`, {
       headers: { Authorization: `Token ${token}` },
     })
-    return response.json()
+    const data = await response.json()
+    // Handle paginated response - return results array if present, otherwise return data
+    return Array.isArray(data) ? data : (data.results || [])
   },
 
   createAppointment: async (data: any, token: string) => {
