@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Bell, Check, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import AlertModal from './alert-modal'
+import ErrorModal from './error-modal'
 
 interface Notification {
   id: number
@@ -746,10 +746,9 @@ export default function NotificationBell() {
         </>
       )}
 
-      <AlertModal
+      <ErrorModal
         isOpen={alertModal.isOpen}
         onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
-        type={alertModal.type}
         title={alertModal.title}
         message={alertModal.message}
       />
