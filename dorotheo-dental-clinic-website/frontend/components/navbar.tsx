@@ -110,20 +110,20 @@ export default function Navbar() {
           {isMenuOpen && (
             <div className="md:hidden py-4 border-t border-white/20">
               <div className="flex flex-col gap-4">
-                <Link href="#services" className="text-white/90 hover:text-[var(--color-accent)]">
+                <Link href="#services" className="text-white/90 hover:text-[var(--color-accent)]" onClick={() => setIsMenuOpen(false)}>
                   Services
                 </Link>
-                <Link href="#about" className="text-white/90 hover:text-[var(--color-accent)]">
+                <Link href="#about" className="text-white/90 hover:text-[var(--color-accent)]" onClick={() => setIsMenuOpen(false)}>
                   About Us
                 </Link>
-                <Link href="#contact" className="text-white/90 hover:text-[var(--color-accent)]">
+                <Link href="#contact" className="text-white/90 hover:text-[var(--color-accent)]" onClick={() => setIsMenuOpen(false)}>
                   Contact
                 </Link>
-                <Link href="#sitemap" className="text-white/90 hover:text-[var(--color-accent)]">
+                <Link href="#sitemap" className="text-white/90 hover:text-[var(--color-accent)]" onClick={() => setIsMenuOpen(false)}>
                   Locations
                 </Link>
                 <button
-                  onClick={() => setIsRegisterOpen(true)}
+                  onClick={() => { setIsRegisterOpen(true); setIsMenuOpen(false); }}
                   className="px-6 py-2.5 bg-[var(--color-accent)] text-white rounded-lg hover:bg-[var(--color-accent-dark)] transition-colors font-medium text-left"
                 >
                   Schedule Appointment
@@ -134,6 +134,7 @@ export default function Navbar() {
                     <Link 
                       href={getDashboardRoute()} 
                       className="flex items-center gap-2 text-white hover:text-[var(--color-accent)]"
+                      onClick={() => setIsMenuOpen(false)}
                     >
                       <div className="w-8 h-8 bg-[var(--color-accent)] rounded-full flex items-center justify-center">
                         <span className="text-white text-sm font-medium">
@@ -154,6 +155,7 @@ export default function Navbar() {
                   <Link 
                     href="/login" 
                     className="flex items-center gap-2 text-white hover:text-[var(--color-accent)]"
+                    onClick={() => setIsMenuOpen(false)}
                   >
                     <User className="w-5 h-5" />
                     <span>Login</span>
