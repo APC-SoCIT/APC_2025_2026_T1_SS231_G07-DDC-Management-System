@@ -5,7 +5,9 @@ import { ChevronLeft, ChevronRight, Clock, Save, MapPin, Calendar } from "lucide
 import { useAuth } from "@/lib/auth"
 import AvailabilitySuccessModal from "@/components/availability-success-modal"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const trimmedBase = rawBase.replace(/\/+$/, "")
+const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trimmedBase}/api`
 
 interface DentistAvailabilityProps {
   dentistId: number | undefined
@@ -101,7 +103,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
 
     try {
       // Build URL with optional clinic filter
-      let url = `${API_BASE_URL}/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`
+      let url = `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`
       if (selectedClinicId) {
         url += `&clinic_id=${selectedClinicId}`
       }
@@ -330,7 +332,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/api/dentist-availability/bulk_create/`,
+        `${API_BASE_URL}/dentist-availability/bulk_create/`,
         {
           method: "POST",
           headers: {
@@ -390,7 +392,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       console.log('[CALENDAR] Delete request body:', deleteBody)
 
       const response = await fetch(
-        `${API_BASE_URL}/api/dentist-availability/bulk_delete/`,
+        `${API_BASE_URL}/dentist-availability/bulk_delete/`,
         {
           method: "POST",
           headers: {
@@ -469,7 +471,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       const firstDayStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`
       const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
       // Get all dates in the current month to delete
-      let fetchUrl = `${API_BASE_URL}/api/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`
+      let fetchUrl = `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${firstDayStr}&end_date=${lastDayStr}`
       if (selectedClinicId) {
         fetchUrl += `&clinic_id=${selectedClinicId}`
       }
@@ -498,7 +500,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
           }
           
           const bulkDeleteResponse = await fetch(
-            `${API_BASE_URL}/api/dentist-availability/bulk_delete/`,
+            `${API_BASE_URL}/dentist-availability/bulk_delete/`,
             {
               method: "POST",
               headers: {
@@ -544,7 +546,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
         }
 
         const response = await fetch(
-          `${API_BASE_URL}/api/dentist-availability/bulk_create/`,
+          `${API_BASE_URL}/dentist-availability/bulk_create/`,
           {
             method: "POST",
             headers: {

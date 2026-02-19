@@ -451,6 +451,13 @@ class DentalChatbotService:
             if self._wants_booking(low):
                 return self._handle_booking(user_message, [])
 
+            # ── General Q&A questions always bypass active flows ──
+            # If the user asks an informational question (services, hours,
+            # dentists, etc.) while mid-flow, answer it via Gemini instead
+            # of continuing the flow — preserves the "Or ask me:" buttons.
+            if self._is_general_qa(low):
+                return self._gemini_answer(user_message, hist)
+
             # ── Continue ongoing flow (if no new explicit intent) ──
             # Only continue the MOST RECENTLY started flow.
             # This prevents old flow tags from hijacking when the user
@@ -524,6 +531,39 @@ class DentalChatbotService:
               'resched ko', 'resched na', 'change ko', 'palitan ko',
               'resched ko yung', 'lipat ko', 'change ko yung',]
         return any(k in low for k in kw) and 'cancel' not in low and 'i-cancel' not in low
+
+    @staticmethod
+    def _is_general_qa(low):
+        """
+        Detect general informational / Q&A questions that should break out
+        of any active booking/reschedule/cancel flow and go straight to
+        Gemini Q&A — even if the chat history has active flow tags.
+        """
+        kw = [
+            # Services
+            'what dental services', 'what services', 'services do you offer',
+            'services offered', 'what treatments', 'list of services',
+            'what procedures', 'available services', 'anong serbisyo',
+            'anong services', 'mga serbisyo', 'mga services',
+            # Dentists / staff
+            'who are the dentists', 'who are your dentists', 'list of dentists',
+            'your dentists', 'available dentists', 'sino ang dentist',
+            'sino ang mga dentist', 'mga dentista', 'who is the dentist',
+            # Clinic hours
+            'clinic hours', 'your hours', 'what are your hours',
+            'operating hours', 'business hours', 'opening hours',
+            'what time', 'open hours', 'when are you open', 'when do you open',
+            'anong oras', 'oras ng clinic', 'schedule ng clinic', 'bukas kayo',
+            # Clinics / location
+            'where are you located', 'clinic location', 'where is your clinic',
+            'branches', 'clinic address', 'your locations',
+            'saan kayo', 'address ng clinic',
+            # General dental knowledge / info
+            'how much', 'what is', 'what are', 'can you explain',
+            'tell me about', 'what does', 'how do', 'what should',
+            'when should', 'why does', 'is it normal', 'is it okay',
+        ]
+        return any(k in low for k in kw)
 
     @staticmethod
     def _is_confirm_yes(low):
@@ -1322,6 +1362,19 @@ class DentalChatbotService:
         tagalog_words = ['ano', 'sino', 'saan', 'kailan', 'paano', 'magkano', 'meron', 'ba', 'ko', 'mo', 'nga', 'po', 'yung', 'mga', 'sa', 'ng', 'na', 'naman', 'lang']
         tagalog_count = sum(1 for word in tagalog_words if word in low)
         is_tagalog = tagalog_count >= 2
+
+        # ── RAG: Try to retrieve page-index context (optional enhancement) ──
+        rag_context = None
+        rag_sources = []
+        try:
+            from .rag.page_index_service import get_context_with_sources
+            rag_context, rag_sources = get_context_with_sources(msg)
+        except Exception as rag_err:
+            # RAG failure must NEVER block the chatbot
+            import logging
+            logging.getLogger('rag.service').error(
+                "RAG retrieval failed (continuing without): %s", rag_err
+            )
         
         # Fallback to Gemini for complex questions
         try:
@@ -1341,6 +1394,10 @@ class DentalChatbotService:
                 prompt += "IMPORTANT - Use this real-time data from our database to answer:\n"
                 prompt += f"{context}\n\n"
                 prompt += "NOTE: Only use the information provided above. Do not make up services, dentists, or hours.\n\n"
+
+            # ── RAG: Inject page-index context if available ──
+            if rag_context:
+                prompt += f"{rag_context}\n\n"
             
             if hist:
                 prompt += "Conversation History:\n"
@@ -1362,7 +1419,12 @@ class DentalChatbotService:
                 },
             )
             text = self._sanitize(resp.text)
-            return self._reply(text)
+
+            # ── RAG: Attach optional sources to response ──
+            result = self._reply(text)
+            if rag_sources:
+                result['sources'] = rag_sources
+            return result
         except Exception as e:
             # Log the actual error for debugging (don't show to user)
             error_type = type(e).__name__

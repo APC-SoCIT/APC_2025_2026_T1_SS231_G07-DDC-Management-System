@@ -378,7 +378,7 @@ export default function StaffAppointments() {
     if (!token) return
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
         headers: {
           'Authorization': `Token ${token}`,
         },
@@ -605,7 +605,7 @@ export default function StaffAppointments() {
     if (!token) return
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -663,7 +663,7 @@ export default function StaffAppointments() {
       variant: "warning",
       onConfirm: async () => {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/${blockId}/`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/${blockId}/`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Token ${token}`,

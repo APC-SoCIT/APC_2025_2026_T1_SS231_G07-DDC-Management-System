@@ -2730,6 +2730,7 @@ def chatbot_query(request):
         return Response({
             'response': result['response'],
             'quick_replies': result.get('quick_replies', []),
+            'sources': result.get('sources', []),
             'error': None
         })
         

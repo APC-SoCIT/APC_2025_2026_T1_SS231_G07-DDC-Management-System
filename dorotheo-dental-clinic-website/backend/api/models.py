@@ -1062,3 +1062,36 @@ class PaymentSplit(models.Model):
                 )
         
         super().save(*args, **kwargs)
+
+
+# ===========================================================================
+# PAGE CHUNK MODEL (for RAG – Page Index Retrieval Augmented Generation)
+# ===========================================================================
+
+class PageChunk(models.Model):
+    """
+    Stores indexed page content chunks with embeddings for RAG retrieval.
+    Used by the AI chatbot to ground answers with page/site content.
+    """
+    page_id = models.CharField(max_length=255, db_index=True, help_text="Unique identifier for the source page")
+    chunk_text = models.TextField(help_text="The text content of this chunk")
+    embedding = models.JSONField(default=list, help_text="Embedding vector stored as JSON array of floats")
+    page_title = models.CharField(max_length=500, blank=True, default='')
+    section_title = models.CharField(max_length=500, blank=True, default='')
+    source_url = models.URLField(max_length=1000, blank=True, default='')
+    chunk_index = models.IntegerField(default=0, help_text="Order of this chunk within its page")
+    token_count = models.IntegerField(default=0, help_text="Approximate token count of chunk_text")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['page_id', 'chunk_index']
+        verbose_name = 'Page Chunk'
+        verbose_name_plural = 'Page Chunks'
+        indexes = [
+            models.Index(fields=['page_id', 'chunk_index'], name='pagechunk_page_idx'),
+            models.Index(fields=['created_at'], name='pagechunk_created_idx'),
+        ]
+
+    def __str__(self):
+        return f"[{self.page_id}] {self.page_title} – chunk {self.chunk_index}"

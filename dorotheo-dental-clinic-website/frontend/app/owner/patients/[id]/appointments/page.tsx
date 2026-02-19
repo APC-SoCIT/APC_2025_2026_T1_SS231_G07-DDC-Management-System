@@ -166,7 +166,7 @@ export default function PatientAppointmentsPage() {
     const fetchDentistAvailability = async () => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/dentist-availability/?dentist_id=${newAppointment.dentist}`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/dentist-availability/?dentist_id=${newAppointment.dentist}`,
           {
             headers: {
               Authorization: `Token ${token}`,
@@ -202,7 +202,7 @@ export default function PatientAppointmentsPage() {
     const fetchBookedSlots = async () => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/booked-slots/?date=${newAppointment.date}`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/booked-slots/?date=${newAppointment.date}`,
           {
             headers: {
               Authorization: `Token ${token}`,
