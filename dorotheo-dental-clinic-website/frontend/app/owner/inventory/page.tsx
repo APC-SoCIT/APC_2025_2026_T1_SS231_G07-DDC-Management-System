@@ -437,7 +437,7 @@ export default function OwnerInventory() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Unit Cost (PHP)</label>
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Unit Cost (₱)</label>
                   <input
                     type="number"
                     name="unit_cost"

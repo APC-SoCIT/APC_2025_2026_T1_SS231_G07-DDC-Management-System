@@ -324,8 +324,7 @@ export function AddInventoryModal({
 
           {/* Unit Cost */}
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5 flex items-center gap-1">
-              <DollarSign className="w-4 h-4" />
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
               Unit Cost (₱) *
             </label>
             <input
