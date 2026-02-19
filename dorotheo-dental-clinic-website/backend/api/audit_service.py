@@ -14,12 +14,13 @@ Security: All functions automatically strip sensitive fields like passwords,
 tokens, and authentication credentials before logging.
 """
 
-from django.core.exceptions import ValidationError
-from django.forms.models import model_to_dict
-from django.conf import settings
+from django.core.exceptions import ValidationError  # type: ignore[import]
+from django.forms.models import model_to_dict  # type: ignore[import]
+from django.conf import settings  # type: ignore[import]
 import logging
 import concurrent.futures
 import threading
+from typing import Any, Optional, Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ def get_user_agent(request):
     return user_agent
 
 
-def sanitize_data(data):
+def sanitize_data(data: Any) -> Any:
     """
     Remove sensitive fields from a dictionary before audit logging.
     
@@ -132,7 +133,7 @@ def sanitize_data(data):
         return data
     
     # Create a copy to avoid modifying the original
-    sanitized = {}
+    sanitized: Dict[str, Any] = {}
     
     for key, value in data.items():
         # Check if the key (case-insensitive) is in sensitive fields
@@ -155,8 +156,8 @@ def sanitize_data(data):
     return sanitized
 
 
-def _write_audit_log_entry(actor_id, action_type, target_table, target_record_id, 
-                           patient_id_val, ip_address, user_agent, changes, reason):
+def _write_audit_log_entry(actor_id: Any, action_type: Any, target_table: Any, target_record_id: Any, 
+                           patient_id_val: Any, ip_address: Any, user_agent: Any, changes: Any, reason: Any) -> Any:
     """
     Internal function that performs the actual database write for audit logs.
     This runs in a background thread when async logging is enabled.
@@ -328,7 +329,13 @@ def create_audit_log(actor, action_type, target_table, target_record_id, **kwarg
     try:
         # Extract IDs in main thread (safer than passing model instances to threads)
         actor_id = actor.id if actor else None
-        patient_id_val = kwargs.get('patient_id').id if kwargs.get('patient_id') else None
+        patient_id_raw = kwargs.get('patient_id')
+        if patient_id_raw is None:
+            patient_id_val = None
+        elif isinstance(patient_id_raw, int):
+            patient_id_val = patient_id_raw
+        else:
+            patient_id_val = patient_id_raw.id
         
         # Sanitize changes dictionary in main thread (CPU work done before threading)
         changes = kwargs.get('changes')
@@ -347,10 +354,11 @@ def create_audit_log(actor, action_type, target_table, target_record_id, **kwarg
         
         if async_enabled:
             # Submit to thread pool for non-blocking write
-            _audit_executor.submit(
-                _write_audit_log_entry,
-                actor_id, action_type, target_table, target_record_id,
-                patient_id_val, ip_address, user_agent, changes, reason
+            _audit_executor.submit(  # type: ignore[arg-type]
+                lambda: _write_audit_log_entry(
+                    actor_id, action_type, target_table, target_record_id,
+                    patient_id_val, ip_address, user_agent, changes, reason
+                )
             )
             # Return None immediately (fire-and-forget)
             return None
