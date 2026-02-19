@@ -14,6 +14,13 @@ from .models import (
     ClinicLocation, BlockedTimeSlot,
 )
 from .views import create_appointment_notification, create_patient_notification
+from . import booking_memory as bmem
+from . import language_detection as lang
+
+import logging
+import time as time_module
+
+logger = logging.getLogger('chatbot.service')
 
 # ── Utility helpers ────────────────────────────────────────────────────────
 
@@ -91,8 +98,14 @@ def _available_slots(dentist, date, clinic=None):
     booked = _booked_times(dentist, date)
     blocked = _blocked_ranges(date, clinic)
 
+    # Filter out past time slots when the date is today
+    now_time = datetime.now().time() if date == datetime.now().date() else None
+
     slots = []
     for t in _generate_slots(avail.start_time, avail.end_time):
+        # Skip slots that have already passed today
+        if now_time and t <= now_time:
+            continue
         t_str = t.strftime('%H:%M')
         if t_str not in {str(bt)[:5] for bt in booked} and not _is_blocked(t, blocked):
             slots.append(t)
@@ -151,17 +164,10 @@ DAYS_OF_WEEK = {
 def _parse_date(msg):
     today = datetime.now().date()
     low = msg.lower()
-    # English & Tagalog & Taglish
-    if 'today' in low or 'ngayon' in low:
-        return today
-    if 'tomorrow' in low or 'bukas' in low:
-        return today + timedelta(days=1)
-    if 'the day after tomorrow' in low or 'samakalawa' in low or 'makalawa' in low:
-        return today + timedelta(days=2)
-    # Tagalog: "next week" / "susunod na linggo"
-    if 'next week' in low or 'susunod na linggo' in low:
-        return today + timedelta(days=(7 - today.weekday()))  # next Monday
-    # Month + day
+
+    # ── Month + day takes PRIORITY over relative keywords ──────────────────
+    # This prevents "ngayong March 23" from being parsed as today.
+    # "ngayong" is Tagalog linker ("this March 23"), not a standalone today.
     for mname, mnum in MONTHS.items():
         m = re.search(rf'{mname}\s+(\d{{1,2}})', low)
         if m:
@@ -174,6 +180,20 @@ def _parse_date(msg):
                 return d
             except ValueError:
                 continue
+
+    # ── Relative date keywords ──────────────────────────────────────────────
+    # English & Tagalog & Taglish
+    # Use word-boundary-style check: avoid matching "ngayong" as "ngayon"
+    ngayon_match = re.search(r'(?<![a-z])ngayon(?![a-z])', low)
+    if 'today' in low or ngayon_match:
+        return today
+    if 'tomorrow' in low or 'bukas' in low:
+        return today + timedelta(days=1)
+    if 'the day after tomorrow' in low or 'samakalawa' in low or 'makalawa' in low:
+        return today + timedelta(days=2)
+    # Tagalog: "next week" / "susunod na linggo"
+    if 'next week' in low or 'susunod na linggo' in low:
+        return today + timedelta(days=(7 - today.weekday()))  # next Monday
     # MM/DD
     m = re.search(r'(\d{1,2})[/-](\d{1,2})', msg)
     if m:
@@ -225,29 +245,41 @@ def _parse_time(msg):
 
 
 def _find_dentist(msg):
-    """Match dentist from message. Supports Dr./Doc prefix and partial last-name matching."""
+    """Match dentist from message. Supports Dr./Doc prefix and partial first/last-name matching."""
     low = msg.lower()
-    
-    # Try exact "Dr. FullName" style first
+
+    # Try exact "Dr. FullName" / "Dr. LastName" / "Dr. FirstName" style first
     for d in _dentists_qs():
         full = d.get_full_name().lower()
-        last = d.last_name.lower() if d.last_name else ''
-        first = d.first_name.lower() if d.first_name else ''
-        patterns = [
-            f'dr. {full}', f'dr {full}', f'doctor {full}', f'doc {full}',
-            f'dr. {last}', f'dr {last}', f'doctor {last}', f'doc {last}',
-        ]
-        if any(p in low for p in patterns):
+        last = (d.last_name or '').lower()
+        first = (d.first_name or '').lower()
+
+        # Skip dentists with no readable name — they would match any "doc " substring
+        if not full.strip():
+            continue
+
+        patterns = []
+        if full:
+            patterns += [f'dr. {full}', f'dr {full}', f'doctor {full}', f'doc {full}']
+        if last:
+            patterns += [f'dr. {last}', f'dr {last}', f'doctor {last}', f'doc {last}']
+        # Also try first-name matching (e.g. "doc marvin" → Dr. Marvin Dorotheo)
+        if first:
+            patterns += [f'dr. {first}', f'dr {first}', f'doctor {first}', f'doc {first}']
+        if patterns and any(p in low for p in patterns):
             return d
-    
-    # Fallback: match just the last name if "dr/doc/doctor" prefix is present
+
+    # Fallback: match just the last name (or first name) if a dr/doc prefix is present
     has_prefix = any(p in low for p in ['dr.', 'dr ', 'doc ', 'doctor '])
     if has_prefix:
         for d in _dentists_qs():
-            last = d.last_name.lower() if d.last_name else ''
+            last = (d.last_name or '').lower()
+            first = (d.first_name or '').lower()
             if last and last in low:
                 return d
-    
+            if first and first in low:
+                return d
+
     return None
 
 
@@ -409,15 +441,31 @@ class DentalChatbotService:
 
     # ── public entry point ────────────────────────────────────────────────
 
-    def get_response(self, user_message, conversation_history=None):
+    def get_response(self, user_message, conversation_history=None, skip_rag=False):
+        self._skip_rag = skip_rag
         try:
+            # ── Language detection (local, no external APIs) ──
+            detected_lang, lang_conf, lang_style = lang.detect_language(user_message)
+            # Always respond in the language of the CURRENT message, not the session average.
+            # Session tracking is kept for analytics but must not override current-message lang.
+            self._lang = detected_lang
+
+            # Update session language memory (history/analytics only)
+            if self.user:
+                session = bmem.get_session(self.user.id)
+                session.language.update(detected_lang, lang_conf, lang_style)
+
+            logger.debug(
+                "Language: detected=%s conf=%.2f style=%s",
+                detected_lang, lang_conf, lang_style,
+            )
+
+            # Multi-language prompt injection sanitization
+            user_message = lang.sanitize_multilang(user_message)
+
             # Security gate
             if not self._is_safe(user_message):
-                return self._reply(
-                    "I can't provide information about system credentials or "
-                    "private data. I'm here to help with dental services and "
-                    "appointments. How else can I assist you?"
-                )
+                return self._reply(lang.security_block(self._lang))
 
             low = user_message.lower().strip()
             hist = conversation_history or []
@@ -443,12 +491,15 @@ class DentalChatbotService:
             # from polluting the new one (e.g. clicking "Reschedule" while
             # mid-booking no longer causes "I couldn't understand that date").
             if self._wants_cancel(low):
+                logger.info("Intent: CANCEL (user=%s)", self.user.id if self.user else 'anon')
                 return self._handle_cancel(user_message, [])
 
             if self._wants_reschedule(low):
+                logger.info("Intent: RESCHEDULE (user=%s)", self.user.id if self.user else 'anon')
                 return self._handle_reschedule(user_message, [])
 
             if self._wants_booking(low):
+                logger.info("Intent: BOOKING (user=%s)", self.user.id if self.user else 'anon')
                 return self._handle_booking(user_message, [])
 
             # ── General Q&A questions always bypass active flows ──
@@ -463,6 +514,8 @@ class DentalChatbotService:
             # This prevents old flow tags from hijacking when the user
             # clicks back on a button from a previous flow.
             active = self._detect_most_recent_flow(hist)
+            if active:
+                logger.info("Continuing flow: %s (user=%s)", active, self.user.id if self.user else 'anon')
             if active == 'cancel':
                 return self._handle_cancel(user_message, hist)
             if active == 'reschedule':
@@ -641,8 +694,7 @@ class DentalChatbotService:
     def _handle_booking(self, msg, hist):
         if not self.is_authenticated:
             return self._reply(
-                "You need to be logged in to book an appointment. "
-                "Please log in first and try again."
+                lang.login_required('booking', self._lang)
             )
 
         # 🔒 PENDING REQUEST LOCK — Block booking if pending reschedule/cancellation exists
@@ -676,14 +728,29 @@ class DentalChatbotService:
             if not clinics.exists():
                 return self._reply("No clinic locations are set up yet. Please contact the clinic directly.")
 
-            lines = ["**Step 1: Choose a Clinic**\n"]
+            # Smart recommendation: prioritize patient's last-visited clinic
+            rec_clinic = None
+            if self.user:
+                last_appt = Appointment.objects.filter(
+                    patient=self.user,
+                    status__in=['confirmed', 'completed'],
+                    clinic__isnull=False,
+                ).order_by('-date', '-time').first()
+                if last_appt:
+                    rec_clinic = last_appt.clinic
+                    logger.info("Smart rec: user %s last visited %s", self.user.id, rec_clinic.name)
+
+            lines = [lang.step_label(1, 'clinic', self._lang) + "\n"]
+            if rec_clinic:
+                lines.append(lang.smart_rec_clinic(rec_clinic.name, self._lang) + "\n")
             qr = []
             for c in clinics:
                 open_dentists = _dentists_with_openings(c, today)
                 tag = f" ({len(open_dentists)} dentist{'s' if len(open_dentists)!=1 else ''} available)" if open_dentists else " (no openings this period)"
-                lines.append(f"• {c.name}{tag}")
+                rec_tag = " ⭐" if rec_clinic and c.id == rec_clinic.id else ""
+                lines.append(f"• {c.name}{tag}{rec_tag}")
                 qr.append(c.name)
-            lines.append("\nPlease select a clinic:")
+            lines.append("\n" + lang.select_prompt('clinic', self._lang))
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_1]')
 
         # ── STEP 2: Dentist (based on DentistAvailability at clinic) ──────
@@ -717,14 +784,30 @@ class DentalChatbotService:
             
             # Get user objects for these dentists
             available_dentists = _dentists_qs().filter(id__in=dentist_ids_with_avail)
-            
-            lines = [f"**Step 2: Choose a Dentist** (at {clinic.name})\n"]
+
+            # Smart recommendation: prioritize patient's last dentist at this clinic
+            rec_dentist = None
+            if self.user:
+                last_at_clinic = Appointment.objects.filter(
+                    patient=self.user, clinic=clinic,
+                    status__in=['confirmed', 'completed'],
+                    dentist__isnull=False,
+                ).order_by('-date', '-time').first()
+                if last_at_clinic and last_at_clinic.dentist in available_dentists:
+                    rec_dentist = last_at_clinic.dentist
+                    logger.info("Smart rec: user %s last saw Dr. %s at %s",
+                                self.user.id, rec_dentist.get_full_name(), clinic.name)
+
+            lines = [lang.step_label(2, 'dentist', self._lang) + f" (at {clinic.name})\n"]
+            if rec_dentist:
+                lines.append(lang.smart_rec_dentist(rec_dentist.get_full_name(), self._lang) + "\n")
             qr = []
             for d in available_dentists:
                 name = f"Dr. {d.get_full_name()}"
-                lines.append(f"• {name}")
+                rec_tag = " ⭐" if rec_dentist and d.id == rec_dentist.id else ""
+                lines.append(f"• {name}{rec_tag}")
                 qr.append(name)
-            lines.append("\nPlease select a dentist:")
+            lines.append("\n" + lang.select_prompt('dentist', self._lang))
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_2]')
 
         # ── STEP 3: Date & Time ───────────────────────────────────────
@@ -758,16 +841,36 @@ class DentalChatbotService:
                     "Please try a different dentist or clinic."
                 )
 
-            lines = [f"**Step 3: Choose a Date**\n\nDr. {dentist.get_full_name()} at {clinic.name}:\n"]
+            lines = [lang.step_label(3, 'date', self._lang) + f"\n\nDr. {dentist.get_full_name()} at {clinic.name}:\n"]
             qr = []
             for d in dates_with_slots:
                 label = _fmt_date(d)
                 lines.append(f"• {label}")
                 qr.append(d.strftime('%B %d'))
-            lines.append("\nSelect a date:")
+            lines.append("\n" + lang.select_prompt('date', self._lang))
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_3]')
 
         if not time_val:
+            # ── Same-date conflict: patient already has an appointment that day ──
+            if self.user:
+                same_day = Appointment.objects.filter(
+                    patient=self.user,
+                    date=date,
+                    status__in=['confirmed', 'pending'],
+                ).first()
+                if same_day:
+                    existing_dentist = same_day.dentist.get_full_name() if same_day.dentist else 'another dentist'
+                    existing_service = same_day.service.name if same_day.service else 'appointment'
+                    existing_time = _fmt_time(same_day.time)
+                    return self._reply(
+                        f"⚠️ You already have a **{existing_service}** appointment on "
+                        f"**{_fmt_date_full(date)}** at **{existing_time}** "
+                        f"with **Dr. {existing_dentist}**. "
+                        "Patients may only have one appointment per day. "
+                        "Please choose a different date.",
+                        tag='[BOOK_STEP_3]'
+                    )
+
             slots = _available_slots(dentist, date, clinic)
             if not slots:
                 return self._reply(
@@ -775,13 +878,13 @@ class DentalChatbotService:
                     "Please pick a different date.",
                     tag='[BOOK_STEP_3]'
                 )
-            lines = [f"**Step 3: Choose a Time** ({_fmt_date(date)})\n"]
+            lines = [lang.step_label(3, 'time', self._lang) + f" ({_fmt_date(date)})\n"]
             qr = []
             for s in slots:
                 label = _fmt_time(s)
                 lines.append(f"• {label}")
                 qr.append(label)
-            lines.append("\nSelect a time:")
+            lines.append("\n" + lang.select_prompt('time', self._lang))
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_3T]')
 
         # ── STEP 4: Service (Cleaning or Consultation only) ───────────
@@ -792,15 +895,67 @@ class DentalChatbotService:
             if not allowed.exists():
                 allowed = Service.objects.all()
 
-            lines = ["**Step 4: Choose a Service**\n"]
+            lines = [lang.step_label(4, 'service', self._lang) + "\n"]
             qr = []
             for s in allowed:
                 lines.append(f"• {s.name}")
                 qr.append(s.name)
-            lines.append("\nSelect a service:")
+            lines.append("\n" + lang.select_prompt('service', self._lang))
             return self._reply('\n'.join(lines), qr, tag='[BOOK_STEP_4]')
 
-        # ── STEP 5: Validate & Finalize ───────────────────────────────
+        # ── STEP 5: Confirmation Gate ─────────────────────────────────
+        # NEVER auto-book. Always require explicit patient confirmation.
+        if not _step_tag(hist, '[BOOK_STEP_5]'):
+            logger.info(
+                "Booking confirmation requested: user=%s clinic=%s dentist=%s date=%s time=%s service=%s",
+                self.user.id if self.user else 'anon',
+                clinic.name, dentist.get_full_name(), date, time_val, service.name,
+            )
+            # Update session memory
+            if self.user:
+                session = bmem.get_session(self.user.id)
+                bmem.update_draft(session, clinic=clinic, dentist=dentist,
+                                  date=date, time=time_val, service=service)
+                session.flags.confirmation_shown = True
+            return self._reply(
+                f"{lang.confirmation_header(self._lang)}\n\n"
+                f"📍 **Clinic:** {clinic.name}\n"
+                f"👨\u200d⚕️ **Dentist:** Dr. {dentist.get_full_name()}\n"
+                f"📅 **Date:** {_fmt_date_full(date)}\n"
+                f"🕐 **Time:** {_fmt_time(time_val)}\n"
+                f"🦷 **Service:** {service.name}\n\n"
+                f"{lang.confirmation_yes_no(self._lang)}",
+                lang.confirmation_buttons(self._lang),
+                tag='[BOOK_STEP_5]'
+            )
+
+        # Check confirmation response
+        if not self._is_confirm_yes(low):
+            if self._is_confirm_no(low):
+                logger.info("Booking cancelled by user at confirmation: user=%s",
+                            self.user.id if self.user else 'anon')
+                if self.user:
+                    bmem.clear_session(self.user.id)
+                return self._reply(
+                    lang.booking_cancelled(self._lang),
+                    tag='[FLOW_COMPLETE]'
+                )
+            # Neither yes nor no — re-prompt
+            return self._reply(
+                f"{lang.reprompt_confirmation(self._lang)}\n\n"
+                f"📍 **Clinic:** {clinic.name}\n"
+                f"👨\u200d⚕️ **Dentist:** Dr. {dentist.get_full_name()}\n"
+                f"📅 **Date:** {_fmt_date_full(date)}\n"
+                f"🕐 **Time:** {_fmt_time(time_val)}\n"
+                f"🦷 **Service:** {service.name}",
+                lang.confirmation_buttons(self._lang),
+                tag='[BOOK_STEP_5]'
+            )
+
+        # ── STEP 6: Validate & Finalize ───────────────────────────────
+        logger.info("Booking confirmed by user, validating: user=%s",
+                    self.user.id if self.user else 'anon')
+
         # Once-a-Week Booking Rule
         if _patient_has_appointment_this_week(self.user, date):
             next_week = date + timedelta(days=(7 - date.weekday()))
@@ -853,15 +1008,24 @@ class DentalChatbotService:
         # Send notification to patient
         create_patient_notification(appt, 'appointment_confirmed')
 
+        # Clear session memory after successful booking
+        if self.user:
+            bmem.clear_session(self.user.id)
+
+        logger.info(
+            "Appointment created: id=%d user=%s clinic=%s dentist=%s date=%s time=%s service=%s",
+            appt.id, self.user.id, clinic.name, dentist.get_full_name(), date, time_val, service.name,
+        )
+
         return self._reply(
-            f"✅ **Appointment Booked Successfully!**\n\n"
+            f"{lang.booking_success(self._lang)}\n\n"
             f"**Clinic:** {clinic.name}\n"
             f"**Dentist:** Dr. {dentist.get_full_name()}\n"
             f"**Date:** {_fmt_date_full(date)}\n"
             f"**Time:** {_fmt_time(time_val)}\n"
             f"**Service:** {service.name}\n"
             f"**Status:** Confirmed\n\n"
-            "Your appointment has been confirmed! See you soon.",
+            f"{lang.booking_success_footer(self._lang)}",
             tag='[FLOW_COMPLETE]'
         )
 
@@ -891,6 +1055,7 @@ class DentalChatbotService:
                     '[PENDING_REQUEST]' in content
                     or '[PENDING_BLOCK]' in content
                     or '[APPROVAL_WELCOME]' in content
+                    or '[FLOW_COMPLETE]' in content
                 ):
                     last_block_idx = i
             
@@ -953,7 +1118,7 @@ class DentalChatbotService:
 
     def _handle_reschedule(self, msg, hist):
         if not self.is_authenticated:
-            return self._reply("Please log in first to reschedule an appointment.")
+            return self._reply(lang.login_required('reschedule', self._lang))
 
         # 🔒 PENDING REQUEST LOCK — Block reschedule if pending reschedule/cancellation exists
         pending_block = self._check_pending_requests()
@@ -968,7 +1133,7 @@ class DentalChatbotService:
         ).order_by('date', 'time')
 
         if not upcoming.exists():
-            return self._reply("You have no upcoming appointments to reschedule.")
+            return self._reply(lang.no_upcoming('reschedule', self._lang))
 
         # STEP R1: Pick appointment
         if not _step_tag(hist, '[RESCHED_STEP_'):
@@ -1174,7 +1339,7 @@ class DentalChatbotService:
 
     def _handle_cancel(self, msg, hist):
         if not self.is_authenticated:
-            return self._reply("Please log in first to cancel an appointment.")
+            return self._reply(lang.login_required('cancel', self._lang))
 
         # 🔒 PENDING REQUEST LOCK — Block cancellation if pending reschedule/cancellation exists
         pending_block = self._check_pending_requests()
@@ -1188,7 +1353,7 @@ class DentalChatbotService:
         ).order_by('date', 'time')
 
         if not upcoming.exists():
-            return self._reply("You have no upcoming appointments to cancel.")
+            return self._reply(lang.no_upcoming('cancel', self._lang))
 
         low = msg.lower()
 
@@ -1357,24 +1522,27 @@ class DentalChatbotService:
         if direct:
             return direct
         
-        # Detect user's language for response matching
-        low = msg.lower()
-        tagalog_words = ['ano', 'sino', 'saan', 'kailan', 'paano', 'magkano', 'meron', 'ba', 'ko', 'mo', 'nga', 'po', 'yung', 'mga', 'sa', 'ng', 'na', 'naman', 'lang']
-        tagalog_count = sum(1 for word in tagalog_words if word in low)
-        is_tagalog = tagalog_count >= 2
+        # Use session language (already detected in get_response)
+        current_lang = getattr(self, '_lang', lang.LANG_ENGLISH)
+        is_tagalog = current_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
 
         # ── RAG: Try to retrieve page-index context (optional enhancement) ──
+        # Skipped for quick-reply button clicks to avoid interference with
+        # structured flow responses (booking steps, cancel, reschedule).
         rag_context = None
         rag_sources = []
-        try:
-            from .rag.page_index_service import get_context_with_sources
-            rag_context, rag_sources = get_context_with_sources(msg)
-        except Exception as rag_err:
-            # RAG failure must NEVER block the chatbot
-            import logging
-            logging.getLogger('rag.service').error(
-                "RAG retrieval failed (continuing without): %s", rag_err
-            )
+        if not getattr(self, '_skip_rag', False):
+            try:
+                from .rag.page_index_service import get_context_with_sources
+                # Normalize query to English for better RAG retrieval
+                rag_query = lang.normalize_for_rag(msg)
+                rag_context, rag_sources = get_context_with_sources(rag_query)
+            except Exception as rag_err:
+                # RAG failure must NEVER block the chatbot
+                import logging
+                logging.getLogger('rag.service').error(
+                    "RAG retrieval failed (continuing without): %s", rag_err
+                )
         
         # Fallback to Gemini for complex questions
         try:
@@ -1383,11 +1551,8 @@ class DentalChatbotService:
 
             prompt = f"{system}\n\n"
             
-            # Language instruction
-            if is_tagalog:
-                prompt += "LANGUAGE INSTRUCTION: The user is speaking Tagalog or Taglish. You MUST respond primarily in Tagalog/Taglish, not English.\n\n"
-            else:
-                prompt += "LANGUAGE INSTRUCTION: The user is speaking English. Respond in clear English.\n\n"
+            # Language instruction (from session-aware detection)
+            prompt += lang.gemini_language_instruction(current_lang) + "\n\n"
             
             # Emphasize context if available
             if context:
@@ -1408,6 +1573,7 @@ class DentalChatbotService:
             
             prompt += f"User: {msg}\n\nAssistant:"
 
+            ai_start = time_module.time()
             resp = self.model.generate_content(
                 prompt,
                 generation_config={"temperature": 0.2, "max_output_tokens": 600, "top_p": 0.9, "top_k": 40},
@@ -1418,6 +1584,10 @@ class DentalChatbotService:
                     'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
                 },
             )
+            ai_elapsed = time_module.time() - ai_start
+            logger.info("Gemini response in %.2fs", ai_elapsed)
+            if ai_elapsed > 10:
+                logger.warning("Gemini slow response: %.2fs (threshold: 10s)", ai_elapsed)
             text = self._sanitize(resp.text)
 
             # ── RAG: Attach optional sources to response ──
@@ -1428,6 +1598,7 @@ class DentalChatbotService:
         except Exception as e:
             # Log the actual error for debugging (don't show to user)
             error_type = type(e).__name__
+            logger.error("Gemini API error (%s): %s", error_type, str(e)[:200])
             
             # Check if it's a rate limit error
             is_rate_limit = 'quota' in str(e).lower() or '429' in str(e) or 'ResourceExhausted' in error_type

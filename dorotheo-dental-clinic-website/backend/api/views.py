@@ -2718,7 +2718,7 @@ def chatbot_query(request):
         user = request.user if request.user.is_authenticated else None
         chatbot = DentalChatbotService(user=user)
         
-        # Get response from Ollama
+        # Get response from chatbot
         result = chatbot.get_response(user_message, conversation_history)
         
         if result['error']:

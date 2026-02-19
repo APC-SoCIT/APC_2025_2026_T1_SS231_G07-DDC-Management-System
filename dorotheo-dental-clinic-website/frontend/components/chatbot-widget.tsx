@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { MessageCircle, X, Send, Loader2, Trash2, Calendar, RefreshCw, XCircle } from "lucide-react"
+import { MessageCircle, X, Send, Loader2, Trash2 } from "lucide-react"
 import { chatbotQuery } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import ReactMarkdown from 'react-markdown'
@@ -11,20 +11,7 @@ interface Message {
   text: string
   sender: "user" | "bot"
   timestamp: Date
-  quickReplies?: string[]
 }
-
-const quickActions = [
-  { icon: Calendar, text: "📅 Book Appointment", message: "I want to book an appointment" },
-  { icon: RefreshCw, text: "🔄 Reschedule", message: "I want to reschedule my appointment" },
-  { icon: XCircle, text: "❌ Cancel", message: "I want to cancel my appointment" },
-]
-
-const defaultSuggestions = [
-  "What dental services do you offer?",
-  "Who are the dentists?",
-  "What are your clinic hours?",
-]
 
 export default function ChatbotWidget() {
   const { user } = useAuth()
@@ -172,7 +159,6 @@ export default function ChatbotWidget() {
         text: response.response,
         sender: "bot",
         timestamp: new Date(),
-        quickReplies: response.quick_replies || []
       }
 
       setMessages((prev) => [...prev, botMessage])
@@ -196,10 +182,6 @@ export default function ChatbotWidget() {
     } finally {
       setIsTyping(false)
     }
-  }
-
-  const handleQuickReply = (reply: string) => {
-    handleSendMessage(reply)
   }
 
   return (
@@ -309,23 +291,7 @@ export default function ChatbotWidget() {
                   </div>
                 </div>
                 
-                {/* Quick Reply Buttons */}
-                {message.sender === "bot" && message.quickReplies && message.quickReplies.length > 0 && (
-                  <div className="flex justify-start mt-2 ml-2">
-                    <div className="flex flex-wrap gap-2 max-w-[80%]">
-                      {message.quickReplies.map((reply, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleQuickReply(reply)}
-                          disabled={isTyping}
-                          className="text-xs bg-[var(--color-primary)] text-white px-3 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
-                        >
-                          {reply}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
             ))}
 
@@ -338,39 +304,6 @@ export default function ChatbotWidget() {
               </div>
             )}
             <div ref={messagesEndRef} />
-          </div>
-
-          {/* Quick Actions & Suggestions */}
-          <div className="p-3 bg-white border-t border-gray-200">
-            <p className="text-xs text-gray-700 mb-2 font-semibold">Quick Actions:</p>
-            <div className="grid grid-cols-3 gap-1.5 mb-3">
-              {quickActions.map((action, index) => {
-                const Icon = action.icon
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleQuickReply(action.message)}
-                    disabled={isTyping}
-                    className="flex items-center justify-center gap-1 text-xs bg-[var(--color-primary)] text-white px-2 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
-                  >
-                    <span>{action.text}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <p className="text-xs text-gray-500 mb-1.5 font-medium">Or ask me:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {defaultSuggestions.map((reply, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleQuickReply(reply)}
-                  disabled={isTyping}
-                  className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
-                >
-                  {reply}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Input */}
