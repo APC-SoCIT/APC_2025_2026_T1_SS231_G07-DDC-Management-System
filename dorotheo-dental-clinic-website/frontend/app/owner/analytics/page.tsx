@@ -78,7 +78,7 @@ export default function OwnerAnalytics() {
           <p className="text-sm sm:text-base text-[var(--color-text-muted)]">Revenue and expenses overview</p>
         </div>
 
-        <div className="flex gap-1 sm:gap-2 bg-white border border-[var(--color-border)] rounded-lg p-1 overflow-x-auto">
+        <div className="flex gap-1 sm:gap-2 bg-white border border-[var(--color-border)] rounded-lg p-1 flex-wrap sm:flex-nowrap">
           {[
             { id: "daily", label: "Daily" },
             { id: "weekly", label: "Weekly" },
@@ -88,7 +88,7 @@ export default function OwnerAnalytics() {
             <button
               key={filter.id}
               onClick={() => setTimeFilter(filter.id as any)}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md font-medium transition-colors whitespace-nowrap text-sm sm:text-base ${
+              className={`flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 px-2 sm:px-4 py-2 sm:py-2 rounded-md font-medium transition-colors whitespace-nowrap text-xs sm:text-base ${
                 timeFilter === filter.id
                   ? "bg-[var(--color-primary)] text-white"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
@@ -105,51 +105,59 @@ export default function OwnerAnalytics() {
         <span>Showing data for: <strong>{dateRange.label}</strong></span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 border border-green-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-green-500 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-4 sm:p-6 border border-green-200 min-h-[140px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-green-500 rounded-lg">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <span className="text-sm font-medium text-green-700">Revenue</span>
+            <span className="text-xs sm:text-sm font-medium text-green-700">Revenue</span>
           </div>
-          <h3 className="text-3xl font-bold text-green-900 mb-1">{totalRevenue.toLocaleString()}</h3>
-          <p className="text-sm text-green-700">From {filteredBillings.length} paid transactions</p>
+          <div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-green-900 mb-1">{totalRevenue.toLocaleString()}</h3>
+            <p className="text-xs sm:text-sm text-green-700">From {filteredBillings.length} paid transactions</p>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-red-50 to-rose-100 rounded-xl p-6 border border-red-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-red-500 rounded-lg">
-              <ShoppingCart className="w-6 h-6 text-white" />
+        <div className="bg-gradient-to-br from-red-50 to-rose-100 rounded-xl p-4 sm:p-6 border border-red-200 min-h-[140px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-red-500 rounded-lg">
+              <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <span className="text-sm font-medium text-red-700">Expenses</span>
+            <span className="text-xs sm:text-sm font-medium text-red-700">Expenses</span>
           </div>
-          <h3 className="text-3xl font-bold text-red-900 mb-1">{totalExpenses.toLocaleString()}</h3>
-          <p className="text-sm text-red-700">From {filteredInventory.length} inventory items</p>
+          <div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-red-900 mb-1">{totalExpenses.toLocaleString()}</h3>
+            <p className="text-xs sm:text-sm text-red-700">From {filteredInventory.length} inventory items</p>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-50 to-cyan-100 rounded-xl p-6 border border-blue-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-blue-500 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-100 rounded-xl p-4 sm:p-6 border border-blue-200 min-h-[140px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-blue-500 rounded-lg">
+              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <span className="text-sm font-medium text-blue-700">Profit</span>
+            <span className="text-xs sm:text-sm font-medium text-blue-700">Profit</span>
           </div>
-          <h3 className={`text-3xl font-bold mb-1 ${profit >= 0 ? "text-blue-900" : "text-red-900"}`}>
-            {profit.toLocaleString()}
-          </h3>
-          <p className="text-sm text-blue-700">Revenue - Expenses</p>
+          <div>
+            <h3 className={`text-2xl sm:text-3xl font-bold mb-1 ${profit >= 0 ? "text-blue-900" : "text-red-900"}`}>
+              {profit.toLocaleString()}
+            </h3>
+            <p className="text-xs sm:text-sm text-blue-700">Revenue - Expenses</p>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-xl p-6 border border-amber-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-amber-500 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
+        <div className="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-xl p-4 sm:p-6 border border-amber-200 min-h-[140px] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-amber-500 rounded-lg">
+              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <span className="text-sm font-medium text-amber-700">Pending</span>
+            <span className="text-xs sm:text-sm font-medium text-amber-700">Pending</span>
           </div>
-          <h3 className="text-3xl font-bold text-amber-900 mb-1">{pendingRevenue.toLocaleString()}</h3>
-          <p className="text-sm text-amber-700">Awaiting payment</p>
+          <div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-amber-900 mb-1">{pendingRevenue.toLocaleString()}</h3>
+            <p className="text-xs sm:text-sm text-amber-700">Awaiting payment</p>
+          </div>
         </div>
       </div>
 

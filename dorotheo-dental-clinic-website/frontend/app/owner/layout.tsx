@@ -55,9 +55,9 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--color-primary)] border-b border-[var(--color-primary)] px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-10 w-auto object-contain" />
+          <ClinicSelector showAllOption={true} className="bg-white" />
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell />
@@ -65,9 +65,9 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
           <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+              className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
             >
-              <User className="w-5 h-5 text-white" />
+              <User className="w-5 h-5 text-gray-700" />
             </button>
             {isProfileOpen && pathname !== "/owner/profile" && (
               <div className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-[var(--color-border)] p-2 z-50">
@@ -80,7 +80,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
               </div>
             )}
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-white">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
             {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -124,12 +124,12 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-[var(--color-border)] transition-transform ${
+        className={`fixed top-0 left-0 z-[60] h-screen w-60 bg-[var(--color-primary)] border-r border-[var(--color-border)] transition-transform ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
-        <div className="flex flex-col h-full">
-          <div className="p-6 bg-[var(--color-primary)]">
+        <div className="flex flex-col h-full bg-white">
+          <div className="w-[calc(100%+1px)] py-6 bg-[var(--color-primary)]">
             <div className="flex items-center justify-center">
               <img src="/logo.png" alt="Dorotheo Dental Clinic" className="h-14 w-auto object-contain" />
             </div>
@@ -177,7 +177,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
       {/* Overlay for mobile */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden" 
+          className="fixed inset-0 bg-black/50 z-[55] lg:hidden" 
           onClick={() => setIsSidebarOpen(false)}
           onKeyDown={(e) => e.key === 'Escape' && setIsSidebarOpen(false)}
           role="button"

@@ -1316,7 +1316,7 @@ export default function StaffAppointments() {
 
       {/* Appointments Table */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[500px] sm:max-h-[600px] lg:max-h-[70vh]">
           <table className="w-full">
             <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr className="border-b border-[var(--color-border)]">
