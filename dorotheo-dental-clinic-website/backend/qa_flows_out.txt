@@ -1,0 +1,705 @@
+
+⚙  Loading user sb@gmail.com ...
+   ✅  Found: Squid Babe (id=24)
+   Clinics  : ['Alabang', 'Bacoor', 'Poblacion']
+   First available: Dr. Dental Doctor  on February 20  at Bacoor
+   Upcoming appointments: 4
+      • Consultation — 2026-03-02 15:30:00 (status=confirmed)
+      • Cleaning — 2026-03-09 15:30:00 (status=confirmed)
+      • Cleaning — 2026-03-16 15:30:00 (status=confirmed)
+
+════════════════════════════════════════════════════════════
+  BOOKING — ENGLISH
+════════════════════════════════════════════════════════════
+
+  ▶ [B-EN-1]  "I want to book an appointment"
+     **Step 1: Choose a Clinic**
+     
+     💡 *Based on your visit history, we recommend **Bacoor**.*
+     
+     • Bacoor (4 dentists available) ⭐
+     • Alabang (2 dentists available)
+     • Poblacion (2 dentists available)
+     
+     Please select a clinic:
+     
+     <!-- [BOOK_STEP_1] -->
+     QR → ['Bacoor', 'Alabang', 'Poblacion']
+
+  ▶ [B-EN-2]  "Alabang"
+     **Step 2: Choose a Dentist** (at Alabang)
+     
+     • Dr. Carlo Salvador
+     • Dr. Marvin Dorotheo
+     
+     Please select a dentist:
+     
+     <!-- [BOOK_STEP_2] -->
+     QR → ['Dr. Carlo Salvador', 'Dr. Marvin Dorotheo']
+
+  ▶ [B-EN-3]  "Dr. Carlo Salvador"
+     **Step 3: Choose a Date**
+     
+     Dr. Carlo Salvador at Alabang:
+     
+     • Wednesday, February 25
+     
+     Please select a date:
+     
+     <!-- [BOOK_STEP_3] -->
+     QR → ['February 25']
+
+  ▶ [B-EN-4]  "February 25"
+     **Step 3: Choose a Time** (Wednesday, February 25)
+     
+     • 9:00 AM
+     • 9:30 AM
+     • 10:00 AM
+     • 10:30 AM
+     • 11:00 AM
+     • 11:30 AM
+     
+     _10 more time slots available._
+     
+     Please select a time:
+     
+     <!-- [BOOK_STEP_3T] -->
+     QR → ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM']
+
+  ▶ [B-EN-5]  "9:00 AM"
+     **Step 4: Choose a Service**
+     
+     • Cleaning
+     • Consultation
+     
+     Please select a service:
+     
+     <!-- [BOOK_STEP_4] -->
+     QR → ['Cleaning', 'Consultation']
+
+  ▶ [B-EN-6]  "Cleaning"
+     🦷 **Our Dental Services:**
+     
+     • Braces
+     • Dental Implants
+     • Tooth Extraction
+     • Checkup
+     • Cleaning
+     • Consultation
+     • pasta
+     • xray
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [B-EN-7]  "Yes, confirm"
+     **Please confirm your booking:**
+     
+     📍 **Clinic:** Alabang
+     👨‍⚕️ **Dentist:** Dr. Carlo Salvador
+     📅 **Date:** Wednesday, February 25, 2026
+     🕐 **Time:** 9:00 AM
+     🦷 **Service:** Cleaning
+     
+     Is this correct? Reply **Yes** to confirm or **No** to cancel.
+     
+     <!-- [BOOK_STEP_5] -->
+     QR → ['Yes, Confirm', 'No, Start Over']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  BOOKING — TAGALOG
+════════════════════════════════════════════════════════════
+
+  ▶ [B-TL-1]  "Gusto ko mag-book ng appointment"
+     **Hakbang 1: Pumili ng Clinic**
+     
+     💡 *Batay sa inyong dating bisita, inirerekomenda namin ang **Bacoor**.*
+     
+     • Bacoor (4 dentists available) ⭐
+     • Alabang (2 dentists available)
+     • Poblacion (2 dentists available)
+     
+     Pumili po ng clinic:
+     
+     <!-- [BOOK_STEP_1] -->
+     QR → ['Bacoor', 'Alabang', 'Poblacion']
+
+  ▶ [B-TL-2]  "Alabang"
+     **Step 2: Choose a Dentist** (at Alabang)
+     
+     • Dr. Carlo Salvador
+     • Dr. Marvin Dorotheo
+     
+     Please select a dentist:
+     
+     <!-- [BOOK_STEP_2] -->
+     QR → ['Dr. Carlo Salvador', 'Dr. Marvin Dorotheo']
+
+  ▶ [B-TL-3]  "Dr. Carlo Salvador"
+     **Step 3: Choose a Date**
+     
+     Dr. Carlo Salvador at Alabang:
+     
+     • Wednesday, February 25
+     
+     Please select a date:
+     
+     <!-- [BOOK_STEP_3] -->
+     QR → ['February 25']
+
+  ▶ [B-TL-4]  "February 25"
+     **Step 3: Choose a Time** (Wednesday, February 25)
+     
+     • 9:00 AM
+     • 9:30 AM
+     • 10:00 AM
+     • 10:30 AM
+     • 11:00 AM
+     • 11:30 AM
+     
+     _10 more time slots available._
+     
+     Please select a time:
+     
+     <!-- [BOOK_STEP_3T] -->
+     QR → ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM']
+
+  ▶ [B-TL-5]  "9:00 AM"
+     **Step 4: Choose a Service**
+     
+     • Cleaning
+     • Consultation
+     
+     Please select a service:
+     
+     <!-- [BOOK_STEP_4] -->
+     QR → ['Cleaning', 'Consultation']
+
+  ▶ [B-TL-6]  "Cleaning"
+     🦷 **Our Dental Services:**
+     
+     • Braces
+     • Dental Implants
+     • Tooth Extraction
+     • Checkup
+     • Cleaning
+     • Consultation
+     • pasta
+     • xray
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [B-TL-7]  "Oo, kumpirmahin"
+     **Please confirm your booking:**
+     
+     📍 **Clinic:** Alabang
+     👨‍⚕️ **Dentist:** Dr. Carlo Salvador
+     📅 **Date:** Wednesday, February 25, 2026
+     🕐 **Time:** 9:00 AM
+     🦷 **Service:** Cleaning
+     
+     Is this correct? Reply **Yes** to confirm or **No** to cancel.
+     
+     <!-- [BOOK_STEP_5] -->
+     QR → ['Yes, Confirm', 'No, Start Over']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  BOOKING — TAGLISH
+════════════════════════════════════════════════════════════
+
+  ▶ [B-MIX-1]  "Pwede ba mag-book ng appointment?"
+     **Hakbang 1: Pumili ng Clinic**
+     
+     💡 *Batay sa inyong dating bisita, inirerekomenda namin ang **Bacoor**.*
+     
+     • Bacoor (4 dentists available) ⭐
+     • Alabang (2 dentists available)
+     • Poblacion (2 dentists available)
+     
+     Pumili po ng clinic:
+     
+     <!-- [BOOK_STEP_1] -->
+     QR → ['Bacoor', 'Alabang', 'Poblacion']
+
+  ▶ [B-MIX-2]  "Poblacion"
+     **Step 2: Choose a Dentist** (at Poblacion)
+     
+     • Dr. Carlo Salvador
+     • Dr. Marvin Dorotheo
+     
+     Please select a dentist:
+     
+     <!-- [BOOK_STEP_2] -->
+     QR → ['Dr. Carlo Salvador', 'Dr. Marvin Dorotheo']
+
+  ▶ [B-MIX-3]  "Dr. Carlo Salvador"
+     **Step 3: Choose a Date**
+     
+     Dr. Carlo Salvador at Poblacion:
+     
+     • Wednesday, February 25
+     
+     Please select a date:
+     
+     <!-- [BOOK_STEP_3] -->
+     QR → ['February 25']
+
+  ▶ [B-MIX-4]  "February 25"
+     **Step 3: Choose a Time** (Wednesday, February 25)
+     
+     • 9:00 AM
+     • 9:30 AM
+     • 10:00 AM
+     • 10:30 AM
+     • 11:00 AM
+     • 11:30 AM
+     
+     _10 more time slots available._
+     
+     Please select a time:
+     
+     <!-- [BOOK_STEP_3T] -->
+     QR → ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM']
+
+  ▶ [B-MIX-5]  "9:00 AM"
+     **Step 4: Choose a Service**
+     
+     • Cleaning
+     • Consultation
+     
+     Please select a service:
+     
+     <!-- [BOOK_STEP_4] -->
+     QR → ['Cleaning', 'Consultation']
+
+  ▶ [B-MIX-6]  "Cleaning"
+     🦷 **Our Dental Services:**
+     
+     • Braces
+     • Dental Implants
+     • Tooth Extraction
+     • Checkup
+     • Cleaning
+     • Consultation
+     • pasta
+     • xray
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [B-MIX-7]  "Yes please, i-confirm na"
+     **Just to confirm po, ito yung booking details:**
+     
+     📍 **Clinic:** Poblacion
+     👨‍⚕️ **Dentist:** Dr. Carlo Salvador
+     📅 **Date:** Wednesday, February 25, 2026
+     🕐 **Time:** 9:00 AM
+     🦷 **Service:** Cleaning
+     
+     Is this correct po? Reply **Yes** to confirm or **No** to cancel.
+     
+     <!-- [BOOK_STEP_5] -->
+     QR → ['Yes, Confirm po', 'No, Start Over']
+  ────────────────────────────────────────────────────────
+
+   Post-booking appointments count: 4
+
+════════════════════════════════════════════════════════════
+  RESCHEDULE — ENGLISH
+════════════════════════════════════════════════════════════
+
+  ▶ [R-EN-1]  "I want to reschedule my appointment"
+     **Reschedule – Select Appointment**
+     
+     • Consultation – Monday, March 02
+     • Cleaning – Monday, March 09
+     • Cleaning – Monday, March 16
+     • Cleaning – Monday, March 23
+     
+     Select the appointment you'd like to reschedule:
+     
+     *Note: You can only change the date/time. Dentist and service stay the same.*
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+
+  ▶ [R-EN-2]  "Consultation – Monday, March 02"
+     I'm sorry, I don't have specific information about that right now. Please contact our clinic directly or visit us in person for assistance.
+
+  ▶ [R-EN-3]  "February 20"
+     I wasn't able to identify which appointment you meant. Could you please select one from the options below?
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+
+  ▶ [R-EN-4]  "Consultation – Monday, March 02"
+     I'm sorry, I don't have specific information about that right now. Please contact our clinic directly or visit us in person for assistance.
+
+  ▶ [R-EN-5]  "Yes, reschedule"
+     **Reschedule – Select Appointment**
+     
+     • Consultation – Monday, March 02
+     • Cleaning – Monday, March 09
+     • Cleaning – Monday, March 16
+     • Cleaning – Monday, March 23
+     
+     Select the appointment you'd like to reschedule:
+     
+     *Note: You can only change the date/time. Dentist and service stay the same.*
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  RESCHEDULE — TAGALOG
+════════════════════════════════════════════════════════════
+
+  ▶ [R-TL-1]  "Gusto ko i-reschedule ang appointment ko"
+     **Reschedule – Select Appointment**
+     
+     • Consultation – Monday, March 02
+     • Cleaning – Monday, March 09
+     • Cleaning – Monday, March 16
+     • Cleaning – Monday, March 23
+     
+     Select the appointment you'd like to reschedule:
+     
+     *Note: You can only change the date/time. Dentist and service stay the same.*
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+
+  ▶ [R-TL-2]  "Consultation – Monday, March 02"
+     I'm sorry, I don't have specific information about that right now. Please contact our clinic directly or visit us in person for assistance.
+
+  ▶ [R-TL-3]  "February 20"
+     I wasn't able to identify which appointment you meant. Could you please select one from the options below?
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+
+  ▶ [R-TL-4]  "Consultation – Monday, March 02"
+     I'm sorry, I don't have specific information about that right now. Please contact our clinic directly or visit us in person for assistance.
+
+  ▶ [R-TL-5]  "Oo, i-reschedule na"
+     **Reschedule – Select Appointment**
+     
+     • Consultation – Monday, March 02
+     • Cleaning – Monday, March 09
+     • Cleaning – Monday, March 16
+     • Cleaning – Monday, March 23
+     
+     Select the appointment you'd like to reschedule:
+     
+     *Note: You can only change the date/time. Dentist and service stay the same.*
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  RESCHEDULE — TAGLISH
+════════════════════════════════════════════════════════════
+
+  ▶ [R-MIX-1]  "Pwede ko bang i-reschedule yung appointment ko?"
+     **Reschedule – Select Appointment**
+     
+     • Consultation – Monday, March 02
+     • Cleaning – Monday, March 09
+     • Cleaning – Monday, March 16
+     • Cleaning – Monday, March 23
+     
+     Select the appointment you'd like to reschedule:
+     
+     *Note: You can only change the date/time. Dentist and service stay the same.*
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+
+  ▶ [R-MIX-2]  "Consultation – Monday, March 02"
+     I'm sorry, I don't have specific information about that right now. Please contact our clinic directly or visit us in person for assistance.
+
+  ▶ [R-MIX-3]  "February 20"
+     I wasn't able to identify which appointment you meant. Could you please select one from the options below?
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+
+  ▶ [R-MIX-4]  "Consultation – Monday, March 02"
+     I'm sorry, I don't have specific information about that right now. Please contact our clinic directly or visit us in person for assistance.
+
+  ▶ [R-MIX-5]  "Yes, okay na yun"
+     I wasn't able to identify which appointment you meant. Could you please select one from the options below?
+     
+     <!-- [RESCHED_STEP_1] -->
+     QR → ['Consultation – Monday, March 02', 'Cleaning – Monday, March 09', 'Cleaning – Monday, March 16', 'Cleaning – Monday, March 23']
+  ────────────────────────────────────────────────────────
+
+   Appointments for cancel test: 4
+
+════════════════════════════════════════════════════════════
+  CANCEL — ENGLISH
+════════════════════════════════════════════════════════════
+
+  ▶ [C-EN-1]  "I want to cancel my appointment"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+
+  ▶ [C-EN-2]  "Consultation – March 02, 2026"
+     👨‍⚕️ **Our Dentists:**
+     
+     • Dr. Dental Doctor – ✅ Available
+       📍 Bacoor
+     • Dr. Marvin Dorotheo – ✅ Available
+     • Dr. George Ocampo – ✅ Available
+       📍 Bacoor
+     • Dr. Michael Orenze – ❌ Not available Monday, March 02
+     • Dr. Carlo Salvador – ✅ Available
+       📍 Bacoor
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [C-EN-3]  "Yes, cancel it"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  CANCEL — TAGALOG
+════════════════════════════════════════════════════════════
+
+  ▶ [C-TL-1]  "Gusto ko i-cancel ang appointment ko"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+
+  ▶ [C-TL-2]  "Consultation – March 02, 2026"
+     👨‍⚕️ **Our Dentists:**
+     
+     • Dr. Dental Doctor – ✅ Available
+       📍 Bacoor
+     • Dr. Marvin Dorotheo – ✅ Available
+     • Dr. George Ocampo – ✅ Available
+       📍 Bacoor
+     • Dr. Michael Orenze – ❌ Not available Monday, March 02
+     • Dr. Carlo Salvador – ✅ Available
+       📍 Bacoor
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [C-TL-3]  "Oo, i-cancel na"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  CANCEL — TAGLISH
+════════════════════════════════════════════════════════════
+
+  ▶ [C-MIX-1]  "Cancel na lang yung appointment ko"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+
+  ▶ [C-MIX-2]  "Consultation – March 02, 2026"
+     👨‍⚕️ **Our Dentists:**
+     
+     • Dr. Dental Doctor – ✅ Available
+       📍 Bacoor
+     • Dr. Marvin Dorotheo – ✅ Available
+     • Dr. George Ocampo – ✅ Available
+       📍 Bacoor
+     • Dr. Michael Orenze – ❌ Not available Monday, March 02
+     • Dr. Carlo Salvador – ✅ Available
+       📍 Bacoor
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [C-MIX-3]  "Yes, cancel na"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  EDGE CASES
+════════════════════════════════════════════════════════════
+
+  ▶ [EDGE-1]  "Book appointment (then abort at confirm)"
+     **Step 1: Choose a Clinic**
+     
+     💡 *Based on your visit history, we recommend **Bacoor**.*
+     
+     • Bacoor (4 dentists available) ⭐
+     • Alabang (2 dentists available)
+     • Poblacion (2 dentists available)
+     
+     Please select a clinic:
+     
+     <!-- [BOOK_STEP_1] -->
+     QR → ['Bacoor', 'Alabang', 'Poblacion']
+     **Step 2: Choose a Dentist** (at Alabang)
+     
+     • Dr. Carlo Salvador
+     • Dr. Marvin Dorotheo
+     
+     Please select a dentist:
+     
+     <!-- [BOOK_STEP_2] -->
+     QR → ['Dr. Carlo Salvador', 'Dr. Marvin Dorotheo']
+     **Step 3: Choose a Date**
+     
+     Dr. Carlo Salvador at Alabang:
+     
+     • Wednesday, February 25
+     
+     Please select a date:
+     
+     <!-- [BOOK_STEP_3] -->
+     QR → ['February 25']
+     **Step 3: Choose a Time** (Wednesday, February 25)
+     
+     • 9:00 AM
+     • 9:30 AM
+     • 10:00 AM
+     • 10:30 AM
+     • 11:00 AM
+     • 11:30 AM
+     
+     _10 more time slots available._
+     
+     Please select a time:
+     
+     <!-- [BOOK_STEP_3T] -->
+     QR → ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM']
+     **Step 4: Choose a Service**
+     
+     • Cleaning
+     • Consultation
+     
+     Please select a service:
+     
+     <!-- [BOOK_STEP_4] -->
+     QR → ['Cleaning', 'Consultation']
+     🦷 **Our Dental Services:**
+     
+     • Braces
+     • Dental Implants
+     • Tooth Extraction
+     • Checkup
+     • Cleaning
+     • Consultation
+     • pasta
+     • xray
+     
+     💙 Would you like to know more or book an appointment?
+
+  ▶ [EDGE-1-NO]  "No, cancel"
+     **Cancel – Select Appointment**
+     
+     • Consultation – March 02, 2026
+     • Cleaning – March 09, 2026
+     • Cleaning – March 16, 2026
+     • Cleaning – March 23, 2026
+     
+     Which appointment would you like to cancel?
+     
+     <!-- [CANCEL_STEP_1] -->
+     QR → ['Consultation – March 02, 2026', 'Cleaning – March 09, 2026', 'Cleaning – March 16, 2026', 'Cleaning – March 23, 2026']
+  ────────────────────────────────────────────────────────
+
+  ▶ [EDGE-2]  "Cancel flow with no appointments check"
+     You need to be logged in to cancel an appointment. Please log in first and try again.
+  ────────────────────────────────────────────────────────
+
+════════════════════════════════════════════════════════════
+  QA COMPLETE
+════════════════════════════════════════════════════════════
+  All flow tests finished. Review output above for:
+  • ❌ grammar errors
+  • ❌ missing/empty responses
+  • ❌ wrong language used
+  • ❌ wrong step tag progression
+  • ✅ success confirmations show correct data
+
+
+=== STDERR ===
+[2026-02-20 23:00:24] INFO [rag.embedding] Generated query embedding (dim=3072) in 0.51s
+[2026-02-20 23:00:24] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+LLM error (attempt 1/2, category=quota_exceeded): 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current
+[2026-02-20 23:00:25] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+LLM error (attempt 1/2, category=quota_exceeded): 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+LLM error (attempt 1/2, category=quota_exceeded): 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current
+CRITICAL_SERVICE_DEGRADED: LLM circuit breaker CLOSED → OPEN after 3 failures (cooldown=60s, last_error=quota_exceeded)
+[2026-02-20 23:00:26] INFO [rag.embedding] Generated query embedding (dim=3072) in 0.49s
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+CRITICAL_SERVICE_DEGRADED: All response systems failed, returning contact-clinic fallback
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+CRITICAL_SERVICE_DEGRADED: All response systems failed, returning contact-clinic fallback
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+CRITICAL_SERVICE_DEGRADED: All response systems failed, returning contact-clinic fallback
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+CRITICAL_SERVICE_DEGRADED: All response systems failed, returning contact-clinic fallback
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+CRITICAL_SERVICE_DEGRADED: All response systems failed, returning contact-clinic fallback
+[2026-02-20 23:00:26] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+CRITICAL_SERVICE_DEGRADED: All response systems failed, returning contact-clinic fallback
+[2026-02-20 23:00:27] INFO [rag.embedding] Generated query embedding (dim=3072) in 0.80s
+[2026-02-20 23:00:27] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+[2026-02-20 23:00:27] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+[2026-02-20 23:00:27] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+[2026-02-20 23:00:27] INFO [rag.vector_search] No indexed page chunks found – skipping RAG
+

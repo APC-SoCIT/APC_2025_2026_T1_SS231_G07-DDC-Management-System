@@ -529,7 +529,8 @@ def build_db_context(msg: str, user=None) -> str:
                             if clinic_name:
                                 lines.append(f"  \U0001F4CD {clinic_name}")
                     else:
-                        lines.append(f"\u2022 Dr. {full_name} \u2013 \u274c Not available {date_context}")
+                        on_word = '' if date_context in ('today', 'tomorrow') else 'on '
+                        lines.append(f"\u2022 Dr. {full_name} \u2013 \u274c Not available {on_word}{date_context}")
 
             lines.append("\n\u23f0 Appointments are booked in 30-minute intervals.")
             parts.append('\n'.join(lines))

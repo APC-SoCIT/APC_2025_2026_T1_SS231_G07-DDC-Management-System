@@ -382,25 +382,41 @@ class DentalChatbotService:
                 logger.info("Intent: BOOKING (user=%s)", self.user.id if self.user else 'anon')
                 return handle_booking(self.user, user_message, [], self._lang)
 
-            # ── General Q&A breaks out of active flows ──
+            # ── Continue ongoing flow (if no new explicit intent) ──
+            # This MUST come before INTENT_CLINIC_INFO so that short menu
+            # selections ("Cleaning", "Consultation – March 02") inside an
+            # active flow are NOT hijacked by the Q&A handler.
+            # Exception: if the message is an actual question (contains '?'
+            # or starts with a question word) we let Q&A handle it so the
+            # user can ask about the clinic while mid-flow.
+            active = isvc.detect_active_flow(hist)
+            if active:
+                _low_msg = user_message.lower().strip()
+                _question_words = (
+                    'what', 'who', 'where', 'when', 'how', 'why',
+                    'is ', 'are ', 'do ', 'does ', 'can ', 'could ',
+                    'anong', 'sino', 'saan', 'paano', 'kailan', 'bakit',
+                )
+                _is_question = '?' in user_message or any(
+                    _low_msg.startswith(w) for w in _question_words
+                )
+                if not _is_question:
+                    logger.info("Continuing flow: %s (user=%s)",
+                                active, self.user.id if self.user else 'anon')
+                    if active == 'cancel':
+                        return handle_cancel(self.user, user_message, hist, self._lang)
+                    if active == 'reschedule':
+                        return handle_reschedule(self.user, user_message, hist, self._lang)
+                    if active == 'booking':
+                        return handle_booking(self.user, user_message, hist, self._lang)
+
+            # ── General Q&A (or question asked mid-flow) ──
             if intent_result.intent == isvc.INTENT_CLINIC_INFO:
                 return self._handle_qa(user_message, hist, skip_rag)
 
             # ── Dental health / symptom advice (uses LLM knowledge, no RAG needed) ──
             if intent_result.intent == isvc.INTENT_DENTAL_ADVICE:
                 return self._handle_dental_advice(user_message, hist)
-
-            # ── Continue ongoing flow (if no new explicit intent) ──
-            active = isvc.detect_active_flow(hist)
-            if active:
-                logger.info("Continuing flow: %s (user=%s)",
-                            active, self.user.id if self.user else 'anon')
-            if active == 'cancel':
-                return handle_cancel(self.user, user_message, hist, self._lang)
-            if active == 'reschedule':
-                return handle_reschedule(self.user, user_message, hist, self._lang)
-            if active == 'booking':
-                return handle_booking(self.user, user_message, hist, self._lang)
 
             # ── Fallback: general Q&A ──
             return self._handle_qa(user_message, hist, skip_rag)
