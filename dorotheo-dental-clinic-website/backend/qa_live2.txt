@@ -1,0 +1,74 @@
+=== T1: what time is doc marvin available ===
+👨‍⚕️ **Our Dentists:**
+
+• Dr. Marvin Dorotheo – Available on:
+• Monday, February 23: 9:00 AM – 5:00 PM
+• Tuesday, February 24: 9:00 AM – 5:00 PM
+• Friday, February 27: 9:00 AM – 5:00 PM
+• Monday, March 02: 9:00 AM – 5:00 PM
+• Tuesday, March 03: 9:00 AM – 5:00 PM
+
+💙 Would you like to know more or book an appointment?
+
+=== T2: when is doc marvin available next week ===
+👨‍⚕️ **Our Dentists:**
+
+• Dr. Marvin Dorotheo – Available on:
+• Monday, February 23
+• Tuesday, February 24
+• Friday, February 27
+
+💙 Would you like to know more or book an appointment?
+
+=== T3: who are the dentists today ===
+👨‍⚕️ **Our Dentists:**
+
+• Dr. Dental Doctor – ✅ Available
+  📍 Bacoor
+• Dr. Marvin Dorotheo – ✅ Available
+  📍 Bacoor
+• Dr. George Ocampo – ✅ Available
+  📍 Bacoor
+• Dr. Michael Orenze – ❌ Not available today
+• Dr. Carlo Salvador – ✅ Available
+  📍 Bacoor
+
+💙 Would you like to know more or book an appointment?
+
+=== T4: what services do you offer ===
+🦷 **Our Dental Services:**
+
+• Braces
+• Dental Implants
+• Tooth Extraction
+• Checkup
+• Cleaning
+• Consultation
+• pasta
+• xray
+
+💙 Would you like to know more or book an appointment?
+
+=== T5: what are your clinic hours ===
+📍 **Clinic Locations:**
+
+**📍 Alabang**
+Ground Floor
+Festival Mall, Filinvest City
+📞 +63 2 8809 5678
+
+**📍 Bacoor**
+Unit 5
+2nd Floor, SM City Bacoor
+📞 +63 46 417 1234
+
+**📍 Poblacion**
+2nd Floor
+Poblacion Commercial Center, 5678 P. Burgos Street
+📞 +63 2 8888 9012
+⏰ Operating Hours:
+• Monday - Friday: 8:00 AM - 6:00 PM
+• Saturday: 9:00 AM - 3:00 PM
+• Sunday: Closed
+
+💙 Would you like to know more or book an appointment?

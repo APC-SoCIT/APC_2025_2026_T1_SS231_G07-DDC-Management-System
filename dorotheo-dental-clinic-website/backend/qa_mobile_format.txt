@@ -1,0 +1,112 @@
+### T1: time slots (11 lines)
+=== OUR DENTISTS ===
+
+Availability for: next 14 days
+• Dr. Marvin Dorotheo – Available on:
+  • Monday, February 23: 9:00 AM – 5:00 PM
+  • Tuesday, February 24: 9:00 AM – 5:00 PM
+  • Friday, February 27: 9:00 AM – 5:00 PM
+  • Monday, March 02: 9:00 AM – 5:00 PM
+  • Tuesday, March 03: 9:00 AM – 5:00 PM
+
+⏰ Appointments are booked in 30-minute intervals.
+
+### T2: next week (9 lines)
+=== OUR DENTISTS ===
+
+Availability for: next week (Monday-Friday)
+• Dr. Marvin Dorotheo – Available on:
+  • Monday, February 23
+  • Tuesday, February 24
+  • Friday, February 27
+
+⏰ Appointments are booked in 30-minute intervals.
+
+### T3: all dentists (22 lines)
+=== OUR DENTISTS ===
+
+Availability for: next 14 days
+• Dr. Dental Doctor – Available on:
+  • Friday, February 20
+  • Monday, February 23
+  • Tuesday, February 24
+  • Wednesday, February 25
+  • Thursday, February 26
+  • Friday, February 27
+  _...and 5 more dates._
+  ?? Bacoor
+• Dr. Marvin Dorotheo – Available on:
+  • Friday, February 20 (Bacoor)
+  • Monday, February 23
+  • Tuesday, February 24
+  • Friday, February 27
+  • Monday, March 02
+  • Tuesday, March 03
+• Dr. George Ocampo – Available on:
+
+_More details available — just ask!_
+
+### T4: specific clinic (11 lines)
+=== OUR DENTISTS ===
+
+Availability for: next 14 days
+• Dr. Marvin Dorotheo – Available on:
+  • Monday, February 23: 9:00 AM – 5:00 PM
+  • Tuesday, February 24: 9:00 AM – 5:00 PM
+  • Friday, February 27: 9:00 AM – 5:00 PM
+  • Monday, March 02: 9:00 AM – 5:00 PM
+  • Tuesday, March 03: 9:00 AM – 5:00 PM
+
+⏰ Appointments are booked in 30-minute intervals.
+
+### T5: today dentists (14 lines)
+=== OUR DENTISTS ===
+
+Availability for: today
+• Dr. Dental Doctor – ✅ Available
+  ?? Bacoor
+• Dr. Marvin Dorotheo – ✅ Available
+  ?? Bacoor
+• Dr. George Ocampo – ✅ Available
+  ?? Bacoor
+• Dr. Michael Orenze – ❌ Not available on today
+• Dr. Carlo Salvador – ✅ Available
+  ?? Bacoor
+
+⏰ Appointments are booked in 30-minute intervals.
+
+### T6: clinic hours (18 lines)
+=== CLINIC LOCATIONS & HOURS ===
+
+📍 Alabang
+   Address: Ground Floor, Festival Mall, Filinvest City, Alabang, Muntinlupa City 1781
+   Phone: +63 2 8809 5678
+
+📍 Bacoor
+   Address: Unit 5, 2nd Floor, SM City Bacoor, Tirona Highway, Bacoor, Cavite 4102
+   Phone: +63 46 417 1234
+
+📍 Poblacion
+   Address: 2nd Floor, Poblacion Commercial Center, 5678 P. Burgos Street, Poblacion, Makati City 1210
+   Phone: +63 2 8888 9012
+
+⏰ Operating Hours:
+   • Monday - Friday: 8:00 AM - 6:00 PM
+   • Saturday: 9:00 AM - 3:00 PM
+   • Sunday: Closed
+
+### T7: dentists at a specific clinic (14 lines)
+=== OUR DENTISTS ===
+
+Availability for: today
+• Dr. Dental Doctor – ✅ Available
+  ?? Bacoor
+• Dr. Marvin Dorotheo – ✅ Available
+  ?? Bacoor
+• Dr. George Ocampo – ✅ Available
+  ?? Bacoor
+• Dr. Michael Orenze – ❌ Not available on today
+• Dr. Carlo Salvador – ✅ Available
+  ?? Bacoor
+
+⏰ Appointments are booked in 30-minute intervals.

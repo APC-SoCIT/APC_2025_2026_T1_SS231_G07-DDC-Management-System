@@ -1,0 +1,35 @@
+QUERY: what time is doc marvin available
+
+INTENT: clinic_information (conf=0.95)
+DB_CTX length: 352
+DB_CTX has surrogates: False
+DB_CTX content:
+=== OUR DENTISTS ===
+
+Availability for: next 14 days
+• Dr. Marvin Dorotheo – Available on:
+  • Monday, February 23: 9:00 AM – 5:00 PM
+  • Tuesday, February 24: 9:00 AM – 5:00 PM
+  • Friday, February 27: 9:00 AM – 5:00 PM
+  • Monday, March 02: 9:00 AM – 5:00 PM
+  • Tuesday, March 03: 9:00 AM – 5:00 PM
+
+⏰ Appointments are booked in 30-minute intervals.
+
+DIRECT_ANSWER: None
+
+FORMAT_FALLBACK length: 317
+FORMAT_FALLBACK has surrogates: False
+FORMAT_FALLBACK content:
+👨‍⚕️ **Our Dentists:**
+
+• Dr. Marvin Dorotheo – Available on:
+• Monday, February 23: 9:00 AM – 5:00 PM
+• Tuesday, February 24: 9:00 AM – 5:00 PM
+• Friday, February 27: 9:00 AM – 5:00 PM
+• Monday, March 02: 9:00 AM – 5:00 PM
+• Tuesday, March 03: 9:00 AM – 5:00 PM
+
+💙 Would you like to know more or book an appointment?
+
+BUILD_REPLY result: {'response': '👨\u200d⚕️ **Our Dentists:**\n\n• Dr. Marvin Dorotheo – Available on:\n• Monday, February 23: 9:00 AM – 5:00 PM\n• Tuesday, February 24: 9:00 AM – 5:00 PM\n• Friday, February 27: 9:00 AM – 5:00 PM\n• Monday, March 02: 9:00 AM – 5:00 PM\n• Tuesday, March 03: 9:00 AM – 5:00 PM\n\n💙 Would you like to know more or book an appointment?', 'quick_replies': [], 'error': None}
