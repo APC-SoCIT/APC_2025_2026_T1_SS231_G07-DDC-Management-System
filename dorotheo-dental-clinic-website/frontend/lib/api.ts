@@ -503,11 +503,29 @@ export const api = {
     return response.json()
   },
 
-  // Analytics endpoints (owner only)
-  getAnalytics: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/analytics/`, {
+  // Analytics endpoints (owner/staff only)
+  getAnalytics: async (token: string, params?: {
+    period?: 'daily' | 'weekly' | 'monthly' | 'annual'
+    clinic_id?: number | null
+    start_date?: string
+    end_date?: string
+  }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.period) searchParams.set('period', params.period)
+    if (params?.clinic_id) searchParams.set('clinic_id', params.clinic_id.toString())
+    if (params?.start_date) searchParams.set('start_date', params.start_date)
+    if (params?.end_date) searchParams.set('end_date', params.end_date)
+
+    const queryString = searchParams.toString()
+    const url = `${API_BASE_URL}/analytics/${queryString ? `?${queryString}` : ''}`
+
+    const response = await fetch(url, {
       headers: { Authorization: `Token ${token}` },
     })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Analytics request failed with status ${response.status}`)
+    }
     return response.json()
   },
 

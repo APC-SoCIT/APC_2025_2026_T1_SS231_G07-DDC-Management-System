@@ -2008,40 +2008,100 @@ class TeethImageViewSet(AuditContextMixin, viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def analytics(request):
-    # Revenue from billing
-    total_revenue = Billing.objects.filter(paid=True).aggregate(Sum('amount'))['amount__sum'] or 0
+    """
+    Analytics endpoint returning financial, operational, and inventory metrics.
     
-    # Expenses from inventory
-    total_expenses = InventoryItem.objects.aggregate(
-        total=Sum(F('cost') * F('quantity'))
-    )['total'] or 0
+    Query Parameters:
+        - period: daily | weekly | monthly | annual (default: monthly)
+        - clinic_id: int (optional, filter all metrics to a specific clinic)
+        - start_date: YYYY-MM-DD (optional, custom start date)
+        - end_date: YYYY-MM-DD (optional, custom end date)
     
-    # Patient statistics
-    total_patients = User.objects.filter(user_type='patient').count()
-    active_patients = User.objects.filter(user_type='patient', is_active_patient=True).count()
-    new_patients_this_month = User.objects.filter(
-        user_type='patient',
-        created_at__month=date.today().month
-    ).count()
-    
-    # Appointment statistics
-    total_appointments = Appointment.objects.count()
-    upcoming_appointments = Appointment.objects.filter(
-        date__gte=date.today(),
-        status__in=['confirmed', 'reschedule_requested', 'cancel_requested']
-    ).count()
-    
-    return Response({
-        'revenue': float(total_revenue),
-        'expenses': float(total_expenses),
-        'profit': float(total_revenue - total_expenses),
-        'total_patients': total_patients,
-        'active_patients': active_patients,
-        'new_patients_this_month': new_patients_this_month,
-        'total_appointments': total_appointments,
-        'upcoming_appointments': upcoming_appointments,
-    })
+    Access: Owner and staff users only.
+    """
+    from api.analytics_utils import (
+        get_date_range, get_financial_summary, get_revenue_time_series,
+        get_revenue_by_service, get_revenue_by_dentist, get_revenue_by_clinic,
+        get_invoice_status_distribution, get_payment_method_distribution,
+        get_operational_summary, get_appointment_status_distribution,
+        get_top_services, get_appointments_by_clinic, get_appointments_by_dentist,
+        get_busiest_hours, get_patient_volume_time_series, get_inventory_summary,
+    )
+
+    # Permission check: only owner or staff
+    user = request.user
+    if user.user_type not in ('owner', 'staff'):
+        return Response(
+            {'error': 'You do not have permission to access analytics.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        # Parse query parameters
+        period = request.query_params.get('period', 'monthly')
+        if period not in ('daily', 'weekly', 'monthly', 'annual'):
+            period = 'monthly'
+
+        clinic_id_param = request.query_params.get('clinic_id', None)
+        clinic_id = int(clinic_id_param) if clinic_id_param else None
+
+        custom_start = request.query_params.get('start_date', None)
+        custom_end = request.query_params.get('end_date', None)
+
+        start_date, end_date = get_date_range(period, custom_start, custom_end)
+
+        # Resolve clinic name if filtered
+        clinic_name = None
+        if clinic_id:
+            try:
+                clinic_name = ClinicLocation.objects.get(id=clinic_id).name
+            except ClinicLocation.DoesNotExist:
+                return Response(
+                    {'error': f'Clinic with id {clinic_id} not found.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Build response
+        response_data = {
+            'period': period,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'clinic_id': clinic_id,
+            'clinic_name': clinic_name,
+
+            'financial': {
+                **get_financial_summary(start_date, end_date, clinic_id),
+                'revenue_time_series': get_revenue_time_series(start_date, end_date, period, clinic_id),
+                'revenue_by_service': get_revenue_by_service(start_date, end_date, clinic_id),
+                'revenue_by_dentist': get_revenue_by_dentist(start_date, end_date, clinic_id),
+                'revenue_by_clinic': get_revenue_by_clinic(start_date, end_date),
+                'invoice_status_distribution': get_invoice_status_distribution(start_date, end_date, clinic_id),
+                'payment_method_distribution': get_payment_method_distribution(start_date, end_date, clinic_id),
+            },
+
+            'operational': {
+                **get_operational_summary(start_date, end_date, clinic_id),
+                'appointment_status_distribution': get_appointment_status_distribution(start_date, end_date, clinic_id),
+                'top_services': get_top_services(start_date, end_date, clinic_id),
+                'appointments_by_clinic': get_appointments_by_clinic(start_date, end_date),
+                'appointments_by_dentist': get_appointments_by_dentist(start_date, end_date, clinic_id),
+                'busiest_hours': get_busiest_hours(start_date, end_date, clinic_id),
+                'patient_volume_time_series': get_patient_volume_time_series(start_date, end_date, period, clinic_id),
+            },
+
+            'inventory': get_inventory_summary(clinic_id),
+        }
+
+        return Response(response_data)
+
+    except Exception as e:
+        logger.error(f"Analytics endpoint error: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'An error occurred while generating analytics data.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 class StaffAvailabilityViewSet(AuditContextMixin, viewsets.ModelViewSet):
@@ -3151,12 +3211,26 @@ class PaymentViewSet(AuditContextMixin, viewsets.ModelViewSet):
                 # Get patient
                 patient = User.objects.get(id=data['patient_id'], user_type='patient')
                 
-                # Get clinic (use request user's clinic if not specified)
+                # Get clinic (priority: explicit clinic_id > first invoice's clinic > user's assigned clinic)
+                # Invoices are already scoped to the clinic where the service was rendered,
+                # so deriving from the invoice is always more accurate than the recording
+                # user's home clinic (which may be a different branch).
                 clinic = None
                 if data.get('clinic_id'):
                     clinic = ClinicLocation.objects.get(id=data['clinic_id'])
-                elif request.user.assigned_clinic:
-                    clinic = request.user.assigned_clinic
+                else:
+                    # Derive clinic from the first allocated invoice so payments are
+                    # correctly attributed to the clinic that raised the invoice.
+                    first_allocation = (data.get('allocations') or [None])[0]
+                    if first_allocation:
+                        try:
+                            first_invoice = Invoice.objects.get(id=first_allocation['invoice_id'])
+                            clinic = first_invoice.clinic
+                        except Invoice.DoesNotExist:
+                            pass
+                    # Final fallback: use the recording user's assigned clinic
+                    if clinic is None:
+                        clinic = request.user.assigned_clinic
                 
                 # Generate payment number
                 payment_number = self._generate_payment_number()
