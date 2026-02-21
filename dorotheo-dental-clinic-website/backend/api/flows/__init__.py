@@ -17,10 +17,10 @@ from typing import Optional, List
 
 # ── Mobile-First Constants ─────────────────────────────────────────────────
 
-MAX_RESPONSE_LINES = 22
+MAX_RESPONSE_LINES = 50
 MAX_SECTION_LINES = 6
-MAX_LIST_ITEMS = 8
-MAX_TIME_SLOTS_SHOWN = 6
+MAX_LIST_ITEMS = 30
+MAX_TIME_SLOTS_SHOWN = 30
 
 
 # ── Time Slot Grouping Utility ─────────────────────────────────────────────

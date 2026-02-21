@@ -162,44 +162,55 @@ Your responses are displayed on mobile devices. Follow these rules strictly:
 1. Keep total response under 18–22 lines.
 2. Maximum 4–6 lines per section.
 3. Maximum 2–3 lines per paragraph.
-4. Use clear section headers with ONE emoji each.
-5. Use bullet points (•) for lists.
-6. Add one blank line between sections.
-7. NEVER output dense text blocks.
-8. NEVER list more than 6–8 items in one section.
-9. Use **bold** only for important labels.
+4. Use `### ` for ALL section headers with ONE emoji each (e.g., `### 📅 Available Dates`).
+5. Use ONLY markdown `-` bullets for ALL lists — one item per line, vertically stacked.
+   ABSOLUTELY NEVER use `•`, `·`, or `|` characters for bullets — ONLY `-`.
+   Each list item MUST be on its own separate line. NEVER put multiple items on one line.
+6. Use **Bold** for ALL key data points: names, times, dates, locations
+   (e.g., **Dr. Carlo Salvador**, **9:00 AM**, **Alabang Clinic**).
+7. Add a single blank line between a section header and its list.
+8. NEVER output dense text blocks.
+9. NEVER list more than 6–8 items in one section.
 10. Do NOT overuse emojis — only for section headers.
 11. Do NOT repeat the same information.
 
 TIME SLOT FORMATTING (CRITICAL):
 - NEVER list 20+ individual time slots.
-- Group continuous time slots into ranges.
-  Correct: "• 9:00 AM – 12:00 PM"
+- Group continuous time slots into ranges using `-` bullets.
+  Correct: "- **9:00 AM – 12:00 PM**"
   Wrong: "9:00 AM, 9:30 AM, 10:00 AM, 10:30 AM..."
 - If exact slot selection is needed, show only the first 5–6 slots,
   then add: "More time slots available upon booking."
 - NEVER display comma-separated time values.
+- NEVER use `•` — use `-` only.
 
 DENTIST AVAILABILITY FORMAT:
 Use this structure:
-## 👨‍⚕️ Dr. [Full Name]
+### 👨‍⚕️ Dr. [Full Name]
+
 ### 📅 Next Available
-• Monday – 9:00 AM to 12:00 PM
-• Tuesday – 1:00 PM to 4:30 PM
+
+- **Monday** – 9:00 AM to 12:00 PM
+- **Tuesday** – 1:00 PM to 4:30 PM
+
 📍 Available at:
-• Alabang
+
+- **Alabang**
+
 Would you like me to book a slot for you?
 
 CLINIC LOCATION FORMAT:
-## 📍 [Clinic Name]
+### 📍 [Clinic Name]
+
 Short address line
 📞 Phone number
 
 OPERATING HOURS FORMAT:
-## ⏰ Operating Hours
-• Monday – Friday: 8:00 AM – 6:00 PM
-• Saturday: 9:00 AM – 3:00 PM
-• Sunday: Closed
+### ⏰ Operating Hours
+
+- **Monday – Friday:** 8:00 AM – 6:00 PM
+- **Saturday:** 9:00 AM – 3:00 PM
+- **Sunday:** Closed
 
 ANTI-PATTERNS (STRICTLY FORBIDDEN):
 - NEVER output: "Dr. X - Available on Monday @ All Clinics: 9:00 AM, 9:30 AM, 10:00 AM..."
@@ -241,8 +252,17 @@ If user asks about system internals (e.g., "How does your system work?",
 CLINIC INFO:
 - Name: Dorotheo Dental and Diagnostic Center
 - Founded: 2001 by Dr. Marvin F. Dorotheo
+- Phone: +63 912 345 6789
+- Facebook Page: Dorotheo Dental FB
+- Instagram: Dorotheo Dental IG
 - Hours: Mon-Fri 8AM-6PM, Sat 9AM-3PM, Sun Closed
-- Services: Preventive, restorative, orthodontics, oral surgery, cosmetic dentistry"""
+- Services: Preventive, restorative, orthodontics, oral surgery, cosmetic dentistry
+
+SOCIAL MEDIA & CONTACT RULES (CRITICAL):
+- When asked for the Facebook page → say ONLY the name: **Dorotheo Dental FB** — NEVER include any URL, link, or "https://"
+- When asked for the Instagram → say ONLY the name: **Dorotheo Dental IG** — NEVER include any URL, link, or "https://"
+- Phone number to share: **+63 912 345 6789**
+- NEVER say "visit us at facebook.com/..." or any similar web address"""
 
 
 # ── Dental Advice Prompt ─────────────────────────────────────────
@@ -263,9 +283,10 @@ Your role is to:
 MOBILE-FIRST FORMATTING (MANDATORY):
 - Keep total response under 18 lines.
 - Maximum 2–3 lines per paragraph.
-- Use clear section headers with ONE emoji each.
-- Use bullet points (•) for lists of home-care tips.
-- Add one blank line between sections.
+- Use `### ` for ALL section headers with ONE emoji each (e.g., `### 🦷 What You Can Do`).
+- Use markdown `-` bullets for ALL lists — one item per line, vertically stacked. NEVER use `•`.
+- Use **Bold** for key terms in each bullet (e.g., **Warm salt water rinse**).
+- Add a single blank line between a section header and its list.
 - NEVER output dense text blocks.
 
 CRITICAL RULES:
@@ -304,14 +325,31 @@ class DentalChatbotService:
 
     # ── public entry point ────────────────────────────────────────────────
 
-    def get_response(self, user_message, conversation_history=None, skip_rag=False):
+    def get_response(self, user_message, conversation_history=None, skip_rag=False, preferred_language=None):
         """
         Main entry point. Classifies intent, routes to the appropriate
         flow or Q&A handler, and returns a response dict.
+
+        preferred_language: 'tl' = Filipino/PH (Taglish treated as Tagalog)
+                            'en' = English (forced regardless of detected lang)
+                            None = auto-detect (default behaviour)
         """
         try:
             # ── Language detection (local, no external APIs) ──
             detected_lang, lang_conf, lang_style = lang.detect_language(user_message)
+
+            # ── Override with user-selected language preference ──
+            if preferred_language == 'tl':
+                # PH selected: treat Taglish as Tagalog, always respond in Filipino
+                detected_lang = lang.LANG_TAGALOG
+                lang_conf = 1.0
+                lang_style = 'formal'
+            elif preferred_language == 'en':
+                # EN selected: always respond in English regardless of input language
+                detected_lang = lang.LANG_ENGLISH
+                lang_conf = 1.0
+                lang_style = 'formal'
+
             self._lang = detected_lang
 
             # Update session language memory
@@ -335,6 +373,17 @@ class DentalChatbotService:
 
             # ── Check if user was previously blocked but now unblocked ──
             if self.is_authenticated and bsvc.was_just_unblocked(self.user, hist):
+                # Classify the user's current intent to see if they want to
+                # proceed directly with a transactional action
+                unblock_intent = isvc.classify_intent(user_message)
+                if unblock_intent.intent == isvc.INTENT_RESCHEDULE and unblock_intent.confidence >= 0.7:
+                    return handle_reschedule(self.user, user_message, [], self._lang)
+                if unblock_intent.intent == isvc.INTENT_SCHEDULE and unblock_intent.confidence >= 0.7:
+                    return handle_booking(self.user, user_message, [], self._lang)
+                if unblock_intent.intent == isvc.INTENT_CANCEL and unblock_intent.confidence >= 0.7:
+                    return handle_cancel(self.user, user_message, [], self._lang)
+
+                # No explicit transactional intent — show the approval menu
                 return build_reply(
                     "\u2705 **Your request has been approved!** You can now book, reschedule, "
                     "or cancel appointments.\n\n"
@@ -395,10 +444,26 @@ class DentalChatbotService:
                 _question_words = (
                     'what', 'who', 'where', 'when', 'how', 'why',
                     'is ', 'are ', 'do ', 'does ', 'can ', 'could ',
-                    'anong', 'sino', 'saan', 'paano', 'kailan', 'bakit',
+                    'anong', 'ano ', 'sino', 'saan', 'paano', 'kailan', 'bakit',
                 )
-                _is_question = '?' in user_message or any(
-                    _low_msg.startswith(w) for w in _question_words
+                # Phrases that look like questions but are actually "show more"
+                # slot/option requests — must continue the active flow.
+                _more_options_phrases = (
+                    'ano pa', 'ibang slot', 'ibang oras', 'ibang araw',
+                    'iba pang slot', 'iba pang oras', 'iba pang araw',
+                    'other slot', 'more slot', 'show more', 'see more',
+                    'other time', 'more time', 'more option', 'other option',
+                    'next slot', 'next time', 'different slot', 'different time',
+                )
+                _is_more_options = any(
+                    p in _low_msg for p in _more_options_phrases
+                )
+                _is_question = (
+                    not _is_more_options
+                    and (
+                        '?' in user_message
+                        or any(_low_msg.startswith(w) for w in _question_words)
+                    )
                 )
                 if not _is_question:
                     logger.info("Continuing flow: %s (user=%s)",
@@ -494,7 +559,7 @@ class DentalChatbotService:
         # 1. Try direct answer first (quick-reply buttons)
         direct = rag_service.get_direct_answer(msg)
         if direct:
-            return build_reply(direct['text'])
+            return build_reply(direct['text'], direct.get('quick_replies'))
 
         # 2. Check semantic cache
         cached = self._cache.get(msg)

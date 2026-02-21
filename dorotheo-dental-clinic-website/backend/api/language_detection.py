@@ -402,7 +402,7 @@ def confirmation_buttons(lang: str) -> List[str]:
 
 
 def step_label(step_num: int, label: str, lang: str) -> str:
-    """Get a step label like 'Step 1: Choose a Clinic' in the right language."""
+    """Get a step label like '### Step 1: Choose a Clinic' in the right language."""
     if lang == LANG_TAGALOG:
         labels = {
             'clinic': 'Pumili ng Clinic',
@@ -412,7 +412,7 @@ def step_label(step_num: int, label: str, lang: str) -> str:
             'service': 'Pumili ng Serbisyo',
         }
         tl_label = labels.get(label, label)
-        return f"**Hakbang {step_num}: {tl_label}**"
+        return f"### Hakbang {step_num}: {tl_label}"
     elif lang == LANG_TAGLISH:
         labels = {
             'clinic': 'Choose a Clinic',
@@ -421,7 +421,7 @@ def step_label(step_num: int, label: str, lang: str) -> str:
             'time': 'Choose a Time',
             'service': 'Choose a Service',
         }
-        return f"**Step {step_num}: {labels.get(label, label)}**"
+        return f"### Step {step_num}: {labels.get(label, label)}"
     else:
         labels = {
             'clinic': 'Choose a Clinic',
@@ -430,7 +430,7 @@ def step_label(step_num: int, label: str, lang: str) -> str:
             'time': 'Choose a Time',
             'service': 'Choose a Service',
         }
-        return f"**Step {step_num}: {labels.get(label, label)}**"
+        return f"### Step {step_num}: {labels.get(label, label)}"
 
 
 def select_prompt(label: str, lang: str) -> str:

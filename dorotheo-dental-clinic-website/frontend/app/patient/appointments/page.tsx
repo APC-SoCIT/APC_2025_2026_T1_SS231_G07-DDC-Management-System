@@ -439,7 +439,8 @@ export default function PatientAppointments() {
           Number(newAppointment.dentist),
           todayStr,
           endDateStr,
-          token
+          token,
+          newAppointment.clinic || undefined
         )
         
         console.log('[BOOKING] Dentist availability received:', availability)
@@ -465,7 +466,7 @@ export default function PatientAppointments() {
     }
 
     fetchDentistAvailability()
-  }, [newAppointment.dentist, token])
+  }, [newAppointment.dentist, newAppointment.clinic, token])
 
   // Update date when calendar date is selected
   useEffect(() => {
@@ -501,7 +502,8 @@ export default function PatientAppointments() {
           Number(selectedAppointment.dentist),
           todayStr,
           endDateStr,
-          token
+          token,
+          selectedAppointment.clinic || undefined
         )
         
         console.log('[RESCHEDULE] Availability received:', availability)

@@ -44,7 +44,7 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
         return build_reply(lang.login_required('booking', detected_lang))
 
     # 🔒 Pending request lock
-    pending_msg = bsvc.check_pending_requests(user)
+    pending_msg = bsvc.check_pending_requests(user, detected_lang)
     if pending_msg:
         return build_reply(pending_msg, tag='[PENDING_BLOCK]')
 
@@ -91,7 +91,7 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
                 if open_dentists else " (no openings this period)"
             )
             rec_tag = " ⭐" if rec_clinic and c.id == rec_clinic.id else ""
-            lines.append(f"• {c.name}{tag_text}{rec_tag}")
+            lines.append(f"- **{c.name}**{tag_text}{rec_tag}")
             qr.append(c.name)
         lines.append("\n" + lang.select_prompt('clinic', detected_lang))
         return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_1]')
@@ -135,14 +135,14 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
             logger.info("Smart rec: user %s last saw Dr. %s at %s",
                         user.id, rec_dentist.get_full_name(), clinic.name)
 
-        lines = [lang.step_label(2, 'dentist', detected_lang) + f" (at {clinic.name})\n"]
+        lines = [lang.step_label(2, 'dentist', detected_lang) + f" (at **{clinic.name}**)\n"]
         if rec_dentist:
             lines.append(lang.smart_rec_dentist(rec_dentist.get_full_name(), detected_lang) + "\n")
         qr = []
         for d in available_dentists:
             name = f"Dr. {d.get_full_name()}"
             rec_tag = " ⭐" if rec_dentist and d.id == rec_dentist.id else ""
-            lines.append(f"• {name}{rec_tag}")
+            lines.append(f"- **{name}**{rec_tag}")
             qr.append(name)
         lines.append("\n" + lang.select_prompt('dentist', detected_lang))
         return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_2]')
@@ -181,17 +181,99 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
 
         lines = [
             lang.step_label(3, 'date', detected_lang)
-            + f"\n\nDr. {dentist.get_full_name()} at {clinic.name}:\n"
+            + f"\n\n**Dr. {dentist.get_full_name()}** at **{clinic.name}**:\n"
         ]
         qr = []
         for d in dates_with_slots:
             label = bsvc.fmt_date(d)
-            lines.append(f"• {label}")
+            lines.append(f"- **{label}**")
             qr.append(d.strftime('%B %d'))
         lines.append("\n" + lang.select_prompt('date', detected_lang))
         return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3]')
 
     if not time_val:
+        # If user typed a bare day-of-week (e.g. "monday") and multiple dates match that
+        # weekday in the dentist's availability, re-show a filtered date picker.
+        _weekday_num = bsvc.parse_weekday_name(msg)
+        if _weekday_num is not None:
+            end = today + timedelta(days=30)
+            avails = DentistAvailability.objects.filter(
+                dentist=dentist, date__gte=today, date__lte=end, is_available=True,
+            ).filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True)).order_by('date')
+            matching = [
+                av.date for av in avails
+                if av.date.weekday() == _weekday_num
+                and bsvc.get_available_slots(dentist, av.date, clinic)
+            ]
+            if len(matching) > 1:
+                is_tl_d = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
+                day_name = msg.strip().title()
+                hdr = (
+                    f"#### Hakbang 3: Pumili ng Petsa\n\n"
+                    f"May ilang **{day_name}** na available. Alin po ang gusto mo?\n"
+                    if is_tl_d else
+                    f"#### Step 3: Choose a Date\n\n"
+                    f"Multiple **{day_name}s** are available. Which one would you like?\n"
+                )
+                lines = [hdr]
+                qr = []
+                for d in matching:
+                    label = bsvc.fmt_date(d)
+                    lines.append(f"- **{label}**")
+                    qr.append(d.strftime('%B %d'))
+                lines.append("\n" + lang.select_prompt('date', detected_lang))
+                return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3]')
+
+        # "More slots" navigation — user already saw first 6 and wants to see all
+        if isvc.step_tag_exists(hist, '[BOOK_STEP_3T]'):
+            _more_patterns = [
+                'more slot', 'mor slot', 'other time', 'next slot', 'show more',
+                'iba pa', 'dagdag', 'more option', 'other slot', 'other option',
+                'ano pa', 'pang slot', 'ibang slot', 'ibang oras',
+            ]
+            _low = low.strip()
+            if any(p in _low for p in _more_patterns) or _low in ('more', 'mor'):
+                slots = bsvc.get_available_slots(dentist, date, clinic)
+                is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
+                if slots and len(slots) > 6:
+                    more_hdr = (
+                        f"### Hakbang 3: Pumili ng Oras (**{bsvc.fmt_date(date)}**)"
+                        if is_tl else
+                        f"### Step 3: Choose a Time (**{bsvc.fmt_date(date)}**)"
+                    )
+                    more_intro = (
+                        "\nNarito po ang lahat ng available na oras:"
+                        if is_tl else
+                        "\nHere are all the available time slots:"
+                    )
+                    lines = [more_hdr, more_intro]
+                    qr = []
+                    for s in slots:
+                        label = bsvc.fmt_time(s)
+                        lines.append(f"- **{label}**")
+                        qr.append(label)
+                    lines.append("\nPumili po ng oras:" if is_tl else "\nSelect a time:")
+                    return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3T]')
+                elif slots:
+                    all_hdr = (
+                        f"### Hakbang 3: Pumili ng Oras (**{bsvc.fmt_date(date)}**)"
+                        if is_tl else
+                        f"### Step 3: Choose a Time (**{bsvc.fmt_date(date)}**)"
+                    )
+                    all_footer = (
+                        "\nIto na po ang lahat ng available na slot. Pumili po ng oras:"
+                        if is_tl else
+                        "\nThese are all the available slots. Select a time:"
+                    )
+                    lines = [all_hdr]
+                    qr = []
+                    for s in slots:
+                        label = bsvc.fmt_time(s)
+                        lines.append(f"- **{label}**")
+                        qr.append(label)
+                    lines.append(all_footer)
+                    return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3T]')
+
         # Same-date conflict check
         same_day = Appointment.objects.filter(
             patient=user, date=date,
@@ -212,25 +294,44 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
 
         slots = bsvc.get_available_slots(dentist, date, clinic)
         if not slots:
-            return build_reply(
-                f"No open slots on {bsvc.fmt_date(date)} for Dr. {dentist.get_full_name()}. "
-                "Please pick a different date.",
-                tag='[BOOK_STEP_3]',
-            )
-        lines = [lang.step_label(3, 'time', detected_lang) + f" ({bsvc.fmt_date(date)})\n"]
+            # Dentist is fully booked on this date — suggest other available dentists
+            alt_dentists = bsvc.get_alt_dentists_on_date(clinic, date, exclude_dentist=dentist)
+            is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
+            if alt_dentists:
+                alt_names = [f"Dr. {d.get_full_name()}" for d in alt_dentists]
+                if is_tl:
+                    msg_text = (
+                        f"Puno na po ang schedule ni **Dr. {dentist.get_full_name()}** "
+                        f"sa {bsvc.fmt_date(date)}.\n\n"
+                        f"Ngunit may available na ibang dentist sa parehong araw:\n"
+                        + '\n'.join(f'- **{n}**' for n in alt_names)
+                        + "\n\nGusto mo bang pumili ng isa sa kanila, o pumili ng ibang petsa?"
+                    )
+                else:
+                    msg_text = (
+                        f"**Dr. {dentist.get_full_name()}** is fully booked on "
+                        f"{bsvc.fmt_date(date)}.\n\n"
+                        f"However, the following dentists are available on that same day:\n"
+                        + '\n'.join(f'- **{n}**' for n in alt_names)
+                        + "\n\nWould you like to book with one of them, or pick a different date?"
+                    )
+                qr = alt_names + (["Pumili ng ibang petsa"] if is_tl else ["Pick different date"])
+                return build_reply(msg_text, qr, tag='[BOOK_STEP_2]')
+            else:
+                no_slots_msg = (
+                    f"Puno na po ang lahat ng dentist sa {bsvc.fmt_date(date)} sa {clinic.name}. "
+                    "Pumili po ng ibang petsa."
+                    if is_tl else
+                    f"All dentists at {clinic.name} are fully booked on {bsvc.fmt_date(date)}. "
+                    "Please pick a different date."
+                )
+                return build_reply(no_slots_msg, tag='[BOOK_STEP_3]')
+        lines = [lang.step_label(3, 'time', detected_lang) + f" (**{bsvc.fmt_date(date)}**)\n"]
         qr = []
-        # Mobile-first: show max 6 individual slots, rest as summary
-        shown_slots = slots[:6]
-        for s in shown_slots:
+        for s in slots:
             label = bsvc.fmt_time(s)
-            lines.append(f"• {label}")
+            lines.append(f"- **{label}**")
             qr.append(label)
-        if len(slots) > 6:
-            remaining = len(slots) - 6
-            lines.append(f"\n_{remaining} more time slots available._")
-            # Still add remaining to quick replies for selection
-            for s in slots[6:]:
-                qr.append(bsvc.fmt_time(s))
         lines.append("\n" + lang.select_prompt('time', detected_lang))
         return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3T]')
 
@@ -243,7 +344,7 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
         lines = [lang.step_label(4, 'service', detected_lang) + "\n"]
         qr = []
         for s in allowed:
-            lines.append(f"• {s.name}")
+            lines.append(f"- **{s.name}**")
             qr.append(s.name)
         lines.append("\n" + lang.select_prompt('service', detected_lang))
         return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_4]')

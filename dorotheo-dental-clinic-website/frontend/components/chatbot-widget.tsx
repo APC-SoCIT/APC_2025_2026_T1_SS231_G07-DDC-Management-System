@@ -23,6 +23,12 @@ export default function ChatbotWidget() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [selectedLanguage, setSelectedLanguage] = useState<'EN' | 'PH'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('chatbot_language') as 'EN' | 'PH') || 'EN'
+    }
+    return 'EN'
+  })
 
   // Load chat history from localStorage on mount and when user changes
   useEffect(() => {
@@ -97,10 +103,14 @@ export default function ChatbotWidget() {
     }
   }, [messages, conversationHistory, user?.id])
 
-  const initializeChat = () => {
+  const initializeChat = (lang?: 'EN' | 'PH') => {
+    const currentLang = lang ?? selectedLanguage
+    const welcomeText = currentLang === 'PH'
+      ? "Maligayang pagdating sa Dorotheo Dental Clinic! \n\nAko si **Sage**, ang inyong AI scheduling concierge. Makakatulong po ako sa:\n\n\u2022 **Mag-book, mag-reschedule, o mag-cancel** ng appointment\n\u2022 Impormasyon tungkol sa aming mga dental services\n\u2022 Aming mga dentista, clinic, at oras\n\u2022 Mga tanong tungkol sa dental health\n\nPaano po kita matutulungan ngayon?"
+      : "Welcome to Dorotheo Dental Clinic! \n\nI'm **Sage**, your AI scheduling concierge. I can help you with:\n\n\u2022 **Book, reschedule, or cancel** appointments\n\u2022 Information about our dental services\n\u2022 Our dentists, clinics, and hours\n\u2022 General dental health questions\n\nHow may I assist you today?"
     const welcomeMessage: Message = {
       id: "1",
-      text: "Welcome to Dorotheo Dental Clinic! \n\nI'm **Sage**, your AI scheduling concierge. I can help you with:\n\n• **Book, reschedule, or cancel** appointments\n• Information about our dental services\n• Our dentists, clinics, and hours\n• General dental health questions\n\nHow may I assist you today?",
+      text: welcomeText,
       sender: "bot",
       timestamp: new Date(),
     }
@@ -128,6 +138,16 @@ export default function ChatbotWidget() {
     scrollToBottom()
   }, [messages])
 
+  // Scroll to bottom when chat panel opens (messages already loaded from localStorage)
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [isOpen])
+
   const handleSendMessage = async (message?: string) => {
     const messageText = message || inputMessage.trim()
     if (!messageText) return
@@ -152,7 +172,7 @@ export default function ChatbotWidget() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
       // Call Ollama API through backend
-      const response = await chatbotQuery(messageText, newHistory, token || undefined)
+      const response = await chatbotQuery(messageText, newHistory, token || undefined, selectedLanguage === 'PH' ? 'tl' : 'en')
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -309,6 +329,19 @@ export default function ChatbotWidget() {
           {/* Input */}
           <div className="p-4 bg-white border-t border-gray-200">
             <div className="flex gap-2 items-center">
+              {/* Language Toggle */}
+              <button
+                onClick={() => {
+                  const newLang = selectedLanguage === 'EN' ? 'PH' : 'EN'
+                  setSelectedLanguage(newLang)
+                  localStorage.setItem('chatbot_language', newLang)
+                }}
+                className="bg-[var(--color-primary)] text-white rounded-full px-3 py-2 text-xs font-bold hover:opacity-90 transition-opacity shrink-0"
+                title={selectedLanguage === 'EN' ? 'Switch to Filipino' : 'Switch to English'}
+                aria-label="Toggle language"
+              >
+                {selectedLanguage === 'EN' ? '🇺🇸 EN' : '🇵🇭 FIL'}
+              </button>
               <input
                 type="text"
                 value={inputMessage}

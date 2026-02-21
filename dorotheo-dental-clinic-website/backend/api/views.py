@@ -2755,9 +2755,14 @@ def chatbot_query(request):
         # Initialize chatbot with current user (if authenticated)
         user = request.user if request.user.is_authenticated else None
         chatbot = DentalChatbotService(user=user)
-        
+
+        # Optional language preference sent by the frontend toggle (EN/PH)
+        preferred_language = request.data.get('preferred_language', None)
+        if preferred_language not in ('en', 'tl', None):
+            preferred_language = None  # Ignore invalid values
+
         # Get response from chatbot
-        result = chatbot.get_response(user_message, conversation_history)
+        result = chatbot.get_response(user_message, conversation_history, preferred_language=preferred_language)
         
         # Always return structured JSON — never crash
         return Response({

@@ -34,7 +34,7 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
         return build_reply(lang.login_required('cancel', detected_lang))
 
     # 🔒 Pending request lock
-    pending_msg = bsvc.check_pending_requests(user)
+    pending_msg = bsvc.check_pending_requests(user, detected_lang)
     if pending_msg:
         return build_reply(pending_msg, tag='[PENDING_BLOCK]')
 
@@ -48,6 +48,7 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
         return build_reply(lang.no_upcoming('cancel', detected_lang))
 
     low = msg.lower()
+    is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
 
     # ── Confirm / Keep (for active cancel flow) ──────────────────────
     if isvc.step_tag_exists(hist, '[CANCEL_STEP_'):
@@ -58,11 +59,12 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
                 for a in upcoming:
                     svc_n = a.service.name if a.service else 'Appointment'
                     qr.append(f"{svc_n} – {a.date.strftime('%B %d, %Y')}")
-                return build_reply(
-                    "I wasn't able to identify the appointment. Could you select one from the list?",
-                    qr,
-                    tag='[CANCEL_STEP_1]',
+                msg_text = (
+                    "Hindi ko po ma-identify ang appointment. Puwede po bang pumili mula sa listahan?"
+                    if is_tl else
+                    "I wasn't able to identify the appointment. Could you select one from the list?"
                 )
+                return build_reply(msg_text, qr, tag='[CANCEL_STEP_1]')
 
             bsvc.submit_cancel_request(appt)
 
@@ -70,22 +72,35 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
             create_appointment_notification(appt, 'cancel_request')
 
             svc = appt.service.name if appt.service else 'Appointment'
+            if is_tl:
+                return build_reply(
+                    f"📋 **Naisumite ang Kahilingang Pangkansela**\n\n"
+                    f"**Serbisyo:** {svc}\n"
+                    f"**Petsa:** {bsvc.fmt_date_full(appt.date)}\n"
+                    f"**Oras:** {bsvc.fmt_time(appt.time)}\n"
+                    f"**Dentista:** Dr. {appt.dentist.get_full_name()}\n\n"
+                    "Naipadala na po ang inyong kahilingan sa staff para sa review. "
+                    "Maabisuhan po kayo kapag naaprubahan na. Aktibo pa rin ang inyong appointment hanggang sa iyon.",
+                    tag='[FLOW_COMPLETE]',
+                )
             return build_reply(
                 f"📋 **Cancellation Request Submitted**\n\n"
                 f"**Service:** {svc}\n"
                 f"**Date:** {bsvc.fmt_date_full(appt.date)}\n"
                 f"**Time:** {bsvc.fmt_time(appt.time)}\n"
                 f"**Dentist:** Dr. {appt.dentist.get_full_name()}\n\n"
-                "Your request has been sent to the staff/owner for review. "
+                "Your request has been sent to the staff for review. "
                 "You will be notified once it is approved. Your appointment remains active until then.",
                 tag='[FLOW_COMPLETE]',
             )
 
         if isvc.is_confirm_no(low):
-            return build_reply(
-                "No problem! Your appointment has been kept. Is there anything else I can help with?",
-                tag='[FLOW_COMPLETE]',
+            msg_text = (
+                "Walang problema po! Nananatili ang inyong appointment. May iba pa po ba akong maitutulong?"
+                if is_tl else
+                "No problem! Your appointment has been kept. Is there anything else I can help with?"
             )
+            return build_reply(msg_text, tag='[FLOW_COMPLETE]')
 
     # ── STEP C2: Confirmation prompt (after user selected an appointment) ──
     if isvc.step_tag_exists(hist, '[CANCEL_STEP_1]'):
@@ -95,36 +110,38 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
             for a in upcoming:
                 svc = a.service.name if a.service else 'Appointment'
                 qr.append(f"{svc} – {a.date.strftime('%B %d, %Y')}")
-            return build_reply(
+            msg_text = (
+                "Hindi ko po ma-identify kung aling appointment ang tinutukoy ninyo. "
+                "Puwede po bang pumili mula sa mga opsyon sa ibaba?"
+                if is_tl else
                 "I wasn't able to identify which appointment you meant. "
-                "Could you please select one from the options below?",
-                qr,
-                tag='[CANCEL_STEP_1]',
+                "Could you please select one from the options below?"
             )
-        svc = appt.service.name if appt.service else 'Appointment'
-        return build_reply(
-            f"**Request Cancellation**\n\n"
-            f"You are about to request cancellation for:\n\n"
-            f"**Service:** {svc}\n"
-            f"**Date:** {bsvc.fmt_date_full(appt.date)}\n"
-            f"**Time:** {bsvc.fmt_time(appt.time)}\n"
-            f"**Dentist:** Dr. {appt.dentist.get_full_name()}\n\n"
-            "This will send a cancellation request to the staff/owner for approval. "
-            "Your appointment stays active until they approve it.\n\n"
-            "Would you like to proceed?",
-            ['Request Cancellation', 'Keep Appointment'],
-            tag='[CANCEL_STEP_2]',
-        )
+            return build_reply(msg_text, qr, tag='[CANCEL_STEP_1]')
+        return _build_cancel_confirmation(appt, is_tl)
 
-    # ── STEP C1: List appointments ────────────────────────────────────
-    lines = ["**Cancel – Select Appointment**\n"]
+    # ── STEP C1: List appointments (or auto-match if date given) ─────
+    # Try to auto-match from the initial message so that when the user says
+    # "cancel my march 16 appointment" we jump straight to confirmation.
+    auto_match = bsvc.match_appointment(msg, upcoming)
+    if auto_match:
+        return _build_cancel_confirmation(auto_match, is_tl)
+
+    if is_tl:
+        header = "### Kanselahin – Pumili ng Appointment\n"
+        footer = "\nAlin pong appointment ang gusto ninyong kanselahin?"
+    else:
+        header = "### Cancel – Select Appointment\n"
+        footer = "\nWhich appointment would you like to cancel?"
+
+    lines = [header]
     qr = []
     for a in upcoming:
         svc = a.service.name if a.service else 'Appointment'
         label = f"{svc} – {a.date.strftime('%B %d, %Y')}"
-        lines.append(f"• {label}")
+        lines.append(f"- **{label}**")
         qr.append(label)
-    lines.append("\nWhich appointment would you like to cancel?")
+    lines.append(footer)
     return build_reply('\n'.join(lines), qr, tag='[CANCEL_STEP_1]')
 
 
@@ -142,3 +159,35 @@ def _find_cancel_appointment(hist: list, qs):
     if qs.count() == 1:
         return qs.first()
     return None
+
+
+def _build_cancel_confirmation(appt, is_tl: bool) -> dict:
+    """Build the cancellation confirmation prompt in the correct language."""
+    svc = appt.service.name if appt.service else 'Appointment'
+    if is_tl:
+        return build_reply(
+            f"**Kahilingang Pangkansela**\n\n"
+            f"Ikansela po ninyo ang:\n\n"
+            f"**Serbisyo:** {svc}\n"
+            f"**Petsa:** {bsvc.fmt_date_full(appt.date)}\n"
+            f"**Oras:** {bsvc.fmt_time(appt.time)}\n"
+            f"**Dentista:** Dr. {appt.dentist.get_full_name()}\n\n"
+            "Magpapadala ito ng kahilingang pangkansela sa staff para sa kanilang pag-apruba. "
+            "Mananatiling aktibo ang inyong appointment hanggang sa kanilang pag-apruba.\n\n"
+            "Gusto po ba ninyong ituloy?",
+            ['Request Cancellation', 'Keep Appointment'],
+            tag='[CANCEL_STEP_2]',
+        )
+    return build_reply(
+        f"**Request Cancellation**\n\n"
+        f"You are about to request cancellation for:\n\n"
+        f"**Service:** {svc}\n"
+        f"**Date:** {bsvc.fmt_date_full(appt.date)}\n"
+        f"**Time:** {bsvc.fmt_time(appt.time)}\n"
+        f"**Dentist:** Dr. {appt.dentist.get_full_name()}\n\n"
+        "This will send a cancellation request to the staff for approval. "
+        "Your appointment stays active until they approve it.\n\n"
+        "Would you like to proceed?",
+        ['Request Cancellation', 'Keep Appointment'],
+        tag='[CANCEL_STEP_2]',
+    )

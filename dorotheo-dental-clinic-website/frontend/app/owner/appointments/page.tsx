@@ -416,7 +416,7 @@ export default function OwnerAppointments() {
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
         const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
         
-        const availability = await api.getDentistAvailability(Number(newAppointment.dentist), todayStr, endDateStr, token)
+        const availability = await api.getDentistAvailability(Number(newAppointment.dentist), todayStr, endDateStr, token, newAppointment.clinic || undefined)
         console.log('[OWNER] Dentist date-specific availability:', availability)
         
         // Create set of available dates directly from the calendar availability
@@ -436,7 +436,7 @@ export default function OwnerAppointments() {
     }
 
     fetchDentistAvailability()
-  }, [newAppointment.dentist, token])
+  }, [newAppointment.dentist, newAppointment.clinic, token])
 
   // Update date when calendar date is selected
   useEffect(() => {

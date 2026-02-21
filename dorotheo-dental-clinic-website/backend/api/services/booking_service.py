@@ -176,6 +176,29 @@ def get_available_slots(
     return slots
 
 
+def get_alt_dentists_on_date(
+    clinic: ClinicLocation,
+    date: date_obj,
+    exclude_dentist: Optional[User] = None,
+) -> List[User]:
+    """
+    Return dentists (excluding exclude_dentist) who have open slots
+    at the given clinic on the given specific date.
+    Used to suggest alternatives when the chosen dentist is fully booked.
+    """
+    avail_ids = DentistAvailability.objects.filter(
+        date=date, is_available=True,
+    ).filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True)).values_list('dentist_id', flat=True)
+    candidates = get_dentists_qs().filter(id__in=avail_ids)
+    if exclude_dentist:
+        candidates = candidates.exclude(id=exclude_dentist.id)
+    result = []
+    for d in candidates:
+        if get_available_slots(d, date, clinic):
+            result.append(d)
+    return result
+
+
 def get_dentists_with_openings(
     clinic: ClinicLocation,
     start_date: date_obj,
@@ -296,6 +319,19 @@ def parse_date(msg: str) -> Optional[date_obj]:
     return None
 
 
+def parse_weekday_name(msg: str) -> Optional[int]:
+    """
+    Returns weekday int (0=Mon..6=Sun) if the message is a bare day-of-week name,
+    else None.  Strips common filler words so 'lunes po' also matches.
+    Used to detect inputs like 'monday' that should trigger a multi-date picker.
+    """
+    low = re.sub(r'\b(next|this|susunod|araw na|sa|ng|ang|po|naman|please|pls)\b', '', msg.lower()).strip()
+    for dname, dnum in DAYS_OF_WEEK.items():
+        if low == dname:
+            return dnum
+    return None
+
+
 def parse_time(msg: str) -> Optional[time_obj]:
     """Extract a time from user message using regex patterns."""
     low = msg.lower()
@@ -327,6 +363,19 @@ def parse_time(msg: str) -> Optional[time_obj]:
         return time_obj(hour, 0)
     if 'tanghali' in low:
         return time_obj(12, 0)
+
+    # Bare HH:MM without AM/PM — infer from clinic hours (e.g. "4:30" → 4:30 PM)
+    # Hours 1-6 without AM/PM are assumed to be PM (afternoon clinic hours).
+    # Hours 7-12 are assumed to be AM (morning clinic hours; 12 = noon).
+    m_bare = re.search(r'\b(\d{1,2}):(\d{2})\b', low)
+    if m_bare:
+        hour = int(m_bare.group(1))
+        minute = int(m_bare.group(2))
+        if 0 <= minute <= 59 and 1 <= hour <= 12:
+            if 1 <= hour <= 6:
+                hour += 12  # afternoon: 1:00–6:59 → PM
+            # hours 7–12 remain as-is (7–11 AM; 12 = noon/PM)
+            return time_obj(hour, minute)
 
     return None
 
@@ -362,6 +411,21 @@ def find_dentist(msg: str) -> Optional[User]:
             if last and last in low:
                 return d
             if first and first in low:
+                return d
+
+    # Tagalog "si [name]" particle and bare name (without any prefix)
+    for d in get_dentists_qs():
+        last = (d.last_name or '').lower()
+        first = (d.first_name or '').lower()
+        if last:
+            if f'si {last}' in low:
+                return d
+            if len(last) > 3 and re.search(r'\b' + re.escape(last) + r'\b', low):
+                return d
+        if first:
+            if f'si {first}' in low:
+                return d
+            if len(first) > 3 and re.search(r'\b' + re.escape(first) + r'\b', low):
                 return d
 
     return None
@@ -455,8 +519,10 @@ def match_appointment(msg: str, qs) -> Optional[Appointment]:
     low = msg.lower()
     for a in qs:
         svc = (a.service.name if a.service else 'appointment').lower()
-        dstr = a.date.strftime('%B %d').lower()
-        if svc in low or dstr in low:
+        dstr_full = a.date.strftime('%B %d').lower()              # "february 23"
+        dstr_abbr = a.date.strftime('%b %d').lower()              # "feb 23" (zero-padded)
+        dstr_short = (a.date.strftime('%b ') + str(a.date.day)).lower()  # "feb 2" (no zero-pad)
+        if svc in low or dstr_full in low or dstr_abbr in low or dstr_short in low:
             return a
     if qs.count() == 1:
         return qs.first()
@@ -616,26 +682,42 @@ def submit_cancel_request(appointment: Appointment) -> bool:
 
 # ── Pending Request Check ─────────────────────────────────────────────────
 
-def check_pending_requests(user: User) -> Optional[str]:
+def check_pending_requests(user: User, detected_lang: str = 'en') -> Optional[str]:
     """
     Check if patient has any pending reschedule or cancellation requests.
     Returns a message string if blocked, or None if clear to proceed.
     """
+    is_tl = detected_lang in ('tl', 'tl-mix')
+
     if Appointment.objects.filter(
         patient=user, status='reschedule_requested'
     ).exists():
+        if is_tl:
+            return (
+                "🚫 Hindi po kayo maaaring mag-book, mag-reschedule, o mag-cancel habang mayroon pang "
+                "nakabinbing kahilingang mag-reschedule.\n\n"
+                "Mangyaring hintayin po ang pagsusuri at pagkumpirma ng staff sa inyong "
+                "kahilingan bago gumawa ng bagong aksyon."
+            )
         return (
             "🚫 You cannot book, reschedule, or cancel while a reschedule request is pending.\n\n"
-            "Please wait for staff/owner to review and confirm your pending reschedule request "
+            "Please wait for staff to review and confirm your pending reschedule request "
             "before taking any new action."
         )
 
     if Appointment.objects.filter(
         patient=user, status='cancel_requested'
     ).exists():
+        if is_tl:
+            return (
+                "🚫 Hindi po kayo maaaring mag-book, mag-reschedule, o mag-cancel habang mayroon pang "
+                "nakabinbing kahilingang mag-cancel.\n\n"
+                "Mangyaring hintayin po ang pagsusuri at pagkumpirma ng staff sa inyong "
+                "kahilingan bago gumawa ng bagong aksyon."
+            )
         return (
             "🚫 You cannot book, reschedule, or cancel while a cancellation request is pending.\n\n"
-            "Please wait for staff/owner to review and confirm your pending cancellation request "
+            "Please wait for staff to review and confirm your pending cancellation request "
             "before taking any new action."
         )
 

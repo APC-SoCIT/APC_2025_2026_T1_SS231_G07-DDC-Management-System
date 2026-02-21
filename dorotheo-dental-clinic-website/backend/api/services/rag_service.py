@@ -272,7 +272,7 @@ def build_db_context(msg: str, user=None) -> str:
     today = datetime.now().date()
 
     asking_about_dentist = any(w in low for w in [
-        'dentist', 'doctor', 'dr', 'doc', 'doktor', 'sino', 'who', 'whos', "who's",
+        'dentist', 'doctor', 'dr.', 'dr ', 'doc', 'doktor', 'sino', 'who', 'whos', "who's",
         'available dentist', 'dentist available', 'available doctor',
     ])
     asking_about_availability = any(w in low for w in [
@@ -317,9 +317,13 @@ def build_db_context(msg: str, user=None) -> str:
             parts.append('\n'.join(lines))
 
     # Clinic hours (Tagalog day-names + 'bukas' = open ALSO trigger this section)
+    # Also trigger for closing time, lunchbreak, and "what time" queries
     if asking_about_clinic or any(w in low for w in [
         'saturday', 'sunday', 'sabado', 'linggo', 'bukas ba', 'bukas kayo',
         'open saturday', 'open sunday', 'weekend', 'weekdays',
+        'what time', 'what time do', 'close', 'closing', 'closing time',
+        'lunch', 'lunch break', 'lunchbreak', 'kelan bukas', 'kelan kayo',
+        'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
     ]):
         clinics = ClinicLocation.objects.all().order_by('name')
         if clinics.exists():
@@ -358,6 +362,14 @@ def build_db_context(msg: str, user=None) -> str:
                 break
         if name_filtered_dents is not None:
             dents = name_filtered_dents
+
+        # Detect if the user is asking about a specific clinic branch
+        # Match against actual ClinicLocation names in the DB (case-insensitive substring)
+        clinic_filter = None
+        for cl in ClinicLocation.objects.all():
+            if cl.name.lower() in low:
+                clinic_filter = cl
+                break
 
         if dents.exists():
             lines = ["=== OUR DENTISTS ==="]
@@ -428,17 +440,27 @@ def build_db_context(msg: str, user=None) -> str:
                     continue
                 if is_multi_date:
                     # List every slot (date + time + clinic) in the range
+                    avail_q = DentistAvailability.objects.filter(
+                        dentist=d, date__gte=start_date, date__lte=end_date,
+                        is_available=True
+                    )
+                    # When user asked about a specific clinic, restrict to that clinic
+                    # (include both clinic-specific AND apply_to_all_clinics records)
+                    if clinic_filter:
+                        from django.db.models import Q as _Q
+                        avail_q = avail_q.filter(
+                            _Q(clinic=clinic_filter) | _Q(apply_to_all_clinics=True)
+                        )
                     avail_slots = list(
-                        DentistAvailability.objects.filter(
-                            dentist=d, date__gte=start_date, date__lte=end_date,
-                            is_available=True
-                        ).order_by('date', 'start_time').select_related('clinic')
+                        avail_q.order_by('date', 'start_time').select_related('clinic')
                     )
                     if avail_slots:
-                        # Group by date → clinic
+                        # Group by date → effective clinic
+                        # For apply_to_all_clinics records (clinic=None), resolve to clinic_filter
                         seen_dates: dict = {}
                         for slot in avail_slots:
-                            seen_dates.setdefault(slot.date, slot.clinic)
+                            effective = slot.clinic if slot.clinic else clinic_filter
+                            seen_dates.setdefault(slot.date, effective)
 
                         # Determine if all dates share the same clinic (or "All Clinics")
                         clinic_names_found = set()
@@ -467,20 +489,17 @@ def build_db_context(msg: str, user=None) -> str:
                                         else:
                                             date_entries.append(f"{fmt_date(dt)}: {range_text}")
                             else:
-                                avail_rec = DentistAvailability.objects.filter(
-                                    dentist=d, date=dt, is_available=True
-                                ).select_related('clinic').first()
-                                if avail_rec:
-                                    if single_clinic:
-                                        # Don't repeat clinic — show it once below
-                                        date_entries.append(fmt_date(dt))
+                                # Use effective clinic already resolved in seen_dates
+                                effective_clinic = clinic_obj  # comes from seen_dates
+                                specific_name = effective_clinic.name if effective_clinic else None
+                                if single_clinic:
+                                    # Don't repeat clinic — show it once below
+                                    date_entries.append(fmt_date(dt))
+                                else:
+                                    if specific_name:
+                                        date_entries.append(f"{fmt_date(dt)} ({specific_name})")
                                     else:
-                                        # Only show specific clinic names; omit 'All Clinics' label
-                                        specific_name = avail_rec.clinic.name if avail_rec.clinic else None
-                                        if specific_name:
-                                            date_entries.append(f"{fmt_date(dt)} ({specific_name})")
-                                        else:
-                                            date_entries.append(fmt_date(dt))
+                                        date_entries.append(fmt_date(dt))
 
                         if date_entries:
                             # Mobile-first: limit to 6 date entries max
@@ -498,12 +517,19 @@ def build_db_context(msg: str, user=None) -> str:
                     else:
                         lines.append(f"\u2022 Dr. {full_name} - No available dates in {date_context}")
                 else:
-                    avail_slot = DentistAvailability.objects.filter(
+                    single_date_q = DentistAvailability.objects.filter(
                         dentist=d, date__gte=start_date, date__lte=end_date,
                         is_available=True
-                    ).select_related('clinic').first()
+                    )
+                    if clinic_filter:
+                        from django.db.models import Q as _Q
+                        single_date_q = single_date_q.filter(
+                            _Q(clinic=clinic_filter) | _Q(apply_to_all_clinics=True)
+                        )
+                    avail_slot = single_date_q.select_related('clinic').first()
                     if avail_slot:
-                        clinic_obj = avail_slot.clinic
+                        # Resolve effective clinic: apply_to_all_clinics records have clinic=None
+                        clinic_obj = avail_slot.clinic if avail_slot.clinic else clinic_filter
                         clinic_name = clinic_obj.name if clinic_obj else None
                         if asking_about_time_slots:
                             # Show grouped time ranges (mobile-first)
@@ -534,6 +560,21 @@ def build_db_context(msg: str, user=None) -> str:
 
             lines.append("\n\u23f0 Appointments are booked in 30-minute intervals.")
             parts.append('\n'.join(lines))
+
+    # Social media / contact — always included when specifically asked, regardless of dentist query
+    _social_contact_kw = ['facebook', 'instagram', ' fb ', ' ig ', 'social media', 'social',
+                          'phone number', 'cellphone', 'numero', 'telepono', 'tawag',
+                          'contact us', 'contact info', 'makipag-ugnayan']
+    if any(w in low for w in _social_contact_kw):
+        already_social = any('CONTACT & SOCIAL' in p for p in parts)
+        if not already_social:
+            parts.append(
+                "=== CLINIC CONTACT & SOCIAL MEDIA ===\n"
+                "Phone: +63 912 345 6789\n"
+                "Facebook Page Name: Dorotheo Dental FB\n"
+                "Instagram Name: Dorotheo Dental IG\n"
+                "IMPORTANT: Share ONLY page names above — NEVER include any URLs or links."
+            )
 
     # Clinic info (only if not already added above and NOT a dentist query)
     if not asking_about_dentist and (asking_about_clinic or any(w in low for w in ['address', 'contact', 'phone', 'schedule'])):
@@ -582,22 +623,23 @@ def get_direct_answer(msg: str) -> Optional[dict]:
     Returns a response dict or None if not a direct question.
     """
     stripped = msg.strip()
+    low = msg.lower().strip()
 
     if stripped == "What dental services do you offer?":
         svcs = Service.objects.all().order_by('name')
         if not svcs.exists():
             return {'text': "We currently don't have services listed. Please contact the clinic directly."}
-        lines = ["🦷 **Our Dental Services:**\n"]
+        lines = ["### 🦷 Our Dental Services\n"]
         for s in svcs:
-            lines.append(f"• **{s.name}**\n")
-        lines.append("💙 Would you like to book an appointment?")
-        return {'text': '\n'.join(lines)}
+            lines.append(f"- **{s.name}**")
+        lines.append("\n💙 Would you like to book an appointment?")
+        return {'text': '\n'.join(lines), 'quick_replies': ['Book Appointment', 'Our Dentists', 'Clinic Hours']}
 
     if stripped == "Who are the dentists?":
         dents = get_dentists_qs().order_by('last_name')
         if not dents.exists():
             return {'text': "We currently don't have dentist information available."}
-        lines = ["👨‍⚕️ **Our Dental Team:**\n"]
+        lines = ["### 👨\u200d⚕️ Our Dental Team\n"]
         today = datetime.now().date()
         for d in dents:
             full_name = d.get_full_name().strip()
@@ -607,30 +649,68 @@ def get_direct_answer(msg: str) -> Optional[dict]:
                 dentist=d, date=today, is_available=True
             ).exists()
             if is_available:
-                lines.append(f"✅ **Dr. {full_name}** - Available today\n")
+                lines.append(f"- ✅ **Dr. {full_name}** – Available today")
             else:
-                lines.append(f"• **Dr. {full_name}**\n")
-        lines.append("💙 Ready to book? Say 'Book Appointment' to schedule your visit!")
-        return {'text': '\n'.join(lines)}
+                lines.append(f"- **Dr. {full_name}**")
+        lines.append("\n💙 Ready to book? Say 'Book Appointment' to schedule your visit!")
+        return {'text': '\n'.join(lines), 'quick_replies': ['Book Appointment', 'Our Services', 'Clinic Hours']}
 
     if stripped == "What are your clinic hours?":
         clinics = ClinicLocation.objects.all().order_by('name')
         if not clinics.exists():
             return {'text': "We currently don't have clinic location information available."}
-        lines = ["📍 **Clinic Locations & Hours**\n"]
+        lines = ["### 📍 Clinic Locations\n"]
         clinic_list = list(clinics)
-        for i, c in enumerate(clinic_list):
-            lines.append(f"**{c.name}**")
+        for c in clinic_list:
+            lines.append(f"\n**{c.name}**")
             lines.append(f"📍 {c.address}")
             lines.append(f"📞 {c.phone}")
-            if i < len(clinic_list) - 1:
-                lines.append("\n")
-        lines.append("\n🕒 **Operating Hours:**")
-        lines.append("• **Monday - Friday:** 8:00 AM - 6:00 PM")
-        lines.append("• **Saturday:** 9:00 AM - 3:00 PM")
-        lines.append("• **Sunday:** Closed")
+        lines.append("\n### ⏰ Operating Hours\n")
+        lines.append("- **Monday – Friday:** 8:00 AM – 6:00 PM")
+        lines.append("- **Saturday:** 9:00 AM – 3:00 PM")
+        lines.append("- **Sunday:** Closed")
         lines.append("\n💙 Need to schedule an appointment? Just say 'Book Appointment'!")
-        return {'text': '\n'.join(lines)}
+        return {'text': '\n'.join(lines), 'quick_replies': ['Book Appointment', 'Our Dentists', 'Our Services']}
+
+    # Contact / Social Media — flexible pattern-based match
+    _social_kw = ['facebook', 'instagram', ' fb', ' ig ', 'fb page', 'ig page', 'social media']
+    _contact_kw = [
+        'contact us', 'contact info', 'how to contact', 'how do i contact',
+        'cellphone', 'phone number', 'numero', 'telepono', 'tawag',
+        'how to reach', 'makipag-ugnayan', 'number nyo', 'number namin',
+        'how can i call', 'how do i call', 'saan ko maabot', 'saan ko kayo',
+        'ma contact', 'macontact', 'ma-contact', 'contact ang', 'contact ng',
+        'contact nyo', 'contact kayo', 'contact ninyo', 'i-contact',
+        'saan ko makita', 'paano kayo', 'paano ka', 'paano makipag',
+    ]
+    _is_social = any(w in low for w in _social_kw)
+    _is_contact = any(w in low for w in _contact_kw)
+    if _is_social or _is_contact:
+        _is_tl = any(w in low for w in [
+            'saan', 'paano', 'numero', 'tawag', 'makipag', 'nyo', 'namin',
+            'natin', 'po ', ' po', 'kayo', 'makontak', 'maabot',
+        ])
+        if _is_tl:
+            return {
+                'text': (
+                    "### 📞 Makipag-ugnayan sa Amin\n\n"
+                    "- 📞 **Telepono:** +63 912 345 6789\n"
+                    "- 📘 **Facebook:** Dorotheo Dental FB\n"
+                    "- 📸 **Instagram:** Dorotheo Dental IG\n\n"
+                    "💙 Maaari ka ring mag-book ng appointment dito sa chat!"
+                ),
+                'quick_replies': ['Book Appointment', 'Clinic Hours', 'Our Location'],
+            }
+        return {
+            'text': (
+                "### 📞 Contact Us\n\n"
+                "- 📞 **Phone:** +63 912 345 6789\n"
+                "- 📘 **Facebook:** Dorotheo Dental FB\n"
+                "- 📸 **Instagram:** Dorotheo Dental IG\n\n"
+                "💙 You can also book an appointment directly through this chat!"
+            ),
+            'quick_replies': ['Book Appointment', 'Clinic Hours', 'Our Location'],
+        }
 
     return None
 
@@ -661,6 +741,9 @@ def format_context_fallback(context: str, is_tagalog: bool) -> str:
         for line in dentists_section.strip().split('\n'):
             stripped = line.strip()
             if stripped.startswith('•'):
+                # Convert • to - for proper markdown bullet formatting
+                lines.append('- ' + stripped[1:].lstrip())
+            elif stripped.startswith('- '):
                 lines.append(stripped)
             elif stripped.startswith('📍'):
                 # Clinic location line — indent under the doctor above
@@ -691,8 +774,28 @@ def format_context_fallback(context: str, is_tagalog: bool) -> str:
                     lines.append(', '.join(parts[1:3]).strip())
             elif stripped.startswith('Phone:'):
                 lines.append(f"📞 {stripped.replace('Phone:', '').strip()}")
-            elif stripped.startswith('⏰') or stripped.startswith('•'):
+            elif stripped.startswith('⏰'):
                 lines.append(stripped)
+            elif stripped.startswith('•'):
+                # Convert • to - for proper markdown bullet formatting
+                lines.append('- ' + stripped[1:].lstrip())
+            elif stripped.startswith('- '):
+                lines.append(stripped)
+        lines.append("")
+
+    if "=== CLINIC CONTACT & SOCIAL MEDIA ===" in context:
+        lines.append("### \ud83d\udcde Makipag-ugnayan\n" if is_tagalog else "### \ud83d\udcde Contact Us\n")
+        social_section = context.split("=== CLINIC CONTACT & SOCIAL MEDIA ===")[1]
+        if "===" in social_section:
+            social_section = social_section.split("===")[0]
+        for sline in social_section.strip().split('\n'):
+            s = sline.strip()
+            if s.startswith('Phone:'):
+                lines.append(f"- \ud83d\udcde **{'Telepono' if is_tagalog else 'Phone'}:** {s.replace('Phone:', '').strip()}")
+            elif s.startswith('Facebook Page Name:'):
+                lines.append(f"- \ud83d\udcd8 **Facebook:** {s.replace('Facebook Page Name:', '').strip()}")
+            elif s.startswith('Instagram Name:'):
+                lines.append(f"- \ud83d\udcf8 **Instagram:** {s.replace('Instagram Name:', '').strip()}")
         lines.append("")
 
     if is_tagalog:
