@@ -345,3 +345,72 @@ AUDIT_SKIP_PATHS = [
 SESSION_COOKIE_AGE = 900  # 15 minutes in seconds
 SESSION_SAVE_EVERY_REQUEST = True  # Reset session timer on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Clear session on browser close
+
+# ============================================
+# RAG (Retrieval Augmented Generation) CONFIGURATION
+# ============================================
+
+# Enable/disable RAG enhancement in the chatbot
+RAG_ENABLED = os.environ.get('RAG_ENABLED', 'True') == 'True'
+
+# Number of top similar chunks to retrieve
+RAG_TOP_K = int(os.environ.get('RAG_TOP_K', '5'))
+
+# Minimum cosine similarity threshold (0.0-1.0)
+RAG_SIMILARITY_THRESHOLD = float(os.environ.get('RAG_SIMILARITY_THRESHOLD', '0.55'))
+
+# Maximum context tokens to inject into AI prompt
+RAG_MAX_CONTEXT_TOKENS = int(os.environ.get('RAG_MAX_CONTEXT_TOKENS', '1500'))
+
+# ============================================
+# LOGGING CONFIGURATION
+# ============================================
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'rag': {
+            'format': '[%(asctime)s] %(levelname)s [%(name)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'rag',
+        },
+    },
+    'loggers': {
+        'rag': {
+            'handlers': ['console'],
+            'level': os.environ.get('RAG_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'rag.service': {
+            'handlers': ['console'],
+            'level': os.environ.get('RAG_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'rag.embedding': {
+            'handlers': ['console'],
+            'level': os.environ.get('RAG_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'rag.vector_search': {
+            'handlers': ['console'],
+            'level': os.environ.get('RAG_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'rag.context_builder': {
+            'handlers': ['console'],
+            'level': os.environ.get('RAG_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'rag.indexer': {
+            'handlers': ['console'],
+            'level': os.environ.get('RAG_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}
