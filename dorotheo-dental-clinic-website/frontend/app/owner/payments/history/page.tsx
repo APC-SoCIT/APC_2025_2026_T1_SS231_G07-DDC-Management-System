@@ -7,9 +7,11 @@ import { getPayments, getPatients } from "@/lib/api"
 import { Payment, Patient } from "@/lib/types"
 import { Calendar, DollarSign, Search, Filter, X, Eye, Plus } from "lucide-react"
 import PaymentDetailsModal from "@/components/payment-details-modal"
+import { useClinic } from "@/lib/clinic-context"
 
 export default function OwnerPaymentHistoryPage() {
   const { token } = useAuth()
+  const { selectedClinic } = useClinic()
   const [payments, setPayments] = useState<Payment[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,16 +29,18 @@ export default function OwnerPaymentHistoryPage() {
     if (token) {
       fetchData()
     }
-  }, [token, selectedPatient, selectedMethod, startDate, endDate, includeVoided])
+  }, [token, selectedClinic, selectedPatient, selectedMethod, startDate, endDate, includeVoided])
 
   const fetchData = async () => {
     if (!token) return
     
     setLoading(true)
     try {
+      const clinicId = selectedClinic && selectedClinic !== "all" ? selectedClinic.id : undefined
       const [paymentsData, patientsData] = await Promise.all([
         getPayments(token, {
           patient_id: selectedPatient || undefined,
+          clinic_id: clinicId,
           payment_method: selectedMethod || undefined,
           start_date: startDate || undefined,
           end_date: endDate || undefined,

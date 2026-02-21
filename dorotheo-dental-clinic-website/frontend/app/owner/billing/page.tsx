@@ -6,8 +6,10 @@ import { DollarSign, Search, CreditCard, FileText, AlertCircle, History } from "
 import { RecordPaymentModal } from "@/components/record-payment-modal"
 import { InvoiceWithPatient, Patient } from "@/lib/types"
 import { getInvoices, getPatients } from "@/lib/api"
+import { useClinic } from "@/lib/clinic-context"
 
 export default function OwnerBillingPage() {
+  const { selectedClinic } = useClinic()
   const [token, setToken] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -17,6 +19,7 @@ export default function OwnerBillingPage() {
 
   // Data
   const [invoices, setInvoices] = useState<InvoiceWithPatient[]>([])
+  const [paidInvoices, setPaidInvoices] = useState<InvoiceWithPatient[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
 
   // Modal state
@@ -25,7 +28,7 @@ export default function OwnerBillingPage() {
   const [selectedPatientName, setSelectedPatientName] = useState("")
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "overdue">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "overdue" | "paid">("all")
   const [selectedPatientFilter, setSelectedPatientFilter] = useState<number | null>(null)
 
   useEffect(() => {
@@ -38,6 +41,13 @@ export default function OwnerBillingPage() {
       setError("Not authenticated")
     }
   }, [])
+
+  // Re-fetch when selected clinic changes
+  useEffect(() => {
+    if (token) {
+      fetchData(token)
+    }
+  }, [selectedClinic])
 
   // Close patient dropdown when clicking outside
   useEffect(() => {
@@ -55,8 +65,10 @@ export default function OwnerBillingPage() {
       setLoading(true)
       setError("")
 
+      const clinicId = selectedClinic && selectedClinic !== "all" ? selectedClinic.id : undefined
+
       const [invoicesData, patientsData] = await Promise.all([
-        getInvoices(authToken),
+        getInvoices(authToken, clinicId ? { clinic_id: clinicId } : undefined),
         getPatients(authToken)
       ])
 
@@ -65,7 +77,13 @@ export default function OwnerBillingPage() {
         parseFloat(inv.balance) > 0 && inv.status !== 'cancelled'
       )
 
+      // Paid invoices
+      const paid = invoicesData.filter(
+        (inv: InvoiceWithPatient) => inv.status === "paid"
+      )
+
       setInvoices(unpaidInvoices)
+      setPaidInvoices(paid)
       setPatients(Array.isArray(patientsData) ? patientsData : (patientsData.results || []))
     } catch (err: any) {
       console.error("Error fetching data:", err)
@@ -89,9 +107,10 @@ export default function OwnerBillingPage() {
   }
 
   // Filter invoices
-  const filteredInvoices = invoices.filter((invoice) => {
+  const baseList = statusFilter === "paid" ? paidInvoices : invoices
+  const filteredInvoices = baseList.filter((invoice) => {
     // Status filter
-    if (statusFilter !== "all" && invoice.status !== statusFilter) {
+    if (statusFilter !== "all" && statusFilter !== "paid" && invoice.status !== statusFilter) {
       return false
     }
 
@@ -109,6 +128,14 @@ export default function OwnerBillingPage() {
     0
   )
   const overdueCount = filteredInvoices.filter((inv) => inv.status === "overdue").length
+
+  const totalSettled = statusFilter === "paid"
+    ? filteredInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_due), 0)
+    : 0
+
+  const lastPaidDate = statusFilter === "paid" && filteredInvoices.length > 0
+    ? new Date(Math.max(...filteredInvoices.map(i => new Date((i as any).paid_at || i.updated_at).getTime()))).toLocaleDateString()
+    : null
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -171,13 +198,13 @@ export default function OwnerBillingPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Pending</p>
+              <p className="text-sm text-gray-600 mb-1">{statusFilter === "paid" ? "Total Settled" : "Total Pending"}</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₱{totalUnpaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₱{(statusFilter === "paid" ? totalSettled : totalUnpaid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <DollarSign className="w-6 h-6 text-red-600" />
+            <div className={`p-3 rounded-lg ${statusFilter === "paid" ? "bg-green-50" : "bg-red-50"}`}>
+              <DollarSign className={`w-6 h-6 ${statusFilter === "paid" ? "text-green-600" : "text-red-600"}`} />
             </div>
           </div>
         </div>
@@ -185,7 +212,7 @@ export default function OwnerBillingPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Unpaid Invoices</p>
+              <p className="text-sm text-gray-600 mb-1">{statusFilter === "paid" ? "Paid Invoices" : "Unpaid Invoices"}</p>
               <p className="text-2xl font-bold text-gray-900">{filteredInvoices.length}</p>
             </div>
             <div className="p-3 bg-amber-50 rounded-lg">
@@ -197,11 +224,13 @@ export default function OwnerBillingPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Overdue</p>
-              <p className="text-2xl font-bold text-gray-900">{overdueCount}</p>
+              <p className="text-sm text-gray-600 mb-1">{statusFilter === "paid" ? "Last Paid" : "Overdue"}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statusFilter === "paid" ? (lastPaidDate ?? "—") : overdueCount}
+              </p>
             </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-red-600" />
+            <div className={`p-3 rounded-lg ${statusFilter === "paid" ? "bg-green-50" : "bg-red-50"}`}>
+              <AlertCircle className={`w-6 h-6 ${statusFilter === "paid" ? "text-green-600" : "text-red-600"}`} />
             </div>
           </div>
         </div>
@@ -292,6 +321,7 @@ export default function OwnerBillingPage() {
             { id: "all", label: "All" },
             { id: "sent", label: "Pending" },
             { id: "overdue", label: "Overdue" },
+            { id: "paid", label: "Paid" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -314,8 +344,8 @@ export default function OwnerBillingPage() {
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">
-              {selectedPatientFilter
-                ? "No billing records yet. Add your first statement of account to get started!"
+              {statusFilter === "paid"
+                ? "No paid invoices found."
                 : "No billing records yet. Add your first statement of account to get started!"}
             </p>
           </div>
@@ -372,7 +402,7 @@ export default function OwnerBillingPage() {
                       ₱{parseFloat(invoice.total_due).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-bold text-red-600">
+                      <span className={`font-bold ${statusFilter === "paid" ? "text-green-600" : "text-red-600"}`}>
                         ₱{parseFloat(invoice.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     </td>
@@ -386,15 +416,17 @@ export default function OwnerBillingPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() =>
-                          handleRecordPayment(invoice.patient, invoice.patient_name || "Patient")
-                        }
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        Record Payment
-                      </button>
+                      {statusFilter !== "paid" && (
+                        <button
+                          onClick={() =>
+                            handleRecordPayment(invoice.patient, invoice.patient_name || "Patient")
+                          }
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          Record Payment
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

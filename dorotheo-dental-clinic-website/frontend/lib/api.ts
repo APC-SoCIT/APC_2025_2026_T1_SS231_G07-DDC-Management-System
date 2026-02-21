@@ -1120,9 +1120,17 @@ export const api = {
     return response.json()
   },
 
-  getInvoices: async (token: string, patientId?: number) => {
-    const params = patientId ? `?patient_id=${patientId}` : ''
-    const response = await fetch(`${API_BASE_URL}/invoices/${params}`, {
+  getInvoices: async (token: string, filters?: number | { patient_id?: number; clinic_id?: number }) => {
+    const searchParams = new URLSearchParams()
+    if (typeof filters === 'number') {
+      // backward-compat: second arg used to be patientId directly
+      searchParams.set('patient_id', filters.toString())
+    } else {
+      if (filters?.patient_id) searchParams.set('patient_id', filters.patient_id.toString())
+      if (filters?.clinic_id) searchParams.set('clinic_id', filters.clinic_id.toString())
+    }
+    const queryString = searchParams.toString()
+    const response = await fetch(`${API_BASE_URL}/invoices/${queryString ? `?${queryString}` : ''}`, {
       headers: { 'Authorization': `Token ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch invoices')

@@ -23,6 +23,7 @@ import {
 import { useAuth } from "@/lib/auth"
 import NotificationBell from "@/components/notification-bell"
 import { ClinicSelector } from "@/components/clinic-selector"
+import { InventoryAnalyticsProvider } from "@/lib/inventory-analytics-context"
 
 export default function OwnerLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname()
@@ -171,7 +172,9 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
 
       {/* Main Content */}
       <main className="lg:ml-64 pt-16 lg:pt-16">
-        <div className="p-6 lg:p-8">{children}</div>
+        <div className="p-6 lg:p-8">
+          <InventoryAnalyticsProvider>{children}</InventoryAnalyticsProvider>
+        </div>
       </main>
 
       {/* Overlay for mobile */}

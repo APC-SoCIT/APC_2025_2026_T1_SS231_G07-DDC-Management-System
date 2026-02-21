@@ -5,6 +5,7 @@ import { Calendar, Users, CheckCircle, XCircle, UserPlus, UserCheck, BarChart3, 
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
 import { getAnalytics } from "@/lib/api"
+import { useInventoryAnalytics } from "@/lib/inventory-analytics-context"
 import type { AnalyticsResponse } from "@/lib/types/analytics"
 
 // Analytics chart components
@@ -38,6 +39,7 @@ function getDateRangeLabel(startDate: string, endDate: string): string {
 export default function OwnerAnalytics() {
   const { token } = useAuth()
   const { selectedClinic } = useClinic()
+  const { inventoryVersion } = useInventoryAnalytics()
   const [period, setPeriod] = useState<Period>("monthly")
   const [activeTab, setActiveTab] = useState<Tab>("financial")
   const [data, setData] = useState<AnalyticsResponse | null>(null)
@@ -62,7 +64,7 @@ export default function OwnerAnalytics() {
     } finally {
       setLoading(false)
     }
-  }, [token, period, clinicId])
+  }, [token, period, clinicId, inventoryVersion])
 
   useEffect(() => {
     fetchData()
