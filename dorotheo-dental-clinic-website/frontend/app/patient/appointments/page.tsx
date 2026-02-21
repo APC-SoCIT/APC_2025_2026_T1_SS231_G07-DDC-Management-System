@@ -395,7 +395,7 @@ export default function PatientAppointments() {
         setServices(patientAllowedServices)
 
         // Fetch blocked time slots
-        const blockedResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+        const blockedResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
           headers: {
             'Authorization': `Token ${token}`,
           },
@@ -439,7 +439,8 @@ export default function PatientAppointments() {
           Number(newAppointment.dentist),
           todayStr,
           endDateStr,
-          token
+          token,
+          newAppointment.clinic || undefined
         )
         
         console.log('[BOOKING] Dentist availability received:', availability)
@@ -465,7 +466,7 @@ export default function PatientAppointments() {
     }
 
     fetchDentistAvailability()
-  }, [newAppointment.dentist, token])
+  }, [newAppointment.dentist, newAppointment.clinic, token])
 
   // Update date when calendar date is selected
   useEffect(() => {
@@ -501,7 +502,8 @@ export default function PatientAppointments() {
           Number(selectedAppointment.dentist),
           todayStr,
           endDateStr,
-          token
+          token,
+          selectedAppointment.clinic || undefined
         )
         
         console.log('[RESCHEDULE] Availability received:', availability)
@@ -864,7 +866,11 @@ export default function PatientAppointments() {
 
   // Helper function to format dentist name with "Dr." prefix
   const formatDentistName = (staff: Staff) => {
-    const fullName = `${staff.first_name} ${staff.last_name}`.trim()
+    const fullName = `${staff.first_name || ''} ${staff.last_name || ''}`.trim()
+    // Return empty string if no name available - these should be filtered out
+    if (!fullName) {
+      return ''
+    }
     // Only add "Dr." if it's not already in the name
     if (fullName.toLowerCase().startsWith('dr.') || fullName.toLowerCase().startsWith('dr ')) {
       return fullName
@@ -1576,11 +1582,18 @@ export default function PatientAppointments() {
                       disabled={!newAppointment.clinic}
                     >
                       <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select clinic first"}</option>
-                      {staff.filter((s) => s.role === 'dentist' || s.user_type === 'owner').map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {formatDentistName(s)}
-                        </option>
-                      ))}
+                      {staff
+                        .filter((s) => (s.role === 'dentist' || s.user_type === 'owner'))
+                        .filter((s) => {
+                          // Filter out dentists with empty names
+                          const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim()
+                          return fullName.length > 0
+                        })
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {formatDentistName(s)}
+                          </option>
+                        ))}
                     </select>
                     {newAppointment.dentist && (
                       <p className="text-xs text-green-600 mt-1">

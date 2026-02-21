@@ -2685,7 +2685,7 @@ class TreatmentAssignmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
 @api_view(['POST'])
 def chatbot_query(request):
     """
-    Handle chatbot queries using Ollama LLM.
+    Handle chatbot queries with full security validation.
     
     POST body:
     {
@@ -2699,10 +2699,18 @@ def chatbot_query(request):
     Returns:
     {
         "response": "AI generated response",
+        "quick_replies": [],
+        "sources": [],
         "error": null
     }
+    
+    Security:
+    - Input sanitization and length limits
+    - Never exposes internal errors to client
+    - Structured JSON response always returned
     """
     from .chatbot_service import DentalChatbotService
+    from .services import security_monitor as secmon
     
     try:
         user_message = request.data.get('message', '').strip()
@@ -2710,34 +2718,72 @@ def chatbot_query(request):
         
         if not user_message:
             return Response(
-                {'error': 'Message is required'},
+                {'response': '', 'quick_replies': [], 'sources': [], 'error': 'Message is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Input length limit (prevent abuse)
+        if len(user_message) > 2000:
+            return Response({
+                'response': "Your message is too long. Please keep it under 2000 characters.",
+                'quick_replies': [],
+                'sources': [],
+                'error': None
+            })
+        
+        # Validate conversation_history format
+        if not isinstance(conversation_history, list):
+            conversation_history = []
+        conversation_history = [
+            m for m in conversation_history
+            if isinstance(m, dict) and 'role' in m and 'content' in m
+            and m['role'] in ('user', 'assistant')
+            and isinstance(m.get('content', ''), str)
+        ]
+        
+        # Security check at API level
+        user_id = request.user.id if request.user.is_authenticated else None
+        is_safe, threat_type, safe_response = secmon.check_message_security(user_message, user_id)
+        if not is_safe:
+            return Response({
+                'response': safe_response,
+                'quick_replies': [],
+                'sources': [],
+                'error': None
+            })
         
         # Initialize chatbot with current user (if authenticated)
         user = request.user if request.user.is_authenticated else None
         chatbot = DentalChatbotService(user=user)
+
+        # Optional language preference sent by the frontend toggle (EN/PH)
+        preferred_language = request.data.get('preferred_language', None)
+        if preferred_language not in ('en', 'tl', None):
+            preferred_language = None  # Ignore invalid values
+
+        # Get response from chatbot
+        result = chatbot.get_response(user_message, conversation_history, preferred_language=preferred_language)
         
-        # Get response from Ollama
-        result = chatbot.get_response(user_message, conversation_history)
-        
-        if result['error']:
-            return Response(
-                {'error': result['error']},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-        
+        # Always return structured JSON — never crash
         return Response({
-            'response': result['response'],
+            'response': result.get('response', ''),
             'quick_replies': result.get('quick_replies', []),
-            'error': None
+            'sources': result.get('sources', []),
+            'error': None  # Never expose internal errors to client
         })
         
     except Exception as e:
-        return Response(
-            {'error': f'Server error: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        # Log error internally, NEVER expose to user
+        logger.error("Chatbot API error: %s", str(e)[:200])
+        return Response({
+            'response': (
+                "I'm sorry, I encountered a temporary issue. "
+                "Please try again, or contact the clinic directly for assistance."
+            ),
+            'quick_replies': [],
+            'sources': [],
+            'error': None
+        })
 
 
 # ============================================================================

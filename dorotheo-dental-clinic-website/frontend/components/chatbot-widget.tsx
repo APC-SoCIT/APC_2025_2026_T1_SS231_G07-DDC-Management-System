@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { MessageCircle, X, Send, Loader2, Trash2, Calendar, RefreshCw, XCircle, Mic, MicOff } from "lucide-react"
+import { MessageCircle, X, Send, Loader2, Trash2 } from "lucide-react"
 import { chatbotQuery } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import ReactMarkdown from 'react-markdown'
@@ -11,20 +11,7 @@ interface Message {
   text: string
   sender: "user" | "bot"
   timestamp: Date
-  quickReplies?: string[]
 }
-
-const quickActions = [
-  { icon: Calendar, text: "📅 Book Appointment", message: "I want to book an appointment" },
-  { icon: RefreshCw, text: "🔄 Reschedule", message: "I want to reschedule my appointment" },
-  { icon: XCircle, text: "❌ Cancel", message: "I want to cancel my appointment" },
-]
-
-const defaultSuggestions = [
-  "What dental services do you offer?",
-  "Who are the dentists?",
-  "What are your clinic hours?",
-]
 
 export default function ChatbotWidget() {
   const { user } = useAuth()
@@ -34,10 +21,14 @@ export default function ChatbotWidget() {
   const [isTyping, setIsTyping] = useState(false)
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([])
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isListening, setIsListening] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const recognitionRef = useRef<any>(null)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [selectedLanguage, setSelectedLanguage] = useState<'EN' | 'PH'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('chatbot_language') as 'EN' | 'PH') || 'EN'
+    }
+    return 'EN'
+  })
 
   // Load chat history from localStorage on mount and when user changes
   useEffect(() => {
@@ -112,10 +103,14 @@ export default function ChatbotWidget() {
     }
   }, [messages, conversationHistory, user?.id])
 
-  const initializeChat = () => {
+  const initializeChat = (lang?: 'EN' | 'PH') => {
+    const currentLang = lang ?? selectedLanguage
+    const welcomeText = currentLang === 'PH'
+      ? "Maligayang pagdating sa Dorotheo Dental Clinic! \n\nAko si **Sage**, ang inyong AI scheduling concierge. Makakatulong po ako sa:\n\n\u2022 **Mag-book, mag-reschedule, o mag-cancel** ng appointment\n\u2022 Impormasyon tungkol sa aming mga dental services\n\u2022 Aming mga dentista, clinic, at oras\n\u2022 Mga tanong tungkol sa dental health\n\nPaano po kita matutulungan ngayon?"
+      : "Welcome to Dorotheo Dental Clinic! \n\nI'm **Sage**, your AI scheduling concierge. I can help you with:\n\n\u2022 **Book, reschedule, or cancel** appointments\n\u2022 Information about our dental services\n\u2022 Our dentists, clinics, and hours\n\u2022 General dental health questions\n\nHow may I assist you today?"
     const welcomeMessage: Message = {
       id: "1",
-      text: "Welcome to Dorotheo Dental Clinic! \n\nI'm **Sage**, your AI scheduling concierge. I can help you with:\n\n• **Book, reschedule, or cancel** appointments\n• Information about our dental services\n• Our dentists, clinics, and hours\n• General dental health questions\n\nHow may I assist you today?",
+      text: welcomeText,
       sender: "bot",
       timestamp: new Date(),
     }
@@ -143,48 +138,15 @@ export default function ChatbotWidget() {
     scrollToBottom()
   }, [messages])
 
-  // Initialize speech recognition (only once)
+  // Scroll to bottom when chat panel opens (messages already loaded from localStorage)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition()
-        recognitionRef.current.continuous = false
-        recognitionRef.current.interimResults = false
-        recognitionRef.current.lang = 'en-US'
-
-        recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript
-          setInputMessage(transcript)
-          setIsListening(false)
-        }
-
-        recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error)
-          setIsListening(false)
-        }
-
-        recognitionRef.current.onend = () => {
-          setIsListening(false)
-        }
-      }
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+      }, 50)
+      return () => clearTimeout(timer)
     }
-  }, [])
-
-  const toggleVoiceInput = () => {
-    if (!recognitionRef.current) {
-      alert('Voice recognition is not supported in your browser. Please use Chrome or Edge.')
-      return
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop()
-      setIsListening(false)
-    } else {
-      recognitionRef.current.start()
-      setIsListening(true)
-    }
-  }
+  }, [isOpen])
 
   const handleSendMessage = async (message?: string) => {
     const messageText = message || inputMessage.trim()
@@ -210,14 +172,13 @@ export default function ChatbotWidget() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
       // Call Ollama API through backend
-      const response = await chatbotQuery(messageText, newHistory, token || undefined)
+      const response = await chatbotQuery(messageText, newHistory, token || undefined, selectedLanguage === 'PH' ? 'tl' : 'en')
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: response.response,
         sender: "bot",
         timestamp: new Date(),
-        quickReplies: response.quick_replies || []
       }
 
       setMessages((prev) => [...prev, botMessage])
@@ -241,10 +202,6 @@ export default function ChatbotWidget() {
     } finally {
       setIsTyping(false)
     }
-  }
-
-  const handleQuickReply = (reply: string) => {
-    handleSendMessage(reply)
   }
 
   return (
@@ -354,23 +311,7 @@ export default function ChatbotWidget() {
                   </div>
                 </div>
                 
-                {/* Quick Reply Buttons */}
-                {message.sender === "bot" && message.quickReplies && message.quickReplies.length > 0 && (
-                  <div className="flex justify-start mt-2 ml-2">
-                    <div className="flex flex-wrap gap-2 max-w-[80%]">
-                      {message.quickReplies.map((reply, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleQuickReply(reply)}
-                          disabled={isTyping}
-                          className="text-xs bg-[var(--color-primary)] text-white px-3 py-2 rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
-                        >
-                          {reply}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
             ))}
 
@@ -385,68 +326,35 @@ export default function ChatbotWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Actions & Suggestions */}
-          <div className="p-3 bg-white border-t border-gray-200">
-            <p className="text-xs text-gray-700 mb-2 font-semibold">Quick Actions:</p>
-            <div className="grid grid-cols-3 gap-1.5 mb-3">
-              {quickActions.map((action, index) => {
-                const Icon = action.icon
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleQuickReply(action.message)}
-                    disabled={isTyping}
-                    className="flex items-center justify-center gap-1 text-xs bg-[var(--color-primary)] text-white px-2 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm font-medium"
-                  >
-                    <span>{action.text}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <p className="text-xs text-gray-500 mb-1.5 font-medium">Or ask me:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {defaultSuggestions.map((reply, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleQuickReply(reply)}
-                  disabled={isTyping}
-                  className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
-                >
-                  {reply}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Input */}
           <div className="p-4 bg-white border-t border-gray-200">
             <div className="flex gap-2 items-center">
+              {/* Language Toggle */}
+              <button
+                onClick={() => {
+                  const newLang = selectedLanguage === 'EN' ? 'PH' : 'EN'
+                  setSelectedLanguage(newLang)
+                  localStorage.setItem('chatbot_language', newLang)
+                }}
+                className="bg-[var(--color-primary)] text-white rounded-full px-3 py-2 text-xs font-bold hover:opacity-90 transition-opacity shrink-0"
+                title={selectedLanguage === 'EN' ? 'Switch to Filipino' : 'Switch to English'}
+                aria-label="Toggle language"
+              >
+                {selectedLanguage === 'EN' ? '🇺🇸 EN' : '🇵🇭 FIL'}
+              </button>
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && !isTyping && !isListening && handleSendMessage()}
-                placeholder={isListening ? "Listening..." : "Ask Sage about dental care..."}
-                disabled={isTyping || isListening}
+                onKeyPress={(e) => e.key === "Enter" && !isTyping && handleSendMessage()}
+                placeholder="Ask Sage about dental care..."
+                disabled={isTyping}
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-sm disabled:opacity-50"
               />
               <button
-                onClick={toggleVoiceInput}
-                className={`rounded-full p-2.5 transition-all ${
-                  isListening 
-                    ? 'bg-red-500 text-white animate-pulse' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-                disabled={isTyping}
-                aria-label={isListening ? "Stop recording" : "Start voice input"}
-                title={isListening ? "Stop recording" : "Voice input (English, Tagalog, or Taglish)"}
-              >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-              </button>
-              <button
                 onClick={() => handleSendMessage()}
                 className="bg-[var(--color-primary)] text-white rounded-full p-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
-                disabled={!inputMessage.trim() || isTyping || isListening}
+                disabled={!inputMessage.trim() || isTyping}
                 aria-label="Send message"
               >
                 <Send className="w-5 h-5" />
