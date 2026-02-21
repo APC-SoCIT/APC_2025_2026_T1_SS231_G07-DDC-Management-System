@@ -87,7 +87,7 @@ export default function OwnerLayout({ children }: Readonly<{ children: React.Rea
       </div>
 
       {/* Top Header for Desktop */}
-      <div className="hidden lg:block fixed top-0 right-0 z-30 bg-white border-b border-[var(--color-border)] px-6 py-3" style={{left: '16rem'}}>
+      <div className="hidden lg:block fixed top-0 right-0 z-30 bg-white border-b border-[var(--color-border)] px-6 py-3" style={{left: '15.1rem'}}>
         <div className="flex items-center justify-end gap-4">
           <ClinicSelector showAllOption={true} />
           <NotificationBell />
