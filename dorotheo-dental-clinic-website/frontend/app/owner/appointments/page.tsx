@@ -270,8 +270,16 @@ export default function OwnerAppointments() {
 
   // Format dentist name with Dr. prefix
   const formatDentistName = (dentist: Staff) => {
-    const prefix = dentist.first_name.startsWith('Dr.') ? '' : 'Dr. '
-    return `${prefix}${dentist.first_name} ${dentist.last_name}`
+    const fullName = `${dentist.first_name || ''} ${dentist.last_name || ''}`.trim()
+    // Return empty string if no name available - these should be filtered out
+    if (!fullName) {
+      return ''
+    }
+    // Only add "Dr." if it's not already in the name
+    if (fullName.toLowerCase().startsWith('dr.') || fullName.toLowerCase().startsWith('dr ')) {
+      return fullName
+    }
+    return `Dr. ${fullName}`
   }
 
   // Format time from HH:MM:SS or HH:MM to 12-hour format (e.g., "1:00 PM")
@@ -367,7 +375,7 @@ export default function OwnerAppointments() {
     if (!token) return
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
         headers: {
           'Authorization': `Token ${token}`,
         },
@@ -408,7 +416,7 @@ export default function OwnerAppointments() {
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
         const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
         
-        const availability = await api.getDentistAvailability(Number(newAppointment.dentist), todayStr, endDateStr, token)
+        const availability = await api.getDentistAvailability(Number(newAppointment.dentist), todayStr, endDateStr, token, newAppointment.clinic || undefined)
         console.log('[OWNER] Dentist date-specific availability:', availability)
         
         // Create set of available dates directly from the calendar availability
@@ -428,7 +436,7 @@ export default function OwnerAppointments() {
     }
 
     fetchDentistAvailability()
-  }, [newAppointment.dentist, token])
+  }, [newAppointment.dentist, newAppointment.clinic, token])
 
   // Update date when calendar date is selected
   useEffect(() => {
@@ -589,7 +597,7 @@ export default function OwnerAppointments() {
     if (!token) return
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -637,7 +645,7 @@ export default function OwnerAppointments() {
       variant: "warning",
       onConfirm: async () => {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/blocked-time-slots/${blockId}/`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/${blockId}/`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Token ${token}`,
@@ -1957,11 +1965,17 @@ export default function OwnerAppointments() {
                       disabled={!newAppointment.clinic}
                     >
                       <option value="">{newAppointment.clinic ? "Select a dentist..." : "Select clinic first"}</option>
-                      {staff.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {formatDentistName(s)}
-                        </option>
-                      ))}
+                      {staff
+                        .filter((s) => {
+                          // Filter out dentists with empty names
+                          const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim()
+                          return fullName.length > 0
+                        })
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {formatDentistName(s)}
+                          </option>
+                        ))}
                     </select>
                     {!newAppointment.clinic && (
                       <p className="text-xs text-amber-600 mt-1">

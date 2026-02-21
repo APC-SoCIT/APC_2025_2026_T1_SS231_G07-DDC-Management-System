@@ -248,7 +248,7 @@ export default function StaffProfile() {
               // First, delete existing availability for the selected dates to avoid duplicates
               const allDates = data.dates!;
               if (allDates.length > 0) {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/bulk_delete/`, {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
@@ -261,7 +261,7 @@ export default function StaffProfile() {
                 });
               }
               const promises = data.dates!.map(date =>
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
@@ -313,7 +313,7 @@ export default function StaffProfile() {
 
               // First, delete existing availability for recurring dates to avoid duplicates
               if (dates.length > 0) {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/bulk_delete/`, {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
@@ -327,7 +327,7 @@ export default function StaffProfile() {
               }
 
               const promises = dates.map(date =>
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/dentist-availability/`, {
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,

@@ -1,0 +1,49 @@
+﻿python : C:\Users\User\OneDrive\Desktop\School Shitzxcz\Mikey Code\APC_2025_2026_T1_SS231_G07-DDC-Management-Syst
+em\dorotheo-dental-clinic-website\backend\api\chatbot_service.py:6: FutureWarning: 
+At line:1 char:1
++ python test_comprehensive.py 2>&1 | Out-File -FilePath test_results_c ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\User\O...FutureWarning: :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+====================================================================================================
+COMPREHENSIVE CHATBOT AI TEST - ALL QUESTION TYPES
+====================================================================================================
+
+====================================================================================================
+TEST 1/31: LAZY ENGLISH - Services
+====================================================================================================
+Traceback (most recent call last):
+  File "C:\Users\User\OneDrive\Desktop\School Shitzxcz\Mikey Code\APC_2025_2026_T1_SS231_G07-DDC-Management-Syste
+m\dorotheo-dental-clinic-website\backend\test_comprehensive.py", line 65, in <module>
+    print(f"\U0001f4f1 USER: '{question}'")
+  File "C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-
+packages\Python311\site-packages\colorama\ansitowin32.py", line 47, in write
+    self.__convertor.write(text)
+  File "C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-
+packages\Python311\site-packages\colorama\ansitowin32.py", line 177, in write
+    self.write_and_convert(text)
+  File "C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-
+packages\Python311\site-packages\colorama\ansitowin32.py", line 205, in write_and_convert
+    self.write_plain_text(text, cursor, len(text))
+  File "C:\Users\User\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-
+packages\Python311\site-packages\colorama\ansitowin32.py", line 210, in write_plain_text
+    self.wrapped.write(text[start:end])
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", 
+line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f4f1' in position 0: character maps to 
+<undefined>
+Sentry is attempting to send 2 pending events
+Waiting up to 2 seconds
+Press Ctrl-Break to quit

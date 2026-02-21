@@ -28,3 +28,22 @@ class ApiConfig(AppConfig):
             logger.error(f"Failed to register audit signals: {e}")
             # Don't raise - allow app to start even if signals fail
             # This prevents the entire application from crashing
+
+        # Run system validation (environment, DB, RAG index)
+        try:
+            from api.services.system_validation import validate_environment
+            result = validate_environment(raise_on_failure=False)
+            if not result.is_valid:
+                logger.warning(
+                    "SYSTEM VALIDATION: %d warnings detected at startup. "
+                    "Chatbot will use DB context fallback.",
+                    len(result.warnings),
+                )
+            else:
+                logger.info(
+                    "SYSTEM VALIDATION PASSED: env=%s, services=%d, dentists=%d, embeddings=%d",
+                    result.environment, result.service_count,
+                    result.dentist_count, result.embedding_count,
+                )
+        except Exception as e:
+            logger.error("System validation failed at startup: %s", e)

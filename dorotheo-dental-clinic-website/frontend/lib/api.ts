@@ -745,13 +745,12 @@ export const api = {
     return response.json()
   },
 
-  getDentistAvailability: async (dentistId: number, startDate: string, endDate: string, token: string) => {
-    const response = await fetch(
-      `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${startDate}&end_date=${endDate}`,
-      {
+  getDentistAvailability: async (dentistId: number, startDate: string, endDate: string, token: string, clinicId?: number | string) => {
+    let url = `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${startDate}&end_date=${endDate}`
+    if (clinicId) url += `&clinic_id=${clinicId}`
+    const response = await fetch(url, {
         headers: { Authorization: `Token ${token}` },
-      }
-    )
+      })
     if (!response.ok) return []
     return response.json()
   },
@@ -1080,7 +1079,7 @@ export const api = {
   },
 
   // Chatbot endpoint
-  chatbotQuery: async (message: string, conversationHistory: Array<{ role: string; content: string }>, token?: string) => {
+  chatbotQuery: async (message: string, conversationHistory: Array<{ role: string; content: string }>, token?: string, preferredLanguage?: 'en' | 'tl') => {
     const headers: HeadersInit = { 'Content-Type': 'application/json' }
     if (token) {
       headers['Authorization'] = `Token ${token}`
@@ -1089,7 +1088,11 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/chatbot/`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ message, conversation_history: conversationHistory }),
+      body: JSON.stringify({
+        message,
+        conversation_history: conversationHistory,
+        ...(preferredLanguage ? { preferred_language: preferredLanguage } : {}),
+      }),
     })
     if (!response.ok) throw new Error('Failed to query chatbot')
     return response.json()
