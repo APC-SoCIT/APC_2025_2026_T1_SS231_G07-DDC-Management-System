@@ -1015,7 +1015,7 @@ export default function PatientAppointments() {
       case "pending":
         return "bg-yellow-100 text-yellow-700"
       case "reschedule_requested":
-        return "bg-orange-100 text-orange-700"
+        return "bg-yellow-100 text-yellow-700"
       case "cancel_requested":
         return "bg-red-100 text-red-700"
       case "cancelled":
@@ -1028,7 +1028,7 @@ export default function PatientAppointments() {
   const formatStatus = (status: string) => {
     switch (status) {
       case "reschedule_requested":
-        return "Reschedule Requested"
+        return "Reschedule Request"
       case "cancel_requested":
         return "Cancellation Requested"
       case "waiting":
@@ -1412,9 +1412,9 @@ export default function PatientAppointments() {
                                       e.stopPropagation()
                                       handleRequestReschedule(apt)
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-white rounded-lg hover:bg-amber-500 transition-colors"
                                   >
-                                    <Edit className="w-4 h-4" />
+                                    <Clock className="w-4 h-4" />
                                     Request Reschedule
                                   </button>
                                   <button
@@ -1439,9 +1439,9 @@ export default function PatientAppointments() {
                                       e.stopPropagation()
                                       handleRequestReschedule(apt)
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-white rounded-lg hover:bg-amber-500 transition-colors"
                                   >
-                                    <Edit className="w-4 h-4" />
+                                    <Clock className="w-4 h-4" />
                                     Request Reschedule
                                   </button>
                                 </div>
