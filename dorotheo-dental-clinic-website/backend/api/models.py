@@ -38,6 +38,10 @@ class User(AbstractUser):
             models.Index(fields=['user_type', 'is_active_patient'], name='user_type_active_idx'),
             # Index for sorting by creation date
             models.Index(fields=['-created_at'], name='user_created_at_idx'),
+            # Composite index supporting patients list ORDER BY (user_type, date_joined, id)
+            models.Index(fields=['user_type', 'date_joined', 'id'], name='user_type_joined_id_idx'),
+            # Composite index supporting clinic-filtered patient queries
+            models.Index(fields=['user_type', 'assigned_clinic_id', 'date_joined'], name='user_type_clinic_joined_idx'),
         ]
 
     def __str__(self):

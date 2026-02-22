@@ -12,6 +12,10 @@ echo "Contents: $(ls -la)"
 echo "Checking database migrations..."
 python manage.py migrate --check || python manage.py migrate --noinput
 
+# Refresh is_active_patient for all patients (idempotent, single SQL pass)
+echo "Updating patient active statuses..."
+python manage.py update_patient_status || echo "update_patient_status failed (non-fatal)"
+
 # Create initial data if needed
 echo "Setting up initial data..."
 python manage.py create_clinics --skip-services || echo "Clinics already exist"

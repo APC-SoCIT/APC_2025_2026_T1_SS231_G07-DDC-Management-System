@@ -40,18 +40,13 @@ export default function StaffDashboard() {
       try {
         setIsLoading(true)
         
-        // Fetch patients - use count for total (includes archived), and fetch archived separately for active count
-        const [patientsResponse, archivedPatientsResponse] = await Promise.all([
-          api.getPatients(token, 1, 1),  // Just need the count
-          api.getArchivedPatients(token),
-        ])
-        const totalCount = (patientsResponse as any).count || 0
-        setTotalPatients(totalCount)
-        const archivedCount = Array.isArray(archivedPatientsResponse) ? archivedPatientsResponse.length : 0
-        setActivePatients(Math.max(0, totalCount - archivedCount))
+        // Fetch patient stats (counts only — no patient data loaded)
+        const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
+        const stats = await api.getPatientStats(token, clinicId)
+        setTotalPatients(stats.total_patients)
+        setActivePatients(stats.active_patients)
         
         // Fetch appointments - filter by clinic if not "all"
-        const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
         const appointments = await api.getAppointments(token, clinicId)
         console.log('[Staff Dashboard] Fetched appointments:', appointments)
         console.log('[Staff Dashboard] Sample appointment dates:', appointments.slice(0, 3).map((a: any) => a.date))

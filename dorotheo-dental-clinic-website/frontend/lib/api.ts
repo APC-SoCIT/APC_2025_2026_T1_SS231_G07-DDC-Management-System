@@ -537,6 +537,24 @@ export const api = {
     return response.json()
   },
 
+  getPatientStats: async (token: string, clinicId?: number) => {
+    const params = clinicId ? `?clinic=${clinicId}` : ''
+    const response = await fetch(`${API_BASE_URL}/users/patient_stats/${params}`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch patient stats')
+    return response.json()
+  },
+
+  searchPatients: async (token: string, query: string) => {
+    if (query.length < 2) return []
+    const response = await fetch(`${API_BASE_URL}/users/patient_search/?q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to search patients')
+    return response.json()
+  },
+
   // Inventory endpoints
   getInventory: async (token: string, clinicId?: number) => {
     const url = clinicId 
@@ -1255,7 +1273,13 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch archived patients')
-    return response.json()
+    const data = await response.json()
+    // Normalise: backend may return a paginated {count, results} object or a flat array.
+    // Always return a consistent shape so callers don't need to branch.
+    if (Array.isArray(data)) {
+      return { count: data.length, results: data }
+    }
+    return { count: data.count ?? 0, results: data.results ?? [] }
   },
 
   // Export Patient Records endpoint
@@ -1570,6 +1594,8 @@ export const {
   markAppointmentMissed,
   getPatients,
   getPatientById,
+  getPatientStats,
+  searchPatients,
   getInventory,
   createInventoryItem,
   updateInventoryItem,

@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth"
-import { getPayments, getPatients } from "@/lib/api"
+import { getPayments, searchPatients } from "@/lib/api"
 import { Payment, Patient } from "@/lib/types"
 import { Calendar, DollarSign, Search, Filter, X, Eye, Plus } from "lucide-react"
 import PaymentDetailsModal from "@/components/payment-details-modal"
@@ -24,6 +24,9 @@ export default function OwnerPaymentHistoryPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [patientSearchQuery, setPatientSearchQuery] = useState("")
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
+  const patientDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (token) {
@@ -31,27 +34,51 @@ export default function OwnerPaymentHistoryPage() {
     }
   }, [token, selectedClinic, selectedPatient, selectedMethod, startDate, endDate, includeVoided])
 
+  // Close patient dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (patientDropdownRef.current && !patientDropdownRef.current.contains(event.target as Node)) {
+        setShowPatientDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Debounced patient search
+  useEffect(() => {
+    if (patientSearchQuery.length < 2) {
+      setPatients([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      if (!token) return
+      try {
+        const results = await searchPatients(token, patientSearchQuery)
+        setPatients(results.map((p: any) => ({ ...p } as Patient)))
+      } catch (err) {
+        console.error("Error searching patients:", err)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [patientSearchQuery, token])
+
   const fetchData = async () => {
     if (!token) return
     
     setLoading(true)
     try {
       const clinicId = selectedClinic && selectedClinic !== "all" ? selectedClinic.id : undefined
-      const [paymentsData, patientsData] = await Promise.all([
-        getPayments(token, {
+      const paymentsData = await getPayments(token, {
           patient_id: selectedPatient || undefined,
           clinic_id: clinicId,
           payment_method: selectedMethod || undefined,
           start_date: startDate || undefined,
           end_date: endDate || undefined,
           include_voided: includeVoided,
-        }),
-        getPatients(token),
-      ])
+        })
       
       setPayments(paymentsData)
-      // getPatients returns paginated data, extract results array
-      setPatients(Array.isArray(patientsData) ? patientsData : (patientsData.results || []))
     } catch (error) {
       console.error("Failed to fetch data:", error)
     } finally {
@@ -70,6 +97,7 @@ export default function OwnerPaymentHistoryPage() {
 
   const clearFilters = () => {
     setSelectedPatient(null)
+    setPatientSearchQuery("")
     setSelectedMethod("")
     setStartDate("")
     setEndDate("")
@@ -211,20 +239,74 @@ export default function OwnerPaymentHistoryPage() {
         {showFilters && (
           <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
+              <div ref={patientDropdownRef}>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Patient</label>
-                <select
-                  value={selectedPatient || ""}
-                  onChange={(e) => setSelectedPatient(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                >
-                  <option value="">All Patients</option>
-                  {Array.isArray(patients) && patients.map((patient) => (
-                    <option key={patient.id} value={patient.id}>
-                      {patient.first_name} {patient.last_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search patients..."
+                    value={patientSearchQuery}
+                    onChange={(e) => {
+                      setPatientSearchQuery(e.target.value)
+                      setShowPatientDropdown(true)
+                    }}
+                    onFocus={() => setShowPatientDropdown(true)}
+                    role="combobox"
+                    aria-expanded={showPatientDropdown}
+                    aria-haspopup="listbox"
+                    aria-autocomplete="list"
+                    aria-controls="owner-patient-listbox"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                  {showPatientDropdown && (
+                    <div
+                      id="owner-patient-listbox"
+                      role="listbox"
+                      className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    >
+                      <div
+                        role="option"
+                        aria-selected={selectedPatient === null}
+                        onClick={() => {
+                          setSelectedPatient(null)
+                          setPatientSearchQuery("")
+                          setShowPatientDropdown(false)
+                        }}
+                        className="px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-200 font-medium text-blue-600 text-sm"
+                      >
+                        All Patients (Clear)
+                      </div>
+                      {patientSearchQuery.length < 2 && (
+                        <div className="px-3 py-2 text-gray-500 text-sm">Type at least 2 characters...</div>
+                      )}
+                      {patientSearchQuery.length >= 2 && patients.length > 0 && (
+                        <select
+                          className="w-full px-3 py-2 border-0 focus:outline-none focus:ring-0 text-sm"
+                          size={Math.min(6, patients.length)}
+                          value={selectedPatient ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            const selected = patients.find((p: any) => String(p.id) === value)
+                            if (selected) {
+                              setSelectedPatient(selected.id)
+                              setPatientSearchQuery(`${selected.first_name} ${selected.last_name}`)
+                            }
+                            setShowPatientDropdown(false)
+                          }}
+                        >
+                          {patients.map((patient: any) => (
+                            <option key={patient.id} value={patient.id}>
+                              {patient.first_name} {patient.last_name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {patients.length === 0 && patientSearchQuery.length >= 2 && (
+                        <div className="px-3 py-2 text-gray-500 text-sm">No patients found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
