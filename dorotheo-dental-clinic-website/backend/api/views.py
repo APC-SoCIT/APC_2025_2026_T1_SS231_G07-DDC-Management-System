@@ -9,7 +9,7 @@ from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db.models import Sum, Count, Q, F, Prefetch, Max
+from django.db.models import Sum, Count, Q, F, Prefetch, Max, Exists, OuterRef
 from django.utils import timezone
 from django.conf import settings
 from datetime import date, timedelta
@@ -637,6 +637,7 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
         """
         Optimized patient list endpoint with N+1 fix.
         Uses select_related and prefetch_related to minimize queries.
+        Pagination is applied BEFORE is_active_patient update to avoid full-table iteration.
         """
         try:
             # Get clinic filter from query params
@@ -649,7 +650,15 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
             if clinic_id and request.user.user_type == 'owner':
                 queryset = queryset.filter(assigned_clinic_id=clinic_id)
             
-            # Build optimized query with JOINs and prefetching
+            # Subquery: does this patient have a completed appointment within the last 2 years?
+            two_years_ago = timezone.now().date() - timedelta(days=730)
+            active_subquery = Appointment.objects.filter(
+                patient=OuterRef('pk'),
+                status='completed',
+                date__gte=two_years_ago
+            )
+            
+            # Build optimized query with JOINs, prefetching, and active status annotation
             patients = queryset.select_related(
                 'assigned_clinic'  # JOIN for clinic data (1 query)
             ).prefetch_related(
@@ -661,36 +670,28 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
                     to_attr='last_appointment_cache'
                 )
             ).annotate(
-                last_completed_appointment=Max('appointments__completed_at')
+                last_completed_appointment=Max('appointments__completed_at'),
+                has_recent_appointment=Exists(active_subquery)
             )
             
-            # Update patient status using prefetched data (no additional queries)
-            two_years_ago = timezone.now().date() - timedelta(days=730)
-            patients_to_update = []
-            
-            for patient in patients:
-                try:
-                    if hasattr(patient, 'last_appointment_cache') and patient.last_appointment_cache:
-                        last_apt = patient.last_appointment_cache[0]
-                        if hasattr(last_apt, 'date') and last_apt.date:
-                            new_status = last_apt.date >= two_years_ago
-                            if patient.is_active_patient != new_status:
-                                patient.is_active_patient = new_status
-                                patients_to_update.append(patient)
-                except Exception:
-                    # Skip patient if there's an error processing their appointment data
-                    continue
-            
-            # Bulk update (1 query for all updates)
-            if patients_to_update:
-                User.objects.bulk_update(patients_to_update, ['is_active_patient'])
-            
-            # Apply pagination
+            # Apply pagination FIRST — only loads the current page's rows into memory
             paginator = PageNumberPagination()
             paginator.page_size = int(request.query_params.get('page_size', 20))
             page = paginator.paginate_queryset(patients, request)
             
             if page is not None:
+                # Update is_active_patient only for patients on this page where status has changed
+                patients_to_update = []
+                for patient in page:
+                    new_status = patient.has_recent_appointment
+                    if patient.is_active_patient != new_status:
+                        patient.is_active_patient = new_status
+                        patients_to_update.append(patient)
+                
+                # Bulk update changed patients on this page (1 query)
+                if patients_to_update:
+                    User.objects.bulk_update(patients_to_update, ['is_active_patient'])
+                
                 serializer = self.get_serializer(page, many=True)
                 return paginator.get_paginated_response(serializer.data)
             
@@ -709,6 +710,46 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
         staff = User.objects.filter(user_type__in=['staff', 'owner'], is_archived=False)
         serializer = self.get_serializer(staff, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def patient_stats(self, request):
+        """Return aggregate patient counts without loading any patient data."""
+        base_queryset = User.objects.filter(user_type='patient', is_archived=False)
+
+        clinic_id = request.query_params.get('clinic')
+        if clinic_id and request.user.user_type == 'owner':
+            try:
+                base_queryset = base_queryset.filter(assigned_clinic_id=int(clinic_id))
+            except (ValueError, TypeError):
+                pass
+
+        total_patients = base_queryset.count()
+        active_patients = base_queryset.filter(is_active_patient=True).count()
+        inactive_patients = base_queryset.filter(is_active_patient=False).count()
+
+        return Response({
+            'total_patients': total_patients,
+            'active_patients': active_patients,
+            'inactive_patients': inactive_patients,
+        })
+
+    @action(detail=False, methods=['get'])
+    def patient_search(self, request):
+        """Lightweight patient search by name or email. Returns max 20 results."""
+        query = request.query_params.get('q', '').strip()
+        if len(query) < 2:
+            return Response([])
+
+        patients = User.objects.filter(
+            user_type='patient',
+            is_archived=False,
+        ).filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query)
+        ).values('id', 'first_name', 'last_name', 'email')[:20]
+
+        return Response(list(patients))
 
     @action(detail=True, methods=['post'])
     def archive(self, request, pk=None):
@@ -773,8 +814,19 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def archived_patients(self, request):
-        """Get all archived patients"""
-        archived = User.objects.filter(user_type='patient', is_archived=True)
+        """Get all archived patients with pagination"""
+        archived = User.objects.filter(
+            user_type='patient', is_archived=True
+        ).select_related('assigned_clinic').order_by('date_joined', 'id')
+
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.query_params.get('page_size', 20))
+        page = paginator.paginate_queryset(archived, request)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(archived, many=True)
         return Response(serializer.data)
 

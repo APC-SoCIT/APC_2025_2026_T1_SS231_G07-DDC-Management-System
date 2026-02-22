@@ -60,10 +60,7 @@ export default function OwnerPatientNotes() {
     if (!token) return
     
     try {
-      const response = await api.getPatients(token)
-      // Handle paginated response - extract results array
-      const patients = Array.isArray(response) ? response : (response.results || [])
-      const patient = patients.find((p: any) => p.id === patientId)
+      const patient = await api.getPatientById(patientId, token)
       if (patient) {
         setPatientName(`${patient.first_name} ${patient.last_name}`)
       }

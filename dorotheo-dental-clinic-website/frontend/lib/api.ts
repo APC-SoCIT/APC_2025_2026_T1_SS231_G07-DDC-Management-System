@@ -537,6 +537,24 @@ export const api = {
     return response.json()
   },
 
+  getPatientStats: async (token: string, clinicId?: number) => {
+    const params = clinicId ? `?clinic=${clinicId}` : ''
+    const response = await fetch(`${API_BASE_URL}/users/patient_stats/${params}`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch patient stats')
+    return response.json()
+  },
+
+  searchPatients: async (token: string, query: string) => {
+    if (query.length < 2) return []
+    const response = await fetch(`${API_BASE_URL}/users/patient_search/?q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to search patients')
+    return response.json()
+  },
+
   // Inventory endpoints
   getInventory: async (token: string, clinicId?: number) => {
     const url = clinicId 
@@ -1570,6 +1588,8 @@ export const {
   markAppointmentMissed,
   getPatients,
   getPatientById,
+  getPatientStats,
+  searchPatients,
   getInventory,
   createInventoryItem,
   updateInventoryItem,

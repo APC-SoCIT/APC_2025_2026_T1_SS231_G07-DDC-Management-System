@@ -5,7 +5,7 @@ import Link from "next/link"
 import { DollarSign, Search, CreditCard, FileText, AlertCircle, History } from "lucide-react"
 import { RecordPaymentModal } from "@/components/record-payment-modal"
 import { InvoiceWithPatient, Patient } from "@/lib/types"
-import { getInvoices, getPatients } from "@/lib/api"
+import { getInvoices, searchPatients } from "@/lib/api"
 
 export default function OwnerPaymentsPage() {
   const [token, setToken] = useState("")
@@ -50,15 +50,30 @@ export default function OwnerPaymentsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // Debounced patient search
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setPatients([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      if (!token) return
+      try {
+        const results = await searchPatients(token, searchQuery)
+        setPatients(results.map((p: any) => ({ ...p, first_name: p.first_name, last_name: p.last_name, email: p.email } as Patient)))
+      } catch (err) {
+        console.error("Error searching patients:", err)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, token])
+
   const fetchData = async (authToken: string) => {
     try {
       setLoading(true)
       setError("")
 
-      const [invoicesData, patientsData] = await Promise.all([
-        getInvoices(authToken),
-        getPatients(authToken)
-      ])
+      const invoicesData = await getInvoices(authToken)
 
       // Only show unpaid invoices (with balance > 0)
       const unpaidInvoices = invoicesData.filter((inv: InvoiceWithPatient) =>
@@ -66,7 +81,6 @@ export default function OwnerPaymentsPage() {
       )
 
       setInvoices(unpaidInvoices)
-      setPatients(Array.isArray(patientsData) ? patientsData : (patientsData.results || []))
     } catch (err: any) {
       console.error("Error fetching data:", err)
       setError(err.message || "Failed to load data")
@@ -242,17 +256,12 @@ export default function OwnerPaymentsPage() {
                 >
                   All Patients (Clear Selection)
                 </div>
-                {patients
-                  .filter((patient) => {
-                    if (!searchQuery) return true
-                    const query = searchQuery.toLowerCase()
-                    const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
-                    return (
-                      fullName.includes(query) ||
-                      patient.email.toLowerCase().includes(query)
-                    )
-                  })
-                  .map((patient) => (
+                {searchQuery.length < 2 && (
+                  <div className="px-4 py-2.5 text-gray-500 text-sm">
+                    Type at least 2 characters to search...
+                  </div>
+                )}
+                {patients.map((patient) => (
                     <div
                       key={patient.id}
                       onClick={() => {
@@ -268,17 +277,9 @@ export default function OwnerPaymentsPage() {
                       <div className="text-sm text-gray-500">{patient.email}</div>
                     </div>
                   ))}
-                {patients.filter((patient) => {
-                  if (!searchQuery) return false
-                  const query = searchQuery.toLowerCase()
-                  const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
-                  return (
-                    fullName.includes(query) ||
-                    patient.email.toLowerCase().includes(query)
-                  )
-                }).length === 0 && searchQuery && (
+                {patients.length === 0 && searchQuery.length >= 2 && (
                   <div className="px-4 py-2.5 text-gray-500 text-sm">
-                    No patients found matching "{searchQuery}"
+                    No patients found matching &quot;{searchQuery}&quot;
                   </div>
                 )}
               </div>
