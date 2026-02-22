@@ -9,7 +9,10 @@ import {
   ChevronUp, 
   Trash2,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  AlertTriangle,
+  CheckCircle,
+  X,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -68,6 +71,13 @@ export default function OwnerPatients() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [pageSize] = useState(20)
+
+  // Confirm modal state
+  type PatientActionType = 'archive' | 'restore' | 'delete' | null
+  const [confirmModal, setConfirmModal] = useState<{ type: PatientActionType; patient: Patient | null }>({ type: null, patient: null })
+  const [actionLoading, setActionLoading] = useState(false)
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   // Fetch real patients and appointments from API
   useEffect(() => {
@@ -197,160 +207,73 @@ export default function OwnerPatients() {
     fetchData()
   }, [token, activeTab, currentPage, pageSize])
 
+  const showToast = (text: string, type: 'success' | 'error') => {
+    setToastMessage({ text, type })
+    setTimeout(() => setToastMessage(null), 3500)
+  }
+
   // Handle archive patient
-  const handleArchive = async (patientId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!confirm("Are you sure you want to archive this patient? They will be moved to the Archived tab.")) return
-    
+  const handleArchive = async () => {
+    if (!confirmModal.patient || !token) return
+    setActionLoading(true)
+    setArchiveError(null)
     try {
-      await api.archivePatient(patientId, token!)
-      // Find the archived patient
-      const archivedPatient = patients.find(p => p.id === patientId)
+      await api.archivePatient(confirmModal.patient.id, token)
+      const archivedPatient = patients.find(p => p.id === confirmModal.patient!.id)
       if (archivedPatient) {
-        // Update status and add to archived list
-        const updatedPatient = { ...archivedPatient, status: "archived" as const }
-        setArchivedPatients([...archivedPatients, updatedPatient])
+        setArchivedPatients([...archivedPatients, { ...archivedPatient, status: "archived" as const }])
       }
-      // Remove from current patients
-      setPatients(patients.filter(p => p.id !== patientId))
-      alert("Patient archived successfully!")
-    } catch (error) {
-      console.error("Error archiving patient:", error)
-      alert("Failed to archive patient")
+      setPatients(patients.filter(p => p.id !== confirmModal.patient!.id))
+      setConfirmModal({ type: null, patient: null })
+      showToast("Patient archived successfully.", "success")
+    } catch (error: any) {
+      const msg = error?.response?.data?.error || error?.message || "Failed to archive patient"
+      setArchiveError(msg)
+    } finally {
+      setActionLoading(false)
     }
   }
 
   // Handle restore patient
-  const handleRestore = async (patientId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!confirm("Are you sure you want to restore this patient?")) return
-    
+  const handleRestore = async () => {
+    if (!confirmModal.patient || !token) return
+    setActionLoading(true)
     try {
-      await api.restorePatient(patientId, token!)
-      // Find the restored patient
-      const restoredPatient = archivedPatients.find(p => p.id === patientId)
+      await api.restorePatient(confirmModal.patient.id, token)
+      const restoredPatient = archivedPatients.find(p => p.id === confirmModal.patient!.id)
       if (restoredPatient) {
-        // Update status and add to patients list
-        const updatedPatient = { ...restoredPatient, status: "active" as const }
-        setPatients([...patients, updatedPatient])
+        setPatients([...patients, { ...restoredPatient, status: "active" as const }])
       }
-      // Remove from archived
-      setArchivedPatients(archivedPatients.filter(p => p.id !== patientId))
-      alert("Patient restored successfully!")
+      setArchivedPatients(archivedPatients.filter(p => p.id !== confirmModal.patient!.id))
+      setConfirmModal({ type: null, patient: null })
+      showToast("Patient restored successfully.", "success")
     } catch (error) {
       console.error("Error restoring patient:", error)
-      alert("Failed to restore patient")
+      showToast("Failed to restore patient.", "error")
+    } finally {
+      setActionLoading(false)
     }
   }
 
-  // Remove mock patients - only use real patient data from API
-  const displayPatients = activeTab === "archived" ? archivedPatients : activeTab === "all" ? [...patients, ...archivedPatients] : patients
-  
-  const handleSort = (column: 'name' | 'email' | 'phone' | 'lastVisit' | 'status') => {
-    if (sortColumn === column) {
-      // Toggle direction if clicking same column
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-    } else {
-      // Set new column and default to ascending
-      setSortColumn(column)
-      setSortDirection('asc')
-    }
-  }
-
-  const getSortedPatients = (patientsToSort: Patient[]) => {
-    if (!sortColumn) return patientsToSort
-
-    return [...patientsToSort].sort((a, b) => {
-      let aValue: string | number = ''
-      let bValue: string | number = ''
-
-      switch (sortColumn) {
-        case 'name':
-          aValue = a.name.toLowerCase()
-          bValue = b.name.toLowerCase()
-          break
-        case 'email':
-          aValue = a.email.toLowerCase()
-          bValue = b.email.toLowerCase()
-          break
-        case 'phone':
-          aValue = a.phone.toLowerCase()
-          bValue = b.phone.toLowerCase()
-          break
-        case 'lastVisit':
-          // Handle "N/A" and datetime strings - ISO format strings sort correctly
-          aValue = a.lastVisit === 'N/A' ? '0000-00-00' : a.lastVisit
-          bValue = b.lastVisit === 'N/A' ? '0000-00-00' : b.lastVisit
-          break
-        case 'status':
-          aValue = a.status.toLowerCase()
-          bValue = b.status.toLowerCase()
-          break
-      }
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
-      return 0
-    })
-  }
-
-  // Helper function to format datetime to date only for display
-  const formatLastVisit = (lastVisit: string): string => {
-    if (lastVisit === 'N/A') return 'N/A'
-    // Extract just the date part from ISO datetime string
-    return lastVisit.split('T')[0]
-  }
-
-  const filteredPatients = getSortedPatients(
-    displayPatients.filter((patient) => {
-      const matchesSearch =
-        patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        patient.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        patient.phone.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesTab =
-        activeTab === "all" ||
-        (activeTab === "archived" && patient.status === "archived") ||
-        (activeTab === "active" && patient.status === "active") ||
-        (activeTab === "inactive" && patient.status === "inactive") ||
-        (activeTab === "new" && patient.status !== "archived" && new Date(patient.lastVisit).getMonth() === new Date().getMonth())
-
-      return matchesSearch && matchesTab
-    })
-  )
-
-  const handleRowClick = (patientId: number) => {
-    router.push(`/owner/patients/${patientId}`)
-  }
-
-  const handleDelete = async (patientId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    if (!confirm("Are you sure you want to delete this patient? This action cannot be undone.")) {
-      return
-    }
-    
+  // Handle delete patient
+  const handleDelete = async () => {
+    if (!confirmModal.patient || !token) return
+    setActionLoading(true)
     try {
-      // Use the API's delete endpoint for patients (users with user_type='patient')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${patientId}/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${confirmModal.patient.id}/`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Token ${token}`,
-        },
+        headers: { 'Authorization': `Token ${token}` },
       })
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete patient')
-      }
-      
-      // Remove from both patients and archived patients lists
-      setPatients(patients.filter((p) => p.id !== patientId))
-      setArchivedPatients(archivedPatients.filter((p) => p.id !== patientId))
-      alert("Patient deleted successfully")
+      if (!response.ok) throw new Error('Failed to delete patient')
+      setPatients(patients.filter(p => p.id !== confirmModal.patient!.id))
+      setArchivedPatients(archivedPatients.filter(p => p.id !== confirmModal.patient!.id))
+      setConfirmModal({ type: null, patient: null })
+      showToast("Patient deleted successfully.", "success")
     } catch (error: any) {
       console.error("Error deleting patient:", error)
-      const errorMessage = error?.message || "Failed to delete patient"
-      alert(errorMessage)
+      showToast(error?.message || "Failed to delete patient.", "error")
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -445,17 +368,107 @@ export default function OwnerPatients() {
         address: "",
       })
       setShowAddModal(false)
-      alert("Patient added successfully! They can now log in with their email and password.")
+      showToast("Patient added successfully! They can now log in with their email and password.", "success")
     } catch (error: any) {
       console.error("Error adding patient:", error)
-      alert("Failed to add patient: " + (error.message || "Unknown error"))
+      showToast("Failed to add patient: " + (error.message || "Unknown error"), "error")
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // Remove mock patients - only use real patient data from API
+  const displayPatients = activeTab === "archived" ? archivedPatients : activeTab === "all" ? [...patients, ...archivedPatients] : patients
+
+  const handleSort = (column: 'name' | 'email' | 'phone' | 'lastVisit' | 'status') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const getSortedPatients = (patientsToSort: Patient[]) => {
+    if (!sortColumn) return patientsToSort
+
+    return [...patientsToSort].sort((a, b) => {
+      let aValue: string | number = ''
+      let bValue: string | number = ''
+
+      switch (sortColumn) {
+        case 'name':
+          aValue = a.name.toLowerCase()
+          bValue = b.name.toLowerCase()
+          break
+        case 'email':
+          aValue = a.email.toLowerCase()
+          bValue = b.email.toLowerCase()
+          break
+        case 'phone':
+          aValue = a.phone.toLowerCase()
+          bValue = b.phone.toLowerCase()
+          break
+        case 'lastVisit':
+          // Handle "N/A" and datetime strings - ISO format strings sort correctly
+          aValue = a.lastVisit === 'N/A' ? '0000-00-00' : a.lastVisit
+          bValue = b.lastVisit === 'N/A' ? '0000-00-00' : b.lastVisit
+          break
+        case 'status':
+          aValue = a.status.toLowerCase()
+          bValue = b.status.toLowerCase()
+          break
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  // Helper function to format datetime to date only for display
+  const formatLastVisit = (lastVisit: string): string => {
+    if (lastVisit === 'N/A') return 'N/A'
+    // Extract just the date part from ISO datetime string
+    return lastVisit.split('T')[0]
+  }
+
+  const filteredPatients = getSortedPatients(
+    displayPatients.filter((patient) => {
+      const matchesSearch =
+        patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.phone.toLowerCase().includes(searchQuery.toLowerCase())
+
+      const matchesTab =
+        activeTab === "all" ||
+        (activeTab === "archived" && patient.status === "archived") ||
+        (activeTab === "active" && patient.status === "active") ||
+        (activeTab === "inactive" && patient.status === "inactive") ||
+        (activeTab === "new" && patient.status !== "archived" && new Date(patient.lastVisit).getMonth() === new Date().getMonth())
+
+      return matchesSearch && matchesTab
+    })
+  )
+
+  const handleRowClick = (patientId: number) => {
+    router.push(`/owner/patients/${patientId}`)
+  }
+
   return (
     <div className="space-y-6 pb-20 lg:pb-6">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className={`fixed top-6 right-6 z-[100] flex items-center gap-3 px-5 py-4 rounded-xl shadow-xl text-white text-sm font-medium transition-all duration-300 ${
+          toastMessage.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toastMessage.type === 'success' ? <CheckCircle className="w-5 h-5 flex-shrink-0" /> : <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
+          {toastMessage.text}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Patients</h1>
@@ -599,14 +612,14 @@ export default function OwnerPatients() {
                       {activeTab !== "archived" ? (
                         <>
                           <button
-                            onClick={(e) => handleArchive(patient.id, e)}
+                            onClick={(e) => { e.stopPropagation(); setArchiveError(null); setConfirmModal({ type: 'archive', patient }) }}
                             className="p-1.5 lg:p-2 hover:bg-orange-50 rounded-lg transition-colors"
                             title="Archive Patient"
                           >
                             <Archive className="w-3 h-3 lg:w-4 lg:h-4 text-orange-600" />
                           </button>
                           <button
-                            onClick={(e) => handleDelete(patient.id, e)}
+                            onClick={(e) => { e.stopPropagation(); setConfirmModal({ type: 'delete', patient }) }}
                             className="p-1.5 lg:p-2 hover:bg-red-50 rounded-lg transition-colors"
                             title="Delete"
                           >
@@ -615,7 +628,7 @@ export default function OwnerPatients() {
                         </>
                       ) : (
                         <button
-                          onClick={(e) => handleRestore(patient.id, e)}
+                          onClick={(e) => { e.stopPropagation(); setConfirmModal({ type: 'restore', patient }) }}
                           className="p-1.5 lg:p-2 hover:bg-green-50 rounded-lg transition-colors"
                           title="Restore Patient"
                         >
@@ -824,6 +837,114 @@ export default function OwnerPatients() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Modal (Archive / Restore / Delete) */}
+      {confirmModal.type && confirmModal.patient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            {/* Header */}
+            <div className={`px-6 py-5 flex items-center gap-4 ${
+              confirmModal.type === 'delete' ? 'bg-red-50 border-b border-red-100' :
+              confirmModal.type === 'archive' ? 'bg-orange-50 border-b border-orange-100' :
+              'bg-green-50 border-b border-green-100'
+            }`}>
+              <div className={`p-3 rounded-full ${
+                confirmModal.type === 'delete' ? 'bg-red-100' :
+                confirmModal.type === 'archive' ? 'bg-orange-100' :
+                'bg-green-100'
+              }`}>
+                {confirmModal.type === 'delete' ? (
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                ) : confirmModal.type === 'archive' ? (
+                  <Archive className="w-6 h-6 text-orange-600" />
+                ) : (
+                  <ArchiveRestore className="w-6 h-6 text-green-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className={`text-lg font-semibold ${
+                  confirmModal.type === 'delete' ? 'text-red-800' :
+                  confirmModal.type === 'archive' ? 'text-orange-800' :
+                  'text-green-800'
+                }`}>
+                  {confirmModal.type === 'delete' ? 'Delete Patient' :
+                   confirmModal.type === 'archive' ? 'Archive Patient' :
+                   'Restore Patient'}
+                </h3>
+              </div>
+              <button
+                onClick={() => { setConfirmModal({ type: null, patient: null }); setArchiveError(null) }}
+                className="p-1.5 rounded-lg hover:bg-white/60 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-[var(--color-text)] mb-1">
+                {confirmModal.type === 'delete' ? (
+                  <>Are you sure you want to <span className="font-semibold text-red-600">permanently delete</span> the record for:</>
+                ) : confirmModal.type === 'archive' ? (
+                  <>Are you sure you want to <span className="font-semibold text-orange-600">archive</span> the record for:</>
+                ) : (
+                  <>Are you sure you want to <span className="font-semibold text-green-600">restore</span> the record for:</>
+                )}
+              </p>
+              <p className="text-lg font-bold text-[var(--color-primary)] mb-4">
+                {confirmModal.patient.name}
+              </p>
+              <p className="text-sm text-[var(--color-text-muted)] bg-gray-50 rounded-lg p-3 border border-gray-200">
+                {confirmModal.type === 'delete'
+                  ? 'This action is permanent and cannot be undone. The patient record and all associated data will be removed.'
+                  : confirmModal.type === 'archive'
+                  ? 'The patient will be moved to the Archived tab and hidden from normal views. If they log in again, their account will be automatically reactivated.'
+                  : 'The patient will be restored to the active list and will show up normally again.'}
+              </p>
+              {/* Balance error */}
+              {archiveError && confirmModal.type === 'archive' && (
+                <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  {archiveError}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => { setConfirmModal({ type: null, patient: null }); setArchiveError(null) }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2.5 border border-[var(--color-border)] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={
+                  confirmModal.type === 'delete' ? handleDelete :
+                  confirmModal.type === 'archive' ? handleArchive :
+                  handleRestore
+                }
+                disabled={actionLoading}
+                className={`flex-1 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2 ${
+                  confirmModal.type === 'delete' ? 'bg-red-600 hover:bg-red-700' :
+                  confirmModal.type === 'archive' ? 'bg-orange-500 hover:bg-orange-600' :
+                  'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {actionLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : null}
+                {actionLoading ? 'Processing...' : (
+                  confirmModal.type === 'delete' ? 'Yes, Delete' :
+                  confirmModal.type === 'archive' ? 'Yes, Archive' :
+                  'Yes, Restore'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

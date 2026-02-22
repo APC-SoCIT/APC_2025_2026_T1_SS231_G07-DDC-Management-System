@@ -513,6 +513,37 @@ export const api = {
     if (!response.ok) throw new Error("Failed to delete staff")
   },
 
+  archiveStaff: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/archive/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const err: any = new Error(data.error || 'Failed to archive staff')
+      err.response = { data }
+      throw err
+    }
+    return response.json()
+  },
+
+  unarchiveStaff: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/restore/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to unarchive staff')
+    return response.json()
+  },
+
+  getArchivedStaff: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/archived_staff/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch archived staff')
+    return response.json()
+  },
+
   updateStaff: async (id: number, data: any, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
       method: "PATCH",
@@ -1058,7 +1089,12 @@ export const api = {
       method: 'POST',
       headers: { Authorization: `Token ${token}` },
     })
-    if (!response.ok) throw new Error('Failed to archive patient')
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const err: any = new Error(data.error || 'Failed to archive patient')
+      err.response = { data }
+      throw err
+    }
     return response.json()
   },
 
@@ -1316,6 +1352,9 @@ export const {
   getStaff,
   createStaff,
   deleteStaff,
+  archiveStaff,
+  unarchiveStaff,
+  getArchivedStaff,
   updateStaff,
   getAnalytics,
   uploadTeethImage,
