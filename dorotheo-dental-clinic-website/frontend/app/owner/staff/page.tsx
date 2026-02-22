@@ -27,6 +27,8 @@ export default function OwnerStaff() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [addStaffError, setAddStaffError] = useState("")
+  const [editStaffError, setEditStaffError] = useState("")
+  const [editStaffSuccess, setEditStaffSuccess] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successCredentials, setSuccessCredentials] = useState({ username: "", password: "" })
   const [newStaff, setNewStaff] = useState({
@@ -113,14 +115,33 @@ export default function OwnerStaff() {
         role: "",
       })
     } catch (error: any) {
-      // Check if it's a birthday validation error
-      const errorMessage = error.response?.data?.birthday?.[0] || error.response?.data?.birthday
-      if (errorMessage && typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('18')) {
-        setAddStaffError("Staff must be 18 years old and above.")
-      } else if (error.response?.data?.birthday) {
-        setAddStaffError("Staff must be 18 years old and above.")
+      const data = error.response?.data
+      if (data) {
+        if (data.birthday) {
+          const msg = Array.isArray(data.birthday) ? data.birthday[0] : data.birthday
+          setAddStaffError(typeof msg === 'string' ? msg : "Staff must be 18 years old and above.")
+        } else if (data.username) {
+          const msg = Array.isArray(data.username) ? data.username[0] : data.username
+          setAddStaffError(`Username: ${typeof msg === 'string' ? msg : 'already taken or invalid'}`)
+        } else if (data.email) {
+          const msg = Array.isArray(data.email) ? data.email[0] : data.email
+          setAddStaffError(`Email: ${typeof msg === 'string' ? msg : 'invalid'}`)
+        } else if (data.password) {
+          const msg = Array.isArray(data.password) ? data.password[0] : data.password
+          setAddStaffError(`Password: ${typeof msg === 'string' ? msg : 'invalid'}`)
+        } else if (data.non_field_errors) {
+          const msg = Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : data.non_field_errors
+          setAddStaffError(typeof msg === 'string' ? msg : "Failed to add staff member.")
+        } else {
+          const messages: string[] = []
+          for (const [, errors] of Object.entries(data)) {
+            if (Array.isArray(errors)) messages.push(...(errors as string[]).map(String))
+            else if (typeof errors === 'string') messages.push(errors)
+          }
+          setAddStaffError(messages.join(' ') || "Failed to add staff member. Please try again.")
+        }
       } else {
-        setAddStaffError("Staff must be 18 years old and above.")
+        setAddStaffError("Failed to add staff member. Please try again.")
       }
     }
   }
@@ -142,6 +163,8 @@ export default function OwnerStaff() {
 
   const handleEditClick = (member: StaffMember) => {
     setEditingStaff(member)
+    setEditStaffError("")
+    setEditStaffSuccess(false)
     setShowEditModal(true)
   }
 
@@ -149,6 +172,17 @@ export default function OwnerStaff() {
     e.preventDefault()
     
     if (!token || !editingStaff) return
+
+    // Validate birthday: staff must be 18+
+    if (editingStaff.birthday) {
+      const today = new Date()
+      const bday = new Date(editingStaff.birthday)
+      const eighteenth = new Date(bday.getFullYear() + 18, bday.getMonth(), bday.getDate())
+      if (today < eighteenth) {
+        setEditStaffError("Staff member must be at least 18 years old")
+        return
+      }
+    }
 
     try {
       const updateData = {
@@ -163,12 +197,26 @@ export default function OwnerStaff() {
 
       await api.updateStaff(editingStaff.id, updateData, token)
       await fetchStaff()
-      setShowEditModal(false)
-      setEditingStaff(null)
-      alert("Staff member updated successfully!")
-    } catch (error) {
+      setEditStaffError("")
+      setEditStaffSuccess(true)
+      setTimeout(() => {
+        setShowEditModal(false)
+        setEditingStaff(null)
+        setEditStaffSuccess(false)
+      }, 1500)
+    } catch (error: any) {
       console.error("Error updating staff:", error)
-      alert("Failed to update staff member.")
+      const data = error.response?.data
+      if (data) {
+        const messages: string[] = []
+        for (const [, errors] of Object.entries(data)) {
+          if (Array.isArray(errors)) messages.push(...(errors as string[]).map(String))
+          else if (typeof errors === 'string') messages.push(errors)
+        }
+        setEditStaffError(messages.join(' ') || "Failed to update staff member. Please try again.")
+      } else {
+        setEditStaffError("Failed to update staff member. Please try again.")
+      }
     }
   }
 
@@ -429,7 +477,7 @@ export default function OwnerStaff() {
                   }}
                   className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
-                {addStaffError && (
+                {addStaffError && (addStaffError.toLowerCase().includes('18') || addStaffError.toLowerCase().includes('birth') || addStaffError.toLowerCase().includes('age') || addStaffError.toLowerCase().includes('old')) && (
                   <p className="text-red-500 text-sm mt-1 font-medium">{addStaffError}</p>
                 )}
               </div>
@@ -476,6 +524,10 @@ export default function OwnerStaff() {
                 </select>
               </div>
 
+              {addStaffError && !addStaffError.includes('match') && !(addStaffError.toLowerCase().includes('18') || addStaffError.toLowerCase().includes('birth') || addStaffError.toLowerCase().includes('age') || addStaffError.toLowerCase().includes('old')) && (
+                <p className="text-red-500 text-sm font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-3">{addStaffError}</p>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -506,6 +558,8 @@ export default function OwnerStaff() {
                 onClick={() => {
                   setShowEditModal(false)
                   setEditingStaff(null)
+                  setEditStaffError("")
+                  setEditStaffSuccess(false)
                 }}
                 className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
               >
@@ -514,6 +568,17 @@ export default function OwnerStaff() {
             </div>
 
             <form onSubmit={handleUpdateStaff} className="p-6 space-y-4">
+              {editStaffSuccess && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                  Staff member updated successfully!
+                </div>
+              )}
+              {editStaffError && (
+                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {editStaffError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
@@ -615,6 +680,8 @@ export default function OwnerStaff() {
                   onClick={() => {
                     setShowEditModal(false)
                     setEditingStaff(null)
+                    setEditStaffError("")
+                    setEditStaffSuccess(false)
                   }}
                   className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
                 >

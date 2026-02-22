@@ -496,7 +496,12 @@ export const api = {
       },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to create staff")
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const err: any = new Error("Failed to create staff")
+      err.response = { data: errorData }
+      throw err
+    }
     return response.json()
   },
 
@@ -517,7 +522,12 @@ export const api = {
       },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to update staff")
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const err: any = new Error("Failed to update staff")
+      err.response = { data: errorData }
+      throw err
+    }
     return response.json()
   },
 
