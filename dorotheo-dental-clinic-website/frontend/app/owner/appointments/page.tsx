@@ -51,7 +51,7 @@ interface Appointment {
   date: string
   time: string
   status: "confirmed" | "pending" | "cancelled" | "completed" | "missed" | "reschedule_requested" | "cancel_requested" | "waiting"
-  patient_status?: 'waiting' | 'ongoing' | 'done'
+  patient_status?: 'pending' | 'waiting' | 'ongoing' | 'done'
   notes: string
   created_at: string
   updated_at: string
@@ -333,14 +333,23 @@ export default function OwnerAppointments() {
       // Handle paginated response
       const allResponse = Array.isArray(allResponseRaw) ? allResponseRaw : (allResponseRaw.results || [])
       console.log("Processed appointments:", allResponse.length, "appointments")
-      setAllAppointments(allResponse)
+      
+      // Auto-set today's confirmed appointments to pending status
+      const today = new Date().toISOString().split('T')[0]
+      const processedAppointments = allResponse.map((apt: Appointment) => {
+        if (apt.date === today && apt.status === 'confirmed') {
+          return { ...apt, status: 'pending' as const }
+        }
+        return apt
+      })
+      setAllAppointments(processedAppointments)
       
       // Filter appointments locally based on selected clinic
       if (selectedClinic === "all") {
-        setAppointments(allResponse)
+        setAppointments(processedAppointments)
       } else {
         const clinicId = selectedClinic?.id
-        const filtered = allResponse.filter((apt: Appointment) => 
+        const filtered = processedAppointments.filter((apt: Appointment) => 
           apt.clinic === clinicId || apt.clinic_data?.id === clinicId
         )
         console.log("Filtered appointments for clinic:", filtered.length)
@@ -1344,36 +1353,8 @@ export default function OwnerAppointments() {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                        {/* Mark as Waiting Button - Only for appointments that aren't already waiting, pending, or done */}
-                        {apt.status !== "waiting" && apt.status !== "pending" && apt.status !== "completed" && apt.status !== "missed" && apt.status !== "cancelled" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleStatusChange(apt.id, "waiting")
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-medium text-xs"
-                            title="Mark as Waiting"
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>Wait</span>
-                          </button>
-                        )}
-                        {/* Mark as Ongoing Button - Only for appointments in waiting status */}
-                        {apt.status === "waiting" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleStatusChange(apt.id, "confirmed")
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded transition-colors font-medium text-xs"
-                            title="Mark as Ongoing"
-                          >
-                            <Hourglass className="w-3 h-3" />
-                            <span>Ongoing</span>
-                          </button>
-                        )}
-                        {/* Complete Button - Only for confirmed appointments */}
-                        {apt.status === "confirmed" && (
+                        {/* Complete Button - Only for confirmed/pending appointments */}
+                        {(apt.status === "confirmed" || apt.status === "pending") && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1388,8 +1369,8 @@ export default function OwnerAppointments() {
                             <span>Done</span>
                           </button>
                         )}
-                        {/* Mark as Missed Button - Only for confirmed appointments */}
-                        {apt.status === "confirmed" && (
+                        {/* Mark as Missed Button - Only for confirmed/pending appointments */}
+                        {(apt.status === "confirmed" || apt.status === "pending") && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()

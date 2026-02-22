@@ -114,8 +114,10 @@ class UserSerializer(serializers.ModelSerializer):
     
     def validate_birthday(self, value):
         """Validate birthday based on user type: patients must be 6 months+, staff must be 18+"""
+        # Fall back to instance user_type when not supplied (e.g. PATCH requests)
+        user_type = self.initial_data.get('user_type') or (self.instance.user_type if self.instance else None)
+
         if not value:
-            user_type = self.initial_data.get('user_type')
             if user_type == 'staff':
                 raise serializers.ValidationError("Birthdate is required")
             return value
@@ -128,7 +130,6 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Birthday cannot be in the future")
         
         # Apply age restrictions based on user type
-        user_type = self.initial_data.get('user_type')
         
         if user_type == 'patient':
             # Check if younger than 6 months (approximately 183 days)

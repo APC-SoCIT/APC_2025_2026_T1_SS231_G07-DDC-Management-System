@@ -158,11 +158,30 @@ export const api = {
 
   updateService: async (id: number, data: FormData, token: string) => {
     const response = await fetch(`${API_BASE_URL}/services/${id}/`, {
-      method: "PUT",
+      method: "PATCH",
       headers: { Authorization: `Token ${token}` },
       body: data,
     })
-    if (!response.ok) throw new Error("Failed to update service")
+    if (!response.ok) {
+      let errorMessage = "Failed to update service"
+      try {
+        const errorData = await response.json()
+        if (errorData.detail) errorMessage = errorData.detail
+        else if (errorData.error) errorMessage = errorData.error
+        else if (errorData.message) errorMessage = errorData.message
+        else if (typeof errorData === 'object' && Object.keys(errorData).length > 0) {
+          const errors = Object.entries(errorData).map(([field, msgs]) => {
+            const messages = Array.isArray(msgs) ? msgs.join(", ") : msgs
+            return `${field}: ${messages}`
+          }).join("; ")
+          if (errors) errorMessage = errors
+        }
+      } catch (_) {}
+      if (response.status === 401) {
+        throw new Error("Your session has expired. Please log out and log in again.")
+      }
+      throw new Error(errorMessage)
+    }
     return response.json()
   },
 
@@ -172,13 +191,12 @@ export const api = {
       headers: { Authorization: `Token ${token}` },
     })
     if (!response.ok) {
-      // Try to parse error message from response
+      let errorMessage = "Failed to delete service"
       try {
         const errorData = await response.json()
-        throw new Error(errorData.message || errorData.error || "Failed to delete service")
-      } catch (parseError) {
-        throw new Error("Failed to delete service")
-      }
+        errorMessage = errorData.message || errorData.error || errorData.detail || "Failed to delete service"
+      } catch (_) {}
+      throw new Error(errorMessage)
     }
   },
 
@@ -478,7 +496,12 @@ export const api = {
       },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to create staff")
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const err: any = new Error("Failed to create staff")
+      err.response = { data: errorData }
+      throw err
+    }
     return response.json()
   },
 
@@ -490,6 +513,37 @@ export const api = {
     if (!response.ok) throw new Error("Failed to delete staff")
   },
 
+  archiveStaff: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/archive/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const err: any = new Error(data.error || 'Failed to archive staff')
+      err.response = { data }
+      throw err
+    }
+    return response.json()
+  },
+
+  unarchiveStaff: async (id: number, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/restore/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to unarchive staff')
+    return response.json()
+  },
+
+  getArchivedStaff: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/users/archived_staff/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+    if (!response.ok) throw new Error('Failed to fetch archived staff')
+    return response.json()
+  },
+
   updateStaff: async (id: number, data: any, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
       method: "PATCH",
@@ -499,7 +553,12 @@ export const api = {
       },
       body: JSON.stringify(data),
     })
-    if (!response.ok) throw new Error("Failed to update staff")
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const err: any = new Error("Failed to update staff")
+      err.response = { data: errorData }
+      throw err
+    }
     return response.json()
   },
 
@@ -1048,7 +1107,12 @@ export const api = {
       method: 'POST',
       headers: { Authorization: `Token ${token}` },
     })
-    if (!response.ok) throw new Error('Failed to archive patient')
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      const err: any = new Error(data.error || 'Failed to archive patient')
+      err.response = { data }
+      throw err
+    }
     return response.json()
   },
 
@@ -1314,6 +1378,9 @@ export const {
   getStaff,
   createStaff,
   deleteStaff,
+  archiveStaff,
+  unarchiveStaff,
+  getArchivedStaff,
   updateStaff,
   getAnalytics,
   uploadTeethImage,

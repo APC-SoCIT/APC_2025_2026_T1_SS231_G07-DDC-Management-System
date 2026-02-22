@@ -313,6 +313,17 @@ def login(request):
             logger.info("[Django] No user found with email: %s", username)
     
     if user:
+        # Block archived staff from logging in
+        if user.user_type == 'staff' and user.is_archived:
+            logger.warning("[Django] Archived staff login attempt blocked for: %s", username)
+            return Response({'error': 'Your account has been archived. Please contact the owner to regain access.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Auto-unarchive patients when they log in
+        if user.user_type == 'patient' and user.is_archived:
+            user.is_archived = False
+            user.save(update_fields=['is_archived'])
+            logger.info("[Django] Patient auto-unarchived on login: %s", username)
+
         token, _ = Token.objects.get_or_create(user=user)
         serializer = UserSerializer(user)
         logger.info("[Django] Login successful for: %s", username)
@@ -695,29 +706,66 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def staff(self, request):
-        staff = User.objects.filter(user_type__in=['staff', 'owner'])
+        staff = User.objects.filter(user_type__in=['staff', 'owner'], is_archived=False)
         serializer = self.get_serializer(staff, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def archive(self, request, pk=None):
-        """Archive a patient record"""
+        """Archive a patient or staff record"""
         user = self.get_object()
-        if user.user_type != 'patient':
-            return Response({'error': 'Only patients can be archived'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user.is_archived = True
-        user.save()
+        requester = request.user
+
+        if user.user_type == 'patient':
+            # Check for outstanding balance before archiving
+            outstanding = Invoice.objects.filter(
+                patient=user
+            ).exclude(status='paid').exclude(status='cancelled')
+            total_balance = sum(inv.balance for inv in outstanding if inv.balance and inv.balance > 0)
+            if total_balance > 0:
+                return Response(
+                    {'error': f'Cannot archive patient. They have an outstanding balance of ₱{total_balance:,.2f}. Please clear the balance first.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user.is_archived = True
+            user.save()
+        elif user.user_type == 'staff':
+            if requester.user_type != 'owner':
+                return Response({'error': 'Only the owner can archive staff accounts'}, status=status.HTTP_403_FORBIDDEN)
+            # Block archiving dentists who have upcoming/active appointments
+            if user.role == 'dentist':
+                from django.utils import timezone as tz
+                today = tz.now().date()
+                upcoming_appointments = Appointment.objects.filter(
+                    dentist=user,
+                    date__gte=today
+                ).exclude(status__in=['cancelled', 'completed']).count()
+                if upcoming_appointments > 0:
+                    return Response(
+                        {'error': f'Cannot archive this dentist. They have {upcoming_appointments} upcoming appointment(s). Please reassign or cancel their appointments first.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            user.is_archived = True
+            user.save()
+        else:
+            return Response({'error': 'This account type cannot be archived'}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(user)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def restore(self, request, pk=None):
-        """Restore an archived patient record"""
+        """Restore an archived patient or staff record"""
         user = self.get_object()
-        if user.user_type != 'patient':
-            return Response({'error': 'Only patients can be restored'}, status=status.HTTP_400_BAD_REQUEST)
-        
+        requester = request.user
+
+        if user.user_type == 'staff':
+            if requester.user_type != 'owner':
+                return Response({'error': 'Only the owner can unarchive staff accounts'}, status=status.HTTP_403_FORBIDDEN)
+
+        if user.user_type not in ('patient', 'staff'):
+            return Response({'error': 'This account type cannot be unarchived'}, status=status.HTTP_400_BAD_REQUEST)
+
         user.is_archived = False
         user.save()
         serializer = self.get_serializer(user)
@@ -727,6 +775,15 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
     def archived_patients(self, request):
         """Get all archived patients"""
         archived = User.objects.filter(user_type='patient', is_archived=True)
+        serializer = self.get_serializer(archived, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def archived_staff(self, request):
+        """Get all archived staff members (owner only)"""
+        if request.user.user_type != 'owner':
+            return Response({'error': 'Only the owner can view archived staff'}, status=status.HTTP_403_FORBIDDEN)
+        archived = User.objects.filter(user_type='staff', is_archived=True)
         serializer = self.get_serializer(archived, many=True)
         return Response(serializer.data)
 
