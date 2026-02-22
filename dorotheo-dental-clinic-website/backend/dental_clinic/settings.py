@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'api',
 ]
@@ -161,7 +163,8 @@ AUTH_USER_MODEL = 'api.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # Primary — checks Bearer tokens first
+        'rest_framework.authentication.TokenAuthentication',          # Legacy — backward compat during migration
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -175,6 +178,49 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,  # Return 20 items per page by default
 }
+
+# ============================================
+# SIMPLE_JWT CONFIGURATION
+# ============================================
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    # Token lifetimes
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+
+    # Rotation & blacklisting — each refresh rotates the token and blacklists the old one
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+
+    # Algorithm
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+
+    # Header config — frontend sends: Authorization: Bearer <jwt>
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+
+    # Claims
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+
+    # Token classes
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
+# ============================================
+# HTTPONLY REFRESH COOKIE SETTINGS
+# ============================================
+REFRESH_COOKIE_NAME = 'refresh_token'
+REFRESH_COOKIE_PATH = '/api/auth/'           # Scoped only to auth endpoints (CSRF mitigation)
+REFRESH_COOKIE_HTTPONLY = True               # Not accessible to JavaScript (XSS mitigation)
+REFRESH_COOKIE_SAMESITE = 'None'            # Required for cross-origin: Vercel → Azure
+REFRESH_COOKIE_SECURE = not DEBUG           # True in production (HTTPS only), False in dev
+REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days — matches REFRESH_TOKEN_LIFETIME
+REFRESH_COOKIE_DOMAIN = os.environ.get('REFRESH_COOKIE_DOMAIN', None)  # None = auto-detect
 
 # CORS Configuration - Use specific allowed origins when credentials are needed
 # Cannot use CORS_ALLOW_ALL_ORIGINS with CORS_ALLOW_CREDENTIALS due to browser security

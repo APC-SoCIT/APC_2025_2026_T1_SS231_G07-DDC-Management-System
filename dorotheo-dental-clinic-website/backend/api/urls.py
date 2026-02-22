@@ -10,6 +10,9 @@ from .views import (
     register, login, logout, current_user, analytics, 
     request_password_reset, reset_password, chatbot_query
 )
+from .auth_views import (
+    jwt_login, jwt_register, jwt_token_refresh, jwt_logout, jwt_verify
+)
 
 router = DefaultRouter()
 router.register('users', UserViewSet)
@@ -36,6 +39,7 @@ router.register('payments', PaymentViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Legacy auth endpoints — kept for backward compatibility during migration
     path('register/', register, name='register'),
     path('login/', login, name='login'),
     path('logout/', logout, name='logout'),
@@ -45,4 +49,10 @@ urlpatterns = [
     path('password-reset/request/', request_password_reset, name='request_password_reset'),
     path('password-reset/confirm/', reset_password, name='reset_password'),
     path('chatbot/', chatbot_query, name='chatbot_query'),
+    # JWT auth endpoints (HttpOnly cookie-based token lifecycle)
+    path('auth/login/', jwt_login, name='jwt_login'),
+    path('auth/register/', jwt_register, name='jwt_register'),
+    path('auth/token/refresh/', jwt_token_refresh, name='jwt_token_refresh'),
+    path('auth/logout/', jwt_logout, name='jwt_logout'),
+    path('auth/verify/', jwt_verify, name='jwt_verify'),
 ]

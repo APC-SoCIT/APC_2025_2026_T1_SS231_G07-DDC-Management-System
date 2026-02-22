@@ -3,6 +3,115 @@ const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 const trimmedBase = rawBase.replace(/\/+$/, "")
 const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trimmedBase}/api`
 
+// ---------------------------------------------------------------------------
+// JWT auth interceptor — module-level token store
+// ---------------------------------------------------------------------------
+let _accessToken: string | null = null
+let _onRefresh: ((newToken: string) => void) | null = null
+let _onAuthFail: (() => void) | null = null
+let _isRefreshing = false
+let _refreshPromise: Promise<string | null> | null = null
+
+/**
+ * Set the auth interceptor state. Called by AuthProvider whenever the
+ * in-memory access token changes.
+ */
+export function setAuthInterceptor(
+  token: string | null,
+  onRefresh?: (newToken: string) => void,
+  onAuthFail?: () => void,
+) {
+  _accessToken = token
+  _onRefresh = onRefresh ?? null
+  _onAuthFail = onAuthFail ?? null
+}
+
+export function clearAuthInterceptor() {
+  _accessToken = null
+  _onRefresh = null
+  _onAuthFail = null
+}
+
+// ---------------------------------------------------------------------------
+// JWT-aware fetch wrapper
+// ---------------------------------------------------------------------------
+
+/**
+ * Wraps `fetch` with automatic Bearer token injection and silent refresh on 401.
+ *
+ * If `accessToken` is provided explicitly it is used; otherwise the module-level
+ * `_accessToken` (set via `setAuthInterceptor`) is used instead.
+ */
+export async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {},
+  accessToken?: string | null,
+  onTokenRefreshed?: (newToken: string) => void,
+  onAuthFailure?: () => void,
+): Promise<Response> {
+  const token = accessToken ?? _accessToken
+  const headers = new Headers(options.headers)
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(url, { ...options, headers })
+
+  // If 401, attempt a silent refresh
+  if (response.status === 401 && token) {
+    let newToken: string | null = null
+
+    // Deduplicate concurrent refreshes
+    if (_isRefreshing && _refreshPromise) {
+      newToken = await _refreshPromise
+    } else {
+      _isRefreshing = true
+      _refreshPromise = _jwtRefresh().finally(() => {
+        _isRefreshing = false
+        _refreshPromise = null
+      })
+      newToken = await _refreshPromise
+    }
+
+    if (newToken) {
+      // Notify callers about the new token
+      ;(onTokenRefreshed ?? _onRefresh)?.(newToken)
+
+      // Retry the original request with the fresh token
+      const retryHeaders = new Headers(options.headers)
+      retryHeaders.set('Authorization', `Bearer ${newToken}`)
+      return fetch(url, { ...options, headers: retryHeaders })
+    }
+
+    // Refresh failed — trigger auth failure callback
+    ;(onAuthFailure ?? _onAuthFail)?.()
+  }
+
+  return response
+}
+
+/**
+ * Internal helper — calls the JWT refresh endpoint.
+ * Returns the new access token string, or null on failure.
+ */
+async function _jwtRefresh(): Promise<string | null> {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!resp.ok) return null
+    const data = await resp.json()
+    return data.access ?? null
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface LoginResponse {
   token: string
   user: {
@@ -15,8 +124,22 @@ interface LoginResponse {
   }
 }
 
+interface JwtLoginResponse {
+  access: string
+  user: {
+    id: number
+    username: string
+    email: string
+    user_type: "patient" | "staff" | "owner"
+    first_name: string
+    last_name: string
+  }
+  legacy_token: string
+}
+
 export const api = {
   // Auth endpoints
+  // @deprecated — Use jwtLogin instead. Kept for backward compatibility.
   login: async (username: string, password: string): Promise<LoginResponse> => {
     const response = await fetch(`${API_BASE_URL}/login/`, {
       method: "POST",
@@ -41,6 +164,7 @@ export const api = {
     return response.json()
   },
 
+  // @deprecated — Use jwtRegister instead. Kept for backward compatibility.
   register: async (data: any) => {
     const response = await fetch(`${API_BASE_URL}/register/`, {
       method: "POST",
@@ -57,11 +181,12 @@ export const api = {
     return response.json()
   },
 
+  // @deprecated — Use jwtLogout instead. Kept for backward compatibility.
   logout: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/logout/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     })
@@ -71,7 +196,7 @@ export const api = {
   // Profile endpoints
   getProfile: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/profile/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error("Failed to fetch profile")
     return response.json()
@@ -81,7 +206,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/profile/`, {
       method: "PATCH",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -105,7 +230,7 @@ export const api = {
   createService: async (data: FormData, token: string) => {
     const response = await fetch(`${API_BASE_URL}/services/`, {
       method: "POST",
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
       body: data,
     })
     if (!response.ok) {
@@ -159,7 +284,7 @@ export const api = {
   updateService: async (id: number, data: FormData, token: string) => {
     const response = await fetch(`${API_BASE_URL}/services/${id}/`, {
       method: "PATCH",
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
       body: data,
     })
     if (!response.ok) {
@@ -188,7 +313,7 @@ export const api = {
   deleteService: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/services/${id}/`, {
       method: "DELETE",
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
       let errorMessage = "Failed to delete service"
@@ -204,7 +329,7 @@ export const api = {
   getAppointments: async (token: string, clinicId?: number) => {
     const params = clinicId ? `?clinic_id=${clinicId}` : '';
     const response = await fetch(`${API_BASE_URL}/appointments/${params}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
       throw new Error(`Failed to fetch appointments: ${response.statusText}`)
@@ -218,7 +343,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -236,7 +361,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/`, {
       method: "PATCH",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -248,7 +373,7 @@ export const api = {
   deleteAppointment: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/`, {
       method: "DELETE",
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error("Failed to delete appointment")
   },
@@ -260,7 +385,7 @@ export const api = {
     if (date) params.append('date', date)
     
     const headers: any = {}
-    if (token) headers.Authorization = `Token ${token}`
+    if (token) headers.Authorization = `Bearer ${token}`
     
     const response = await fetch(`${API_BASE_URL}/appointments/booked_slots/?${params.toString()}`, {
       headers,
@@ -274,7 +399,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/request_reschedule/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -287,7 +412,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/approve_reschedule/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     })
@@ -299,7 +424,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/reject_reschedule/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     })
@@ -312,7 +437,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/request_cancel/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ reason }),
@@ -329,7 +454,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/approve_cancel/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     })
@@ -341,7 +466,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/reject_cancel/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     })
@@ -354,7 +479,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/mark_completed/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -367,7 +492,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/mark_missed/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     })
@@ -380,7 +505,7 @@ export const api = {
     const response = await fetch(
       `${API_BASE_URL}/users/patients/?page=${page}&page_size=${pageSize}`,
       {
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       }
     )
     if (!response.ok) throw new Error('Failed to fetch patients')
@@ -396,7 +521,7 @@ export const api = {
   // Get all patients without pagination (for backward compatibility)
   getAllPatients: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/patients/?page_size=10000`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch patients')
     const data = await response.json()
@@ -406,7 +531,7 @@ export const api = {
 
   getPatientById: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${patientId}/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch patient')
     return response.json()
@@ -418,7 +543,7 @@ export const api = {
       ? `${API_BASE_URL}/inventory/?clinic_id=${clinicId}`
       : `${API_BASE_URL}/inventory/`
     const response = await fetch(url, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return []
     const data = await response.json()
@@ -430,7 +555,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/inventory/`, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -443,7 +568,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/inventory/${id}/`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -455,14 +580,14 @@ export const api = {
   deleteInventoryItem: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/inventory/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete inventory item')
   },
 
   getLowStockCount: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/inventory/low_stock_count/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch low stock count')
     return response.json()
@@ -471,7 +596,7 @@ export const api = {
   // Billing endpoints
   getBilling: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/billing/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     return response.json()
   },
@@ -479,7 +604,7 @@ export const api = {
   // Staff endpoints (owner only)
   getStaff: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/staff/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return []
     const data = await response.json()
@@ -491,7 +616,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/users/`, {
       method: "POST",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -508,7 +633,7 @@ export const api = {
   deleteStaff: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
       method: "DELETE",
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error("Failed to delete staff")
   },
@@ -516,7 +641,7 @@ export const api = {
   archiveStaff: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${id}/archive/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
@@ -530,7 +655,7 @@ export const api = {
   unarchiveStaff: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${id}/restore/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to unarchive staff')
     return response.json()
@@ -538,7 +663,7 @@ export const api = {
 
   getArchivedStaff: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/archived_staff/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch archived staff')
     return response.json()
@@ -548,7 +673,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/users/${id}/`, {
       method: "PATCH",
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
@@ -579,7 +704,7 @@ export const api = {
     const url = `${API_BASE_URL}/analytics/${queryString ? `?${queryString}` : ''}`
 
     const response = await fetch(url, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
@@ -600,7 +725,7 @@ export const api = {
 
     const response = await fetch(`${API_BASE_URL}/teeth-images/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     })
 
@@ -613,7 +738,7 @@ export const api = {
 
   getLatestTeethImage: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/teeth-images/latest/?patient_id=${patientId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return null
     return response.json()
@@ -621,7 +746,7 @@ export const api = {
 
   getPatientTeethImages: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/teeth-images/by_patient/?patient_id=${patientId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return []
     return response.json()
@@ -630,7 +755,7 @@ export const api = {
   deleteTeethImage: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/teeth-images/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete teeth image')
   },
@@ -640,7 +765,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/billing/${billingId}/update_status/`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status }),
@@ -659,7 +784,7 @@ export const api = {
       : `${API_BASE_URL}/billing/?status=${status}`
     
     const response = await fetch(url, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return []
     const data = await response.json()
@@ -674,7 +799,7 @@ export const api = {
       : `${API_BASE_URL}/dental-records/`
     
     const response = await fetch(url, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return []
     const data = await response.json()
@@ -684,7 +809,7 @@ export const api = {
 
   getDentalRecord: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/dental-records/${id}/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch dental record')
     return response.json()
@@ -694,7 +819,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/dental-records/`, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -710,7 +835,7 @@ export const api = {
       : `${API_BASE_URL}/documents/`
     
     const response = await fetch(url, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) return []
     const data = await response.json()
@@ -731,7 +856,7 @@ export const api = {
 
     const response = await fetch(`${API_BASE_URL}/documents/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     })
 
@@ -745,7 +870,7 @@ export const api = {
   deleteDocument: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/documents/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete document')
   },
@@ -777,7 +902,7 @@ export const api = {
   // Staff Availability endpoints
   getStaffAvailability: async (staffId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/staff-availability/?staff_id=${staffId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch staff availability')
     return response.json()
@@ -787,7 +912,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/staff-availability/bulk_update/`, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ staff_id: staffId, availability }),
@@ -798,7 +923,7 @@ export const api = {
 
   getAvailableStaffByDate: async (date: string, token: string) => {
     const response = await fetch(`${API_BASE_URL}/staff-availability/by_date/?date=${date}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch available staff')
     return response.json()
@@ -808,7 +933,7 @@ export const api = {
     let url = `${API_BASE_URL}/dentist-availability/?dentist_id=${dentistId}&start_date=${startDate}&end_date=${endDate}`
     if (clinicId) url += `&clinic_id=${clinicId}`
     const response = await fetch(url, {
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
     if (!response.ok) return []
     return response.json()
@@ -817,7 +942,7 @@ export const api = {
   // Dentist Notification endpoints (kept for backward compatibility)
   getNotifications: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/notifications/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch notifications')
     return response.json()
@@ -826,7 +951,7 @@ export const api = {
   markNotificationRead: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/notifications/${id}/mark_read/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to mark notification as read')
     return response.json()
@@ -835,7 +960,7 @@ export const api = {
   markAllNotificationsRead: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/notifications/mark_all_read/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to mark all notifications as read')
     return response.json()
@@ -843,7 +968,7 @@ export const api = {
 
   getUnreadNotificationCount: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/notifications/unread_count/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch unread count')
     return response.json()
@@ -852,7 +977,7 @@ export const api = {
   // Appointment Notification endpoints (for staff and owner)
   getAppointmentNotifications: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch appointment notifications')
     return response.json()
@@ -861,7 +986,7 @@ export const api = {
   markAppointmentNotificationRead: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/${id}/mark_read/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to mark notification as read')
     return response.json()
@@ -870,7 +995,7 @@ export const api = {
   markAllAppointmentNotificationsRead: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/mark_all_read/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to mark all notifications as read')
     return response.json()
@@ -879,7 +1004,7 @@ export const api = {
   clearAllAppointmentNotifications: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/clear_all/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to clear all notifications')
     return response.json()
@@ -890,7 +1015,7 @@ export const api = {
       throw new Error('No authentication token provided')
     }
     const response = await fetch(`${API_BASE_URL}/appointment-notifications/unread_count/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch unread count')
     return response.json()
@@ -899,7 +1024,7 @@ export const api = {
   // Patient Intake Form endpoints
   getIntakeForms: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/intake-forms/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch intake forms')
     return response.json()
@@ -907,7 +1032,7 @@ export const api = {
 
   getIntakeFormByPatient: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/intake-forms/by_patient/?patient_id=${patientId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch intake form')
     return response.json()
@@ -917,7 +1042,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/intake-forms/`, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -930,7 +1055,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/intake-forms/${id}/`, {
       method: 'PUT',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -942,7 +1067,7 @@ export const api = {
   deleteIntakeForm: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/intake-forms/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete intake form')
     return response.json()
@@ -951,7 +1076,7 @@ export const api = {
   // File Attachment endpoints
   getFileAttachments: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/file-attachments/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch file attachments')
     return response.json()
@@ -959,7 +1084,7 @@ export const api = {
 
   getFilesByPatient: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/file-attachments/by_patient/?patient_id=${patientId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch files')
     return response.json()
@@ -968,7 +1093,7 @@ export const api = {
   uploadFile: async (formData: FormData, token: string) => {
     const response = await fetch(`${API_BASE_URL}/file-attachments/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     })
     if (!response.ok) throw new Error('Failed to upload file')
@@ -978,7 +1103,7 @@ export const api = {
   deleteFile: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/file-attachments/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete file')
     return response.json()
@@ -987,7 +1112,7 @@ export const api = {
   // Clinical Notes endpoints
   getClinicalNotes: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/clinical-notes/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch clinical notes')
     return response.json()
@@ -995,7 +1120,7 @@ export const api = {
 
   getNotesByPatient: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/clinical-notes/by_patient/?patient_id=${patientId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch notes')
     return response.json()
@@ -1005,7 +1130,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/clinical-notes/`, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -1018,7 +1143,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/clinical-notes/${id}/`, {
       method: 'PUT',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -1030,7 +1155,7 @@ export const api = {
   deleteClinicalNote: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/clinical-notes/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete clinical note')
     return response.json()
@@ -1039,7 +1164,7 @@ export const api = {
   // Treatment Assignment endpoints
   getTreatmentAssignments: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/treatment-assignments/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch treatment assignments')
     return response.json()
@@ -1047,7 +1172,7 @@ export const api = {
 
   getAssignmentsByPatient: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/treatment-assignments/by_patient/?patient_id=${patientId}`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch assignments')
     return response.json()
@@ -1057,7 +1182,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/treatment-assignments/`, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -1070,7 +1195,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/treatment-assignments/${id}/`, {
       method: 'PUT',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -1083,7 +1208,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/treatment-assignments/${id}/update_status/`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Token ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status }),
@@ -1095,7 +1220,7 @@ export const api = {
   deleteTreatmentAssignment: async (id: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/treatment-assignments/${id}/`, {
       method: 'DELETE',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to delete treatment assignment')
     return response.json()
@@ -1105,7 +1230,7 @@ export const api = {
   archivePatient: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${patientId}/archive/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
@@ -1119,7 +1244,7 @@ export const api = {
   restorePatient: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${patientId}/restore/`, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to restore patient')
     return response.json()
@@ -1127,7 +1252,7 @@ export const api = {
 
   getArchivedPatients: async (token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/archived_patients/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch archived patients')
     return response.json()
@@ -1136,7 +1261,7 @@ export const api = {
   // Export Patient Records endpoint
   exportPatientRecords: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/users/${patientId}/export_records/`, {
-      headers: { Authorization: `Token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to export patient records')
     return response.json()
@@ -1146,7 +1271,7 @@ export const api = {
   chatbotQuery: async (message: string, conversationHistory: Array<{ role: string; content: string }>, token?: string, preferredLanguage?: 'en' | 'tl') => {
     const headers: HeadersInit = { 'Content-Type': 'application/json' }
     if (token) {
-      headers['Authorization'] = `Token ${token}`
+      headers['Authorization'] = `Bearer ${token}`
     }
     
     const response = await fetch(`${API_BASE_URL}/chatbot/`, {
@@ -1167,7 +1292,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/invoices/create_invoice/`, {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${token}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -1198,7 +1323,7 @@ export const api = {
     }
     const queryString = searchParams.toString()
     const response = await fetch(`${API_BASE_URL}/invoices/${queryString ? `?${queryString}` : ''}`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch invoices')
     const data = await response.json()
@@ -1207,7 +1332,7 @@ export const api = {
 
   getInvoice: async (invoiceId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch invoice')
     return response.json()
@@ -1215,7 +1340,7 @@ export const api = {
 
   downloadInvoicePDF: async (invoiceId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/download-pdf/`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     
     if (!response.ok) {
@@ -1256,7 +1381,7 @@ export const api = {
 
   getPatientBalance: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/invoices/patient_balance/${patientId}/`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch patient balance')
     return response.json()
@@ -1268,7 +1393,7 @@ export const api = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${token}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     })
@@ -1300,7 +1425,7 @@ export const api = {
     
     const queryString = params.toString()
     const response = await fetch(`${API_BASE_URL}/payments/${queryString ? `?${queryString}` : ''}`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     
     if (!response.ok) throw new Error('Failed to fetch payments')
@@ -1310,7 +1435,7 @@ export const api = {
 
   getPayment: async (paymentId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch payment')
     return response.json()
@@ -1318,7 +1443,7 @@ export const api = {
 
   getPatientPayments: async (patientId: number, token: string) => {
     const response = await fetch(`${API_BASE_URL}/payments/patient_payments/${patientId}/`, {
-      headers: { 'Authorization': `Token ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch patient payments')
     return response.json()
@@ -1329,7 +1454,7 @@ export const api = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Token ${token}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ reason }),
     })
@@ -1339,6 +1464,82 @@ export const api = {
       throw new Error(error.error || 'Failed to void payment')
     }
     
+    return response.json()
+  },
+
+  // =========================================================================
+  // JWT Authentication endpoints (HttpOnly cookie-based)
+  // =========================================================================
+
+  /** POST /api/auth/login/ — returns { access, user, legacy_token } and sets HttpOnly refresh cookie */
+  jwtLogin: async (username: string, password: string): Promise<JwtLoginResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/login/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Login failed' }))
+      if (response.status === 401) {
+        throw new Error(errorData.error || 'Invalid username or password')
+      }
+      throw new Error(errorData.error || 'Login failed')
+    }
+    return response.json()
+  },
+
+  /** POST /api/auth/register/ — returns { access, user, legacy_token } and sets HttpOnly refresh cookie */
+  jwtRegister: async (data: any): Promise<JwtLoginResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/register/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      const err: any = new Error('Registration failed')
+      err.data = error
+      throw err
+    }
+    return response.json()
+  },
+
+  /** POST /api/auth/token/refresh/ — reads HttpOnly cookie, returns { access } */
+  jwtRefresh: async (): Promise<{ access: string } | null> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!response.ok) return null
+      return response.json()
+    } catch {
+      return null
+    }
+  },
+
+  /** POST /api/auth/logout/ — blacklists refresh token, clears HttpOnly cookie */
+  jwtLogout: async (): Promise<any> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/logout/`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      return response.json()
+    } catch {
+      return { message: 'Logged out' }
+    }
+  },
+
+  /** GET /api/auth/verify/ — requires Bearer access token, returns { user } */
+  jwtVerify: async (accessToken: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/verify/`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Token verification failed')
     return response.json()
   },
 }
@@ -1444,4 +1645,9 @@ export const {
   getPayment,
   getPatientPayments,
   voidPayment,
+  jwtLogin,
+  jwtRegister,
+  jwtRefresh,
+  jwtLogout,
+  jwtVerify,
 } = api
