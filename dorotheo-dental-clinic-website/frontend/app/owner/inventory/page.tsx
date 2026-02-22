@@ -4,12 +4,14 @@ import { useState, useEffect } from "react"
 import { Plus, AlertTriangle, Edit2, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
+import { useInventoryAnalytics } from "@/lib/inventory-analytics-context"
 import { AddInventoryModal } from "@/components/add-inventory-modal"
 import { InventorySuccessModal } from "@/components/inventory-success-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
 
 export default function OwnerInventory() {
   const { selectedClinic, allClinics } = useClinic()
+  const { notifyInventoryChanged } = useInventoryAnalytics()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -158,6 +160,7 @@ export default function OwnerInventory() {
       setShowEditModal(false)
       setSelectedItem(null)
       await fetchInventory()
+      notifyInventoryChanged()
       
       alert("Inventory item updated successfully!")
     } catch (error: any) {
@@ -181,6 +184,7 @@ export default function OwnerInventory() {
       setShowDeleteModal(false)
       setSelectedItem(null)
       await fetchInventory()
+      notifyInventoryChanged()
       
       alert("Inventory item deleted successfully!")
     } catch (error: any) {
@@ -314,6 +318,7 @@ export default function OwnerInventory() {
         onClose={() => setShowAddModal(false)}
         onSuccess={(itemData) => {
           fetchInventory()
+          notifyInventoryChanged()
           if (itemData) {
             setSuccessItemData(itemData)
             setShowSuccessModal(true)
