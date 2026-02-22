@@ -117,8 +117,12 @@ export function InvoiceStep2Items({
       total_price: dialogQuantity * unitPrice,
     }
 
-    onItemsChange([...items, newItem])
+    // Close dialog first, then update items after a tick to avoid nested Dialog render issues
     setShowAddDialog(false)
+    setSelectedInventoryItem(null)
+    setTimeout(() => {
+      onItemsChange([...items, newItem])
+    }, 50)
   }
 
   // Edit item handlers
@@ -146,8 +150,13 @@ export function InvoiceStep2Items({
       total_price: dialogQuantity * selectedInvoiceItem.unit_price,
     }
 
-    onItemsChange(updatedItems)
+    // Close dialog first, then update items after a tick
     setShowEditDialog(false)
+    setSelectedInvoiceItem(null)
+    setSelectedInvoiceItemIndex(-1)
+    setTimeout(() => {
+      onItemsChange(updatedItems)
+    }, 50)
   }
 
   // Remove item handlers
@@ -161,8 +170,14 @@ export function InvoiceStep2Items({
     if (selectedInvoiceItemIndex === -1) return
     
     const updatedItems = items.filter((_, index) => index !== selectedInvoiceItemIndex)
-    onItemsChange(updatedItems)
+    
+    // Close dialog first, then update items after a tick
     setShowRemoveDialog(false)
+    setSelectedInvoiceItem(null)
+    setSelectedInvoiceItemIndex(-1)
+    setTimeout(() => {
+      onItemsChange(updatedItems)
+    }, 50)
   }
 
   // Quantity controls for selected items
@@ -280,12 +295,12 @@ export function InvoiceStep2Items({
           ) : (
             <div className="space-y-3">
               {items.map((item, index) => (
-                <Card key={index}>
+                <Card key={`item-${item.inventory_item_id}-${index}`} className="bg-white">
                   <CardContent className="p-4">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <h4 className="font-semibold">{item.item_name}</h4>
+                          <h4 className="font-semibold text-gray-900">{item.item_name}</h4>
                           {item.description && (
                             <p className="text-sm text-muted-foreground">{item.description}</p>
                           )}

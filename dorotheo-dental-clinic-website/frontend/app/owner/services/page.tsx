@@ -9,6 +9,7 @@ import { api } from "@/lib/api"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { ClinicBadge } from "@/components/clinic-badge"
 import AlertModal from "@/components/alert-modal"
+import ConfirmModal from "@/components/confirm-modal"
 import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
 
 interface Service {
@@ -39,6 +40,11 @@ export default function ServicesPage() {
     title: string
     message: string
   }>({ isOpen: false, type: "info", title: "", message: "" })
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    serviceId: number | null
+    isLoading: boolean
+  }>({ isOpen: false, serviceId: null, isLoading: false })
 
   // Format duration to show hours and minutes
   const formatDuration = (minutes: number) => {
@@ -190,36 +196,32 @@ export default function ServicesPage() {
 
   const handleDelete = async (id: number) => {
     if (!token) return
+    setConfirmModal({ isOpen: true, serviceId: id, isLoading: false })
+  }
 
-    if (confirm("Are you sure you want to delete this service?")) {
-      try {
-        await api.deleteService(id, token)
-        setServices(services.filter((s) => s.id !== id))
-        setAlertModal({
-          isOpen: true,
-          type: "success",
-          title: "Service Deleted",
-          message: "The service has been successfully deleted."
-        })
-      } catch (error: any) {
-        console.error("Failed to delete service:", error)
-        // Check if it's a response error with message
-        if (error.message) {
-          setAlertModal({
-            isOpen: true,
-            type: "error",
-            title: "Cannot Delete Service",
-            message: error.message
-          })
-        } else {
-          setAlertModal({
-            isOpen: true,
-            type: "error",
-            title: "Cannot Delete Service",
-            message: "This service cannot be deleted because there are active appointments associated with it. Please cancel or reassign those appointments first."
-          })
-        }
-      }
+  const confirmDelete = async () => {
+    if (!token || !confirmModal.serviceId) return
+    const id = confirmModal.serviceId
+    setConfirmModal(prev => ({ ...prev, isLoading: true }))
+    try {
+      await api.deleteService(id, token)
+      setServices(services.filter((s) => s.id !== id))
+      setConfirmModal({ isOpen: false, serviceId: null, isLoading: false })
+      setAlertModal({
+        isOpen: true,
+        type: "success",
+        title: "Service Deleted",
+        message: "The service has been successfully deleted."
+      })
+    } catch (error: any) {
+      console.error("Failed to delete service:", error)
+      setConfirmModal({ isOpen: false, serviceId: null, isLoading: false })
+      setAlertModal({
+        isOpen: true,
+        type: "error",
+        title: "Cannot Delete Service",
+        message: error.message || "This service cannot be deleted because there are active appointments associated with it. Please cancel or reassign those appointments first."
+      })
     }
   }
 
@@ -590,6 +592,19 @@ export default function ServicesPage() {
         type={alertModal.type}
         title={alertModal.title}
         message={alertModal.message}
+      />
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, serviceId: null, isLoading: false })}
+        onConfirm={confirmDelete}
+        title="Delete Service"
+        message="Are you sure you want to delete this service? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={confirmModal.isLoading}
       />
     </div>
   )

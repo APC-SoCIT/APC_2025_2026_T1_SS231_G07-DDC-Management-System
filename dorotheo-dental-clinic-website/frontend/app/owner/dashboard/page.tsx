@@ -17,7 +17,7 @@ interface Appointment {
   service_name: string | null
   service_color: string | null
   status: string
-  patient_status?: 'waiting' | 'ongoing' | 'done'
+  patient_status?: 'pending' | 'waiting' | 'ongoing' | 'done'
 }
 
 export default function OwnerDashboard() {
@@ -114,7 +114,7 @@ export default function OwnerDashboard() {
     .sort((a, b) => a.time.localeCompare(b.time))
 
   // Categorize appointments by patient status (default to pending if no status set)
-  const pendingAppointments = todayAppointments.filter(apt => !apt.patient_status)
+  const pendingAppointments = todayAppointments.filter(apt => !apt.patient_status || apt.patient_status === 'pending')
   const waitingAppointments = todayAppointments.filter(apt => apt.patient_status === 'waiting')
   const ongoingAppointments = todayAppointments.filter(apt => apt.patient_status === 'ongoing')
   const doneAppointments = todayAppointments.filter(apt => apt.patient_status === 'done')
@@ -299,14 +299,14 @@ export default function OwnerDashboard() {
         </div>
         {isLoading ? (
           <p className="text-center py-8 text-[var(--color-text-muted)]">Loading appointments...</p>
-        ) : todayAppointments.length > 0 ? (
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Pending Column */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Pending ({pendingAppointments.length})</h3>
               </div>
-              <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+              <div className="divide-y divide-gray-200 max-h-[300px] overflow-y-auto">
                 {pendingAppointments.length > 0 ? (
                   pendingAppointments.map((apt) => (
                     <div key={apt.id} className="p-4 hover:bg-gray-50 transition-colors">
@@ -325,8 +325,8 @@ export default function OwnerDashboard() {
                           );
                         })()}
                         <div className="flex flex-col gap-1 pt-2">
-                          <button onClick={() => handlePatientStatusChange(apt.id, 'waiting')} className="px-3 py-1 rounded text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors max-w-[120px]">Waiting</button>
-                          <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'waiting')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Waiting</button>
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors max-w-[120px]">Ongoing</button>
                           <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
                         </div>
                       </div>
@@ -343,7 +343,7 @@ export default function OwnerDashboard() {
               <div className="bg-yellow-100 px-4 py-3 border-b border-yellow-200">
                 <h3 className="text-sm font-semibold text-yellow-700 uppercase tracking-wide">Waiting ({waitingAppointments.length})</h3>
               </div>
-              <div className="divide-y divide-yellow-200 max-h-[600px] overflow-y-auto">
+              <div className="divide-y divide-yellow-200 max-h-[300px] overflow-y-auto">
                 {waitingAppointments.length > 0 ? (
                   waitingAppointments.map((apt) => (
                     <div key={apt.id} className="p-4 bg-white hover:bg-yellow-50 transition-colors">
@@ -362,7 +362,7 @@ export default function OwnerDashboard() {
                           );
                         })()}
                         <div className="flex flex-col gap-1 pt-2">
-                          <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-colors max-w-[120px]">Ongoing</button>
+                          <button onClick={() => handlePatientStatusChange(apt.id, 'ongoing')} className="px-3 py-1 rounded text-[11px] font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors max-w-[120px]">Ongoing</button>
                           <button onClick={() => handlePatientStatusChange(apt.id, 'done')} className="px-3 py-1 rounded text-[11px] font-medium bg-green-50 hover:bg-green-100 text-green-700 transition-colors max-w-[120px]">Done</button>
                         </div>
                       </div>
@@ -379,7 +379,7 @@ export default function OwnerDashboard() {
               <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
                 <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Ongoing ({ongoingAppointments.length})</h3>
               </div>
-              <div className="divide-y divide-blue-200 max-h-[600px] overflow-y-auto">
+              <div className="divide-y divide-blue-200 max-h-[300px] overflow-y-auto">
                 {ongoingAppointments.length > 0 ? (
                   ongoingAppointments.map((apt) => (
                     <div key={apt.id} className="p-4 bg-white hover:bg-blue-50 transition-colors">
@@ -414,7 +414,7 @@ export default function OwnerDashboard() {
               <div className="bg-green-100 px-4 py-3 border-b border-green-200">
                 <h3 className="text-sm font-semibold text-green-700 uppercase tracking-wide">Done ({doneAppointments.length})</h3>
               </div>
-              <div className="divide-y divide-green-200 max-h-[600px] overflow-y-auto">
+              <div className="divide-y divide-green-200 max-h-[300px] overflow-y-auto">
                 {doneAppointments.length > 0 ? (
                   doneAppointments.map((apt) => (
                     <div key={apt.id} className="p-4 bg-white hover:bg-green-50 transition-colors">
@@ -441,8 +441,6 @@ export default function OwnerDashboard() {
               </div>
             </div>
           </div>
-        ) : (
-          <p className="text-center py-8 text-[var(--color-text-muted)]">No appointments scheduled for today</p>
         )}
       </div>
 
@@ -481,7 +479,7 @@ export default function OwnerDashboard() {
             
             <div className="grid grid-cols-7 gap-2">
               {Array.from({ length: firstDay }, (_, i) => (
-                <div key={`empty-${i}`} className="aspect-square" />
+                <div key={`empty-${i}`} />
               ))}
               
               {Array.from({ length: daysInMonth }, (_, i) => {
@@ -495,7 +493,7 @@ export default function OwnerDashboard() {
                   <button
                     key={day}
                     onClick={() => selectDate(day)}
-                    className={`aspect-square p-2 rounded-lg text-sm font-medium transition-all relative ${
+                    className={`p-2 rounded-lg text-sm font-medium transition-all relative ${
                       isSelectedDay(day)
                         ? "bg-[#0f766e] text-white shadow-lg"
                         : isToday(day)
