@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, FileText, Clock, AlertCircle } from "lucide-react"
+import { Calendar, FileText, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 import { ClinicBadge } from "@/components/clinic-badge"
@@ -63,13 +63,6 @@ export default function PatientDashboard() {
     fetchAppointments()
   }, [token])
 
-  const treatmentPlans: Array<{
-    id: number
-    title: string
-    status: string
-    progress: number
-  }> = []
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -93,7 +86,7 @@ export default function PatientDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -116,16 +109,6 @@ export default function PatientDashboard() {
 
         <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">0</p>
-          <p className="text-sm text-[var(--color-text-muted)]">Active Treatment Plans</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
-          <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
               <AlertCircle className="w-6 h-6 text-amber-600" />
             </div>
@@ -133,35 +116,6 @@ export default function PatientDashboard() {
           <p className="text-2xl font-bold text-[var(--color-text)] mb-1">PHP 0</p>
           <p className="text-sm text-[var(--color-text-muted)]">Pending Balance</p>
         </div>
-      </div>
-
-      {/* Treatment Plans */}
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">Treatment Plans</h2>
-        {treatmentPlans.length > 0 ? (
-          <div className="space-y-4">
-            {treatmentPlans.map((plan) => (
-              <div key={plan.id} className="border border-[var(--color-border)] rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-[var(--color-text)]">{plan.title}</h3>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      plan.status === "ongoing" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {plan.status}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-[var(--color-primary)] h-2 rounded-full" style={{ width: `${plan.progress}%` }} />
-                </div>
-                <p className="text-sm text-[var(--color-text-muted)] mt-2">{plan.progress}% Complete</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center py-8 text-[var(--color-text-muted)]">No active treatment plans</p>
-        )}
       </div>
 
       {/* Upcoming Appointments */}
@@ -203,10 +157,22 @@ export default function PatientDashboard() {
                           ? "bg-yellow-100 text-yellow-700"
                           : appointment.status === "completed"
                           ? "bg-blue-100 text-blue-700"
+                          : appointment.status === "reschedule_requested"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : appointment.status === "cancel_requested"
+                          ? "bg-red-100 text-red-700"
+                          : appointment.status === "cancelled"
+                          ? "bg-red-100 text-red-700"
+                          : appointment.status === "missed"
+                          ? "bg-yellow-100 text-yellow-700"
                           : "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {appointment.status}
+                      {appointment.status === "reschedule_requested"
+                        ? "Reschedule Request"
+                        : appointment.status === "cancel_requested"
+                        ? "Cancel Request"
+                        : appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
                     </span>
                   </div>
                 </div>

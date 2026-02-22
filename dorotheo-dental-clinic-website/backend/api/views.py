@@ -1433,6 +1433,13 @@ class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
             if existing_notifications == 0:
                 create_appointment_notification(appointment, 'reschedule_request')
             
+            # Notify the patient that their reschedule request was received
+            apt_date = appointment.reschedule_date or appointment.date
+            create_patient_notification(
+                appointment,
+                'reschedule_request',
+                custom_message=f"Your reschedule request for your appointment on {apt_date} is now pending staff review. You will be notified once it is approved or rejected."
+            )
             serializer = self.get_serializer(appointment)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
@@ -1541,6 +1548,13 @@ class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
         
         # Create notifications for staff and owner
         create_appointment_notification(appointment, 'cancel_request')
+        
+        # Notify the patient that their cancellation request was received
+        create_patient_notification(
+            appointment,
+            'cancel_request',
+            custom_message=f"Your cancellation request for your appointment on {appointment.date} is now pending staff review. You will be notified once it is approved or rejected."
+        )
         
         serializer = self.get_serializer(appointment)
         return Response(serializer.data, status=status.HTTP_200_OK)
