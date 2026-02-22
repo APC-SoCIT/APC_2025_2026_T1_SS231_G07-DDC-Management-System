@@ -40,13 +40,15 @@ export default function StaffDashboard() {
       try {
         setIsLoading(true)
         
-        // Fetch patients
-        const patientsResponse = await api.getPatients(token)
-        // Handle both array and paginated response formats
-        const patients = Array.isArray(patientsResponse) ? patientsResponse : (patientsResponse.results || [])
-        setTotalPatients(patients.length)
-        const active = patients.filter((p: any) => p.is_active_patient !== false).length
-        setActivePatients(active)
+        // Fetch patients - use count for total (includes archived), and fetch archived separately for active count
+        const [patientsResponse, archivedPatientsResponse] = await Promise.all([
+          api.getPatients(token, 1, 1),  // Just need the count
+          api.getArchivedPatients(token),
+        ])
+        const totalCount = (patientsResponse as any).count || 0
+        setTotalPatients(totalCount)
+        const archivedCount = Array.isArray(archivedPatientsResponse) ? archivedPatientsResponse.length : 0
+        setActivePatients(Math.max(0, totalCount - archivedCount))
         
         // Fetch appointments - filter by clinic if not "all"
         const clinicId = selectedClinic === "all" ? undefined : selectedClinic?.id
@@ -239,51 +241,51 @@ export default function StaffDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <CalendarIcon className="w-6 h-6 text-blue-600" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white p-4 rounded-xl border border-[var(--color-border)]">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+              <CalendarIcon className="w-4 h-4 text-blue-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">{todayAppointments.length}</p>
-          <p className="text-sm text-[var(--color-text-muted)]">Appointments Today</p>
+          <p className="text-xl font-bold text-[var(--color-text)] mb-0.5">{todayAppointments.length}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Appointments Today</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-green-600" />
+        <div className="bg-white p-4 rounded-xl border border-[var(--color-border)]">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 text-green-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">
+          <p className="text-xl font-bold text-[var(--color-text)] mb-0.5">
             {isLoading ? "..." : totalPatients}
           </p>
-          <p className="text-sm text-[var(--color-text-muted)]">Total Patients</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Total Patients</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-purple-600" />
+        <div className="bg-white p-4 rounded-xl border border-[var(--color-border)]">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 text-purple-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">
+          <p className="text-xl font-bold text-[var(--color-text)] mb-0.5">
             {isLoading ? "..." : activePatients}
           </p>
-          <p className="text-sm text-[var(--color-text-muted)]">Active Patients</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Active Patients</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-[var(--color-border)]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+        <div className="bg-white p-4 rounded-xl border border-[var(--color-border)]">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">
+          <p className="text-xl font-bold text-[var(--color-text)] mb-0.5">
             {isLoading ? "..." : lowStockCount}
           </p>
-          <p className="text-sm text-[var(--color-text-muted)]">Stock Alerts</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Stock Alerts</p>
         </div>
       </div>
 

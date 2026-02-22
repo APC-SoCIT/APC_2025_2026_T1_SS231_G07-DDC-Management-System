@@ -732,6 +732,19 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
         elif user.user_type == 'staff':
             if requester.user_type != 'owner':
                 return Response({'error': 'Only the owner can archive staff accounts'}, status=status.HTTP_403_FORBIDDEN)
+            # Block archiving dentists who have upcoming/active appointments
+            if user.role == 'dentist':
+                from django.utils import timezone as tz
+                today = tz.now().date()
+                upcoming_appointments = Appointment.objects.filter(
+                    dentist=user,
+                    date__gte=today
+                ).exclude(status__in=['cancelled', 'completed']).count()
+                if upcoming_appointments > 0:
+                    return Response(
+                        {'error': f'Cannot archive this dentist. They have {upcoming_appointments} upcoming appointment(s). Please reassign or cancel their appointments first.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             user.is_archived = True
             user.save()
         else:

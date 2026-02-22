@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   CheckCircle,
   X,
+  Users,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -70,6 +71,7 @@ export default function OwnerPatients() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [totalArchivedCount, setTotalArchivedCount] = useState(0)
   const [pageSize] = useState(20)
 
   // Confirm modal state
@@ -177,6 +179,7 @@ export default function OwnerPatients() {
 
         // Always fetch archived patients
         const archivedResponse = await api.getArchivedPatients(token)
+        setTotalArchivedCount(Array.isArray(archivedResponse) ? archivedResponse.length : 0)
         const transformedArchived = archivedResponse.map((user: any) => ({
           id: user.id,
           name: `${user.first_name} ${user.last_name}`,
@@ -481,6 +484,28 @@ export default function OwnerPatients() {
           <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
           Add Patient
         </button>
+      </div>
+
+      {/* Patient Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white p-4 rounded-xl border border-[var(--color-border)] flex items-center gap-3">
+          <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
+            <Users className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-[var(--color-text)] leading-none">{isLoading ? "..." : totalCount}</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Total Patients</p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-[var(--color-border)] flex items-center gap-3">
+          <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
+            <Users className="w-4 h-4 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-[var(--color-text)] leading-none">{isLoading ? "..." : Math.max(0, totalCount - totalArchivedCount)}</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Active Patients</p>
+          </div>
+        </div>
       </div>
 
       {/* Search and Filters */}
