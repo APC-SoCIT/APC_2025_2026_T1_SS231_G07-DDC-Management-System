@@ -33,19 +33,35 @@ class Command(BaseCommand):
             date__gte=two_years_ago,
         )
 
-        # All non-archived patient IDs annotated with the subquery result
-        patient_qs = User.objects.filter(user_type='patient').annotate(
-            has_recent_appointment=Exists(recent_completed)
+        # Subquery: does this patient have ANY completed appointment (ever)?
+        any_completed = Appointment.objects.filter(
+            patient=OuterRef('pk'),
+            status='completed',
         )
 
-        # Single UPDATE for patients that should become active
+        # Non-archived patients annotated with both subquery results.
+        # Patients with no completed appointments at all are intentionally excluded from
+        # deactivation to preserve the "new patient = active" behavior in User.update_patient_status().
+        patient_qs = User.objects.filter(user_type='patient', is_archived=False).annotate(
+            has_recent_appointment=Exists(recent_completed),
+            has_any_completed_appointment=Exists(any_completed),
+        )
+
+        # Single UPDATE for patients that should become active (recent appointment, currently inactive)
         activated = User.objects.filter(
             pk__in=patient_qs.filter(has_recent_appointment=True, is_active_patient=False).values('pk')
         ).update(is_active_patient=True)
 
-        # Single UPDATE for patients that should become inactive
+        # Single UPDATE for patients that should become inactive:
+        # – has old appointments (at least one completed) but none within the 2-year window
+        # – currently marked active
+        # Patients with NO completed appointments are left active (new/no-show patients).
         deactivated = User.objects.filter(
-            pk__in=patient_qs.filter(has_recent_appointment=False, is_active_patient=True).values('pk')
+            pk__in=patient_qs.filter(
+                has_recent_appointment=False,
+                has_any_completed_appointment=True,
+                is_active_patient=True,
+            ).values('pk')
         ).update(is_active_patient=False)
 
         total_changed = activated + deactivated

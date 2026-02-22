@@ -179,8 +179,8 @@ export default function OwnerPatients() {
 
         // Always fetch archived patients
         const archivedResponse = await api.getArchivedPatients(token)
-        setTotalArchivedCount(Array.isArray(archivedResponse) ? archivedResponse.length : 0)
-        const transformedArchived = archivedResponse.map((user: any) => ({
+        setTotalArchivedCount(archivedResponse.count)
+        const transformedArchived = archivedResponse.results.map((user: any) => ({
           id: user.id,
           name: `${user.first_name} ${user.last_name}`,
           email: user.email,

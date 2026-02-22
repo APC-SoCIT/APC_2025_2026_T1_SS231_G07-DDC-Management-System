@@ -251,11 +251,22 @@ export default function PaymentHistoryPage() {
                       setShowPatientDropdown(true)
                     }}
                     onFocus={() => setShowPatientDropdown(true)}
+                    role="combobox"
+                    aria-expanded={showPatientDropdown}
+                    aria-haspopup="listbox"
+                    aria-autocomplete="list"
+                    aria-controls="staff-patient-listbox"
                     className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   />
                   {showPatientDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <div
+                      id="staff-patient-listbox"
+                      role="listbox"
+                      className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    >
                       <div
+                        role="option"
+                        aria-selected={selectedPatient === null}
                         onClick={() => {
                           setSelectedPatient(null)
                           setPatientSearchQuery("")
@@ -268,21 +279,28 @@ export default function PaymentHistoryPage() {
                       {patientSearchQuery.length < 2 && (
                         <div className="px-3 py-2 text-gray-500 text-sm">Type at least 2 characters...</div>
                       )}
-                      {patients.map((patient) => (
-                        <div
-                          key={patient.id}
-                          onClick={() => {
-                            setSelectedPatient(patient.id)
-                            setPatientSearchQuery(`${patient.first_name} ${patient.last_name}`)
+                      {patientSearchQuery.length >= 2 && patients.length > 0 && (
+                        <select
+                          className="w-full px-3 py-2 border-0 focus:outline-none focus:ring-0 text-sm"
+                          size={Math.min(6, patients.length)}
+                          value={selectedPatient ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            const selected = patients.find((p: any) => String(p.id) === value)
+                            if (selected) {
+                              setSelectedPatient(selected.id)
+                              setPatientSearchQuery(`${selected.first_name} ${selected.last_name}`)
+                            }
                             setShowPatientDropdown(false)
                           }}
-                          className={`px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm ${
-                            selectedPatient === patient.id ? 'bg-blue-50' : ''
-                          }`}
                         >
-                          {patient.first_name} {patient.last_name}
-                        </div>
-                      ))}
+                          {patients.map((patient: any) => (
+                            <option key={patient.id} value={patient.id}>
+                              {patient.first_name} {patient.last_name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {patients.length === 0 && patientSearchQuery.length >= 2 && (
                         <div className="px-3 py-2 text-gray-500 text-sm">No patients found</div>
                       )}

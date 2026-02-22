@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0036_auditlog'),
+        ('api', '0037_pagechunk'),
     ]
 
     operations = [

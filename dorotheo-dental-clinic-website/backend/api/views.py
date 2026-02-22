@@ -658,6 +658,12 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
                 date__gte=two_years_ago
             )
             
+            # Subquery: does this patient have ANY completed appointment (ever)?
+            any_completed_subquery = Appointment.objects.filter(
+                patient=OuterRef('pk'),
+                status='completed'
+            )
+
             # Build optimized query with JOINs, prefetching, and active status annotation
             patients = queryset.select_related(
                 'assigned_clinic'  # JOIN for clinic data (1 query)
@@ -671,7 +677,8 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
                 )
             ).annotate(
                 last_completed_appointment=Max('appointments__completed_at'),
-                has_recent_appointment=Exists(active_subquery)
+                has_recent_appointment=Exists(active_subquery),
+                has_any_completed_appointment=Exists(any_completed_subquery)
             )
             
             # Apply pagination FIRST — only loads the current page's rows into memory
@@ -680,10 +687,19 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
             page = paginator.paginate_queryset(patients, request)
             
             if page is not None:
-                # Update is_active_patient only for patients on this page where status has changed
+                # Update is_active_patient only for patients on this page where status has changed.
+                # Patients with no completed appointments at all remain active (matching
+                # the User.update_patient_status() per-instance behavior in models.py).
                 patients_to_update = []
                 for patient in page:
-                    new_status = patient.has_recent_appointment
+                    if patient.has_recent_appointment:
+                        new_status = True
+                    elif patient.has_any_completed_appointment:
+                        # Has old appointments but none in the last 2 years → inactive
+                        new_status = False
+                    else:
+                        # No completed appointments yet → stay active (new patient)
+                        new_status = True
                     if patient.is_active_patient != new_status:
                         patient.is_active_patient = new_status
                         patients_to_update.append(patient)
@@ -714,6 +730,11 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def patient_stats(self, request):
         """Return aggregate patient counts without loading any patient data."""
+        if request.user.user_type not in ('staff', 'owner'):
+            return Response(
+                {'error': 'Only staff and owner can access patient statistics.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         base_queryset = User.objects.filter(user_type='patient', is_archived=False)
 
         clinic_id = request.query_params.get('clinic')
@@ -736,6 +757,11 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def patient_search(self, request):
         """Lightweight patient search by name or email. Returns max 20 results."""
+        if request.user.user_type not in ('staff', 'owner'):
+            return Response(
+                {'error': 'Only staff and owner can search patients.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         query = request.query_params.get('q', '').strip()
         if len(query) < 2:
             return Response([])

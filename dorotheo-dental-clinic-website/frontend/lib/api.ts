@@ -1273,7 +1273,13 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) throw new Error('Failed to fetch archived patients')
-    return response.json()
+    const data = await response.json()
+    // Normalise: backend may return a paginated {count, results} object or a flat array.
+    // Always return a consistent shape so callers don't need to branch.
+    if (Array.isArray(data)) {
+      return { count: data.length, results: data }
+    }
+    return { count: data.count ?? 0, results: data.results ?? [] }
   },
 
   // Export Patient Records endpoint

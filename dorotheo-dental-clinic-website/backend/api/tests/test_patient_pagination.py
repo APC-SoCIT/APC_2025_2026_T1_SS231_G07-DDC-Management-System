@@ -199,9 +199,9 @@ class PatientPaginationTestCase(TestCase):
         self.assertEqual(len(data['results']), 10)  # 50 - 2*20 = 10
 
     def test_invalid_page_returns_error(self):
-        """Requesting a page beyond the last should return an error (404 or 500)."""
+        """Requesting a page beyond the last should return a 404 error."""
         response = self.client.get('/api/users/patients/?page=999')
-        self.assertIn(response.status_code, [status.HTTP_404_NOT_FOUND, status.HTTP_500_INTERNAL_SERVER_ERROR])
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     # --------------------------------------------------
     # is_active_patient status
