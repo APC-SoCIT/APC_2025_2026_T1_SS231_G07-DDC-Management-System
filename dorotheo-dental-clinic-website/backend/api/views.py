@@ -2116,7 +2116,15 @@ def analytics(request):
             period = 'monthly'
 
         clinic_id_param = request.query_params.get('clinic_id', None)
-        clinic_id = int(clinic_id_param) if clinic_id_param else None
+        clinic_id = None
+        if clinic_id_param:
+            try:
+                clinic_id = int(clinic_id_param)
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'Invalid clinic_id. It must be an integer.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         custom_start = request.query_params.get('start_date', None)
         custom_end = request.query_params.get('end_date', None)

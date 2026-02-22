@@ -53,6 +53,13 @@ jest.mock("@/lib/api", () => ({
   getPatients: (...args: any[]) => mockGetPatients(...args),
 }));
 
+// Mock clinic context to avoid provider dependency in tests
+jest.mock("@/lib/clinic-context", () => ({
+  useClinic: () => ({
+    selectedClinic: { id: 1, name: "Test Clinic" },
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
@@ -421,7 +428,7 @@ describe("Billing Page — Filtering Logic", () => {
     const aliceOptions = await screen.findAllByText("Alice Smith");
     // The dropdown option is the one inside a div with class containing "font-medium text-gray-900" without being a <p>
     const dropdownOption = aliceOptions.find(
-      (el) => el.tagName === "DIV" && el.className.includes("font-medium")
+      (el: HTMLElement) => el.tagName === "DIV" && el.className.includes("font-medium")
     );
     await userEvent.click(dropdownOption!);
 
@@ -515,11 +522,11 @@ describe("Billing Page — Table Rendering", () => {
 
     const badges = screen.getAllByText("Paid", { selector: "span" });
     // Filter to only the status badges (not the tab button)
-    const statusBadges = badges.filter((el) =>
+    const statusBadges = badges.filter((el: HTMLElement) =>
       el.className.includes("rounded-full")
     );
     expect(statusBadges.length).toBeGreaterThan(0);
-    statusBadges.forEach((badge) => {
+    statusBadges.forEach((badge: HTMLElement) => {
       expect(badge.className).toContain("text-green-700");
     });
   });
@@ -533,7 +540,7 @@ describe("Billing Page — Table Rendering", () => {
 
     // Balance cells should have green text
     const balanceCells = screen.getAllByText(/₱0\.00/);
-    balanceCells.forEach((cell) => {
+    balanceCells.forEach((cell: HTMLElement) => {
       if (cell.className.includes("font-bold")) {
         expect(cell.className).toContain("text-green-600");
       }
