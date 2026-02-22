@@ -10,10 +10,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import (
-    Sum, Count, Avg, F, Q, Value, Min, Subquery, OuterRef
+    Sum, Count, Avg, F, Q, Value, Min, Subquery, OuterRef, Case, When, DateField
 )
 from django.db.models.functions import (
-    TruncDay, TruncWeek, TruncMonth, TruncYear, ExtractHour, Coalesce
+    TruncDay, TruncWeek, TruncMonth, TruncYear, ExtractHour, Coalesce, Cast
 )
 
 from api.models import (
@@ -420,17 +420,21 @@ def get_operational_summary(start_date, end_date, clinic_id=None):
     )
 
     # --- New vs Returning Patients ---
-    # First-ever completed appointment actual date per patient (use completed_at when set)
-    all_completed_appts = (
+    # First-ever completed appointment actual date per patient — computed in DB
+    patient_first_qs = (
         Appointment.objects.filter(status='completed')
-        .only('patient_id', 'date', 'completed_at')
+        .annotate(
+            actual_date=Case(
+                When(completed_at__isnull=False,
+                     then=Cast(TruncDay('completed_at'), output_field=DateField())),
+                default=F('date'),
+                output_field=DateField(),
+            )
+        )
+        .values('patient_id')
+        .annotate(first_date=Min('actual_date'))
     )
-    patient_first_map: dict = {}
-    for appt in all_completed_appts:
-        actual_date = appt.completed_at.date() if appt.completed_at else appt.date
-        pid = appt.patient_id
-        if pid not in patient_first_map or actual_date < patient_first_map[pid]:
-            patient_first_map[pid] = actual_date
+    patient_first_map = {row['patient_id']: row['first_date'] for row in patient_first_qs}
 
     # New = first actual visit falls within the date range
     new_patient_ids_set = {
@@ -623,24 +627,25 @@ def get_patient_volume_time_series(start_date, end_date, period, clinic_id=None)
         if start_date <= actual_date <= end_date:
             appt_count_map[_get_period_key(actual_date)] += 1
 
-    # New patients per period — use completed_at date if available, else scheduled date
-    # First-ever completed appointment per patient (across all time)
-    all_completed = (
+    # New patients per period — first-ever completed appointment per patient, computed in DB
+    patient_first_qs = (
         Appointment.objects.filter(status='completed')
-        .only('patient_id', 'date', 'completed_at')
-        .order_by('patient_id', 'date')
+        .annotate(
+            actual_date=Case(
+                When(completed_at__isnull=False,
+                     then=Cast(TruncDay('completed_at'), output_field=DateField())),
+                default=F('date'),
+                output_field=DateField(),
+            )
+        )
+        .values('patient_id')
+        .annotate(first_date=Min('actual_date'))
+        .filter(first_date__gte=start_date, first_date__lte=end_date)
     )
-    patient_first_map: dict = {}
-    for appt in all_completed:
-        actual_date = appt.completed_at.date() if appt.completed_at else appt.date
-        pid = appt.patient_id
-        if pid not in patient_first_map or actual_date < patient_first_map[pid]:
-            patient_first_map[pid] = actual_date
 
     new_patient_map = defaultdict(int)
-    for pid, first_date in patient_first_map.items():
-        if start_date <= first_date <= end_date:
-            new_patient_map[_get_period_key(first_date)] += 1
+    for row in patient_first_qs:
+        new_patient_map[_get_period_key(row['first_date'])] += 1
 
     # Build result list over all date buckets that have data
     all_keys = sorted(set(list(appt_count_map.keys()) + list(new_patient_map.keys())))

@@ -64,7 +64,7 @@ export default function OwnerAnalytics() {
     } finally {
       setLoading(false)
     }
-  }, [token, period, clinicId, inventoryVersion])
+  }, [token, period, clinicId])
 
   useEffect(() => {
     fetchData()
