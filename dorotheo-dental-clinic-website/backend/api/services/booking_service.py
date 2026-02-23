@@ -515,18 +515,178 @@ def gather_booking_context(
 
 
 def match_appointment(msg: str, qs) -> Optional[Appointment]:
-    """Try to match user's message to an appointment in queryset."""
+    """
+    Try to match user's message to an appointment in queryset.
+
+    Matching logic:
+    - If BOTH service name AND date are mentioned → require BOTH to match the same appointment
+    - If only service OR only date is mentioned → match on whichever is found
+    - If only one appointment exists → return it
+    - If no match → return None (caller should provide helpful mismatch feedback)
+    """
     low = msg.lower()
+
+    # Build match data for each appointment
+    match_data = []
     for a in qs:
         svc = (a.service.name if a.service else 'appointment').lower()
-        dstr_full = a.date.strftime('%B %d').lower()              # "february 23"
-        dstr_abbr = a.date.strftime('%b %d').lower()              # "feb 23" (zero-padded)
-        dstr_short = (a.date.strftime('%b ') + str(a.date.day)).lower()  # "feb 2" (no zero-pad)
-        if svc in low or dstr_full in low or dstr_abbr in low or dstr_short in low:
+        date_variants = [
+            a.date.strftime('%B %d').lower(),               # "february 23"
+            a.date.strftime('%b %d').lower(),                # "feb 23" (zero-padded)
+            (a.date.strftime('%b ') + str(a.date.day)).lower(),  # "feb 2" (no zero-pad)
+            a.date.strftime('%B %-d').lower() if hasattr(a.date, 'strftime') else '',  # "february 2" (no zero-pad)
+        ]
+        # Also handle "month day" without zero padding for full month name
+        date_variants.append(
+            (a.date.strftime('%B ') + str(a.date.day)).lower()  # "february 2"
+        )
+        # Remove duplicates
+        date_variants = list(set(v for v in date_variants if v))
+
+        svc_match = svc in low
+        date_match = any(d in low for d in date_variants)
+
+        match_data.append({
+            'appointment': a,
+            'svc_name': svc,
+            'date_variants': date_variants,
+            'svc_match': svc_match,
+            'date_match': date_match,
+        })
+
+    # Detect what the user mentioned
+    any_svc_in_msg = any(m['svc_match'] for m in match_data)
+    any_date_in_msg = any(m['date_match'] for m in match_data)
+
+    # Also check if user mentioned a service name that exists in appointments
+    # but doesn't match a specific appointment's date
+    all_svc_names = set(m['svc_name'] for m in match_data)
+    user_mentioned_service = any(s in low for s in all_svc_names)
+
+    # Check if user mentioned a date-like pattern
+    import re as _re
+    user_mentioned_date = bool(_re.search(
+        r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|'
+        r'january|february|march|april|june|july|august|september|october|november|december)'
+        r'\s*\d{1,2}\b', low
+    ))
+
+    # CASE 1: Both service AND date mentioned → require BOTH to match the same appointment
+    if (user_mentioned_service or any_svc_in_msg) and (user_mentioned_date or any_date_in_msg):
+        for m in match_data:
+            if m['svc_match'] and m['date_match']:
+                return m['appointment']
+        # Both mentioned but no single appointment matches both → return None
+        # (The caller will show helpful mismatch message)
+        return None
+
+    # CASE 2: Only service OR only date mentioned → match on what's found
+    for m in match_data:
+        if m['svc_match'] or m['date_match']:
+            return m['appointment']
+
+    # CASE 3: Exact quick-reply label match (e.g., "Cleaning – February 23, 2026 at 9:00 AM")
+    for a in qs:
+        svc = a.service.name if a.service else 'Appointment'
+        # Match against the label format used in quick replies (with or without time)
+        label_with_time = f"{svc} – {a.date.strftime('%B %d, %Y')} at {fmt_time(a.time)}".lower()
+        label_full = f"{svc} – {a.date.strftime('%B %d, %Y')}".lower()
+        label_short = f"{svc} – {a.date.strftime('%B %d')}".lower()
+        label_fmt_date = f"{svc} – {fmt_date(a.date)}".lower()
+        label_fmt_date_time = f"{svc} – {fmt_date(a.date)} at {fmt_time(a.time)}".lower()
+        if any(lbl in low for lbl in [label_with_time, label_fmt_date_time, label_full, label_short, label_fmt_date]):
             return a
+
+    # CASE 4: Only one appointment → auto-select
     if qs.count() == 1:
         return qs.first()
+
     return None
+
+
+def get_appointment_mismatch_message(msg: str, qs, is_tl: bool, action: str = 'cancel') -> Optional[str]:
+    """
+    When a user mentions a service+date combo that doesn't match any appointment,
+    generate a helpful message showing what they actually have.
+
+    Args:
+        msg: The user's message
+        qs: QuerySet of upcoming appointments
+        is_tl: Whether to respond in Tagalog
+        action: 'cancel' or 'reschedule'
+
+    Returns:
+        A helpful mismatch message, or None if no mismatch detected.
+    """
+    import re as _re
+    low = msg.lower()
+
+    # Extract what service the user mentioned
+    mentioned_svc = None
+    for a in qs:
+        svc = (a.service.name if a.service else '').lower()
+        if svc and svc in low:
+            mentioned_svc = a.service.name
+            break
+
+    # Extract what date the user mentioned
+    mentioned_date = None
+    date_match = _re.search(
+        r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
+        r'jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+        r'\s*(\d{1,2})\b', low
+    )
+    if date_match:
+        mentioned_date = f"{date_match.group(1).capitalize()} {date_match.group(2)}"
+
+    if not mentioned_svc and not mentioned_date:
+        return None
+
+    # Build the list of actual appointments
+    actual_list = []
+    for a in qs:
+        svc = a.service.name if a.service else 'Appointment'
+        actual_list.append(f"- **{svc}** on **{a.date.strftime('%B %d, %Y')}** at **{fmt_time(a.time)}**")
+
+    actual_text = '\n'.join(actual_list)
+
+    if is_tl:
+        parts = []
+        if mentioned_svc and mentioned_date:
+            parts.append(
+                f"Wala po kayong appointment para sa **{mentioned_svc}** sa **{mentioned_date}**."
+            )
+        elif mentioned_svc:
+            parts.append(
+                f"Hindi ko po mahanap ang appointment para sa **{mentioned_svc}** sa petsang binanggit ninyo."
+            )
+        elif mentioned_date:
+            parts.append(
+                f"Wala po kayong appointment sa **{mentioned_date}**."
+            )
+        parts.append(f"\nNarito po ang inyong mga kasalukuyang appointment:\n{actual_text}")
+        verb = 'kanselahin' if action == 'cancel' else 'i-reschedule'
+        parts.append(f"\nAlin po ang gusto ninyong {verb}?")
+        return '\n'.join(parts)
+    else:
+        parts = []
+        if mentioned_svc and mentioned_date:
+            parts.append(
+                f"You don't have an appointment for **{mentioned_svc}** on **{mentioned_date}**."
+            )
+        elif mentioned_svc:
+            parts.append(
+                f"I couldn't find a **{mentioned_svc}** appointment on that date."
+            )
+        elif mentioned_date:
+            parts.append(
+                f"You don't have an appointment on **{mentioned_date}**."
+            )
+        parts.append(f"\nHere are your current appointments:\n{actual_text}")
+        verb = 'cancel' if action == 'cancel' else 'reschedule'
+        parts.append(f"\nWhich one would you like to {verb}?")
+        return '\n'.join(parts)
+
 
 
 # ── Appointment Creation (Atomic) ─────────────────────────────────────────

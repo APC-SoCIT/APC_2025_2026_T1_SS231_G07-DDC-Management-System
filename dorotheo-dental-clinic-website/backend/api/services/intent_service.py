@@ -322,9 +322,9 @@ OUT_OF_SCOPE_PATTERNS = [
     # Programming
     r'write.*code', r'\bprogramming\b', r'\bpython\b', r'\bjavascript\b',
     r'how to code', r'\balgorithm\b',
-    # Random trivia
+    # Random trivia (but NOT dental-related questions like "what color braces")
     r'who invented', r'when was .* born', r'how tall is',
-    r'what color is', r'how many .* in .* world',
+    r'how many .* in .* world',
     # Explicit off-topic
     r'\bbitcoin\b', r'\bcrypto\b', r'stock market', r'\blottery\b',
     # Geography/History
@@ -518,6 +518,21 @@ def _is_out_of_scope(text: str) -> bool:
     """Check if the message is unrelated to dental clinic topics."""
     low = text.lower()
 
+    # FIRST: if the message contains ANY dental-related words, it is NEVER out-of-scope.
+    # This ensures questions like "what color braces" or "my teeth itch" are always handled.
+    dental_words = [
+        'tooth', 'teeth', 'dental', 'dentist', 'clinic',
+        'appointment', 'braces', 'ngipin', 'dentista', 'service',
+        'gum', 'gums', 'gilagid', 'molar', 'filling', 'crown',
+        'extraction', 'cleaning', 'whitening', 'retainer', 'denture',
+        'orthodontic', 'implant', 'veneer', 'oral', 'jaw', 'panga',
+        'cavity', 'floss', 'brush', 'mouth', 'bibig', 'checkup',
+        'consultation', 'x-ray', 'xray', 'root canal',
+        'color', 'kulay',  # color questions about braces/dental
+    ]
+    if any(dw in low for dw in dental_words):
+        return False
+
     # Check keyword matches
     if _matches_keywords(low, OUT_OF_SCOPE_KEYWORDS):
         return True
@@ -525,11 +540,6 @@ def _is_out_of_scope(text: str) -> bool:
     # Check regex patterns
     for pattern in OUT_OF_SCOPE_PATTERNS:
         if re.search(pattern, low, re.IGNORECASE):
-            # But exclude dental-related false positives
-            dental_words = ['tooth', 'teeth', 'dental', 'dentist', 'clinic',
-                           'appointment', 'braces', 'ngipin', 'dentista', 'service']
-            if any(dw in low for dw in dental_words):
-                return False
             return True
 
     return False
@@ -584,6 +594,56 @@ def _is_dental_advice(text: str) -> bool:
         if re.search(pattern, text, re.IGNORECASE):
             return True
     return _matches_keywords(text, DENTAL_ADVICE_KEYWORDS)
+
+
+# ── Dental Recommendation / Opinion Patterns ─────────────────────────────
+# These match questions asking for dental-related advice, recommendations, or opinions
+# that the AI can answer using its general dental knowledge.
+# E.g. "What color braces should I get?", "What toothpaste do you recommend?"
+
+DENTAL_RECOMMENDATION_PATTERNS = [
+    # Color/style questions about dental items
+    r'(what|which|anong|ano)\s+(color|colour|kulay|shade|design|style|type).{0,40}(brace|retainer|crown|veneer|filling|denture|tooth|teeth|ngipin)',
+    r'(brace|retainer|crown|veneer|filling|denture).{0,30}(color|colour|kulay|shade|design|style|recommend)',
+    r'(recommend|suggest|advice|best|maganda|magandang|okay|ok).{0,40}(color|colour|kulay|shade).{0,30}(brace|retainer|crown|veneer|tooth|teeth|ngipin)',
+    # Product recommendations
+    r'(what|which|anong|ano).{0,20}(toothpaste|toothbrush|mouthwash|floss|dental product).{0,20}(recommend|suggest|best|good|use|should)',
+    r'(recommend|suggest|best|good).{0,20}(toothpaste|toothbrush|mouthwash|floss|dental product)',
+    # Dental choice questions
+    r'(should i|can i|is it ok|is it okay|pwede|puwede).{0,30}(get|have|use|choose|pick|wear).{0,30}(brace|retainer|veneer|crown|whitening|implant)',
+    r'(what|which|anong).{0,20}(type|kind|uri).{0,30}(brace|retainer|filling|crown|denture|implant|whitening)',
+    # General dental opinion/advice
+    r'(what do you think|what do you suggest|what would you recommend|ano sa tingin|sa tingin mo).{0,40}(tooth|teeth|dental|brace|ngipin|oral)',
+    r'(any tips|any advice|any suggestion|may tips|may payo).{0,30}(tooth|teeth|dental|brace|oral|ngipin|gum)',
+    # "should I get braces" type questions
+    r'should (i|we|my).{0,30}(get|have|try|consider|use).{0,30}(brace|retainer|veneer|crown|whitening|implant|cleaning|extraction)',
+    # Itching/discomfort questions (not severe symptoms, more like general concerns)
+    r'(gums?|teeth?|tooth|ngipin|gilagid).{0,20}(itch|itching|itchy|kumakati|makati|kati)',
+    r'(itch|itching|itchy|kumakati|makati).{0,20}(gums?|teeth?|tooth|ngipin|gilagid)',
+]
+
+DENTAL_RECOMMENDATION_KEYWORDS = [
+    'color braces', 'color of braces', 'braces color',
+    'what color braces', 'which color braces',
+    'best toothpaste', 'best toothbrush', 'best mouthwash',
+    'recommend toothpaste', 'recommend mouthwash',
+    'gums itching', 'gum itching', 'gums itch', 'gums are itching',
+    'itchy gums', 'teeth itching', 'itchy teeth',
+    'my gums are itching', 'my gums itch',
+    'kulay ng braces', 'anong kulay ng braces',
+    'magandang kulay ng braces',
+]
+
+
+def _is_dental_recommendation(text: str) -> bool:
+    """Detect dental-related recommendation/opinion questions.
+    E.g. 'What color braces should I get?' → True
+    E.g. 'My gums are itching what should I do' → True
+    """
+    for pattern in DENTAL_RECOMMENDATION_PATTERNS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    return _matches_keywords(text, DENTAL_RECOMMENDATION_KEYWORDS)
 
 
 def classify_intent(message: str) -> IntentResult:
@@ -655,6 +715,12 @@ def classify_intent(message: str) -> IntentResult:
     # E.g. "How often should I floss?", "Is mouthwash necessary?"
     if _is_dental_advice(low):
         logger.info("Intent: DENTAL_ADVICE (hygiene/advice, rule-based)")
+        return IntentResult(intent=INTENT_DENTAL_ADVICE, confidence=0.85, source='rule')
+
+    # 5c. Check dental-related recommendation/opinion questions
+    # E.g. "What color braces should I get?", "What toothpaste do you recommend?"
+    if _is_dental_recommendation(low):
+        logger.info("Intent: DENTAL_ADVICE (recommendation, rule-based)")
         return IntentResult(intent=INTENT_DENTAL_ADVICE, confidence=0.85, source='rule')
 
     # 6. Check clinic information

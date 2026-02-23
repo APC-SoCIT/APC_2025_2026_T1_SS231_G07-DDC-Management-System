@@ -36,7 +36,7 @@ SLOW_RESPONSE_THRESHOLD = 10  # seconds
 # Default generation config
 DEFAULT_GEN_CONFIG = {
     "temperature": 0.2,
-    "max_output_tokens": 900,
+    "max_output_tokens": 2048,
     "top_p": 0.9,
     "top_k": 40,
 }

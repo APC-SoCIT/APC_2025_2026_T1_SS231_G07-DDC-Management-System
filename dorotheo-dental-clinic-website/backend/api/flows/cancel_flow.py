@@ -106,10 +106,14 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
     if isvc.step_tag_exists(hist, '[CANCEL_STEP_1]'):
         appt = bsvc.match_appointment(msg, upcoming)
         if not appt:
+            # Check if user mentioned a service+date that doesn't match
+            mismatch_msg = bsvc.get_appointment_mismatch_message(msg, upcoming, is_tl, action='cancel')
             qr = []
             for a in upcoming:
                 svc = a.service.name if a.service else 'Appointment'
-                qr.append(f"{svc} – {a.date.strftime('%B %d, %Y')}")
+                qr.append(f"{svc} \u2013 {a.date.strftime('%B %d, %Y')} at {bsvc.fmt_time(a.time)}")
+            if mismatch_msg:
+                return build_reply(mismatch_msg, qr, tag='[CANCEL_STEP_1]')
             msg_text = (
                 "Hindi ko po ma-identify kung aling appointment ang tinutukoy ninyo. "
                 "Puwede po bang pumili mula sa mga opsyon sa ibaba?"
@@ -127,6 +131,15 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
     if auto_match:
         return _build_cancel_confirmation(auto_match, is_tl)
 
+    # Check if user mentioned a mismatched service+date combo
+    mismatch_msg = bsvc.get_appointment_mismatch_message(msg, upcoming, is_tl, action='cancel')
+    if mismatch_msg:
+        qr = []
+        for a in upcoming:
+            svc = a.service.name if a.service else 'Appointment'
+            qr.append(f"{svc} \u2013 {a.date.strftime('%B %d, %Y')} at {bsvc.fmt_time(a.time)}")
+        return build_reply(mismatch_msg, qr, tag='[CANCEL_STEP_1]')
+
     if is_tl:
         header = "### Kanselahin – Pumili ng Appointment\n"
         footer = "\nAlin pong appointment ang gusto ninyong kanselahin?"
@@ -138,7 +151,7 @@ def handle_cancel(user, msg: str, hist: list, detected_lang: str) -> dict:
     qr = []
     for a in upcoming:
         svc = a.service.name if a.service else 'Appointment'
-        label = f"{svc} – {a.date.strftime('%B %d, %Y')}"
+        label = f"{svc} \u2013 {a.date.strftime('%B %d, %Y')} at {bsvc.fmt_time(a.time)}"
         lines.append(f"- **{label}**")
         qr.append(label)
     lines.append(footer)
