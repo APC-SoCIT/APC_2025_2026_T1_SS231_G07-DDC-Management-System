@@ -14,6 +14,21 @@ interface Service {
   image: string
 }
 
+function ServiceImage({ src, alt }: { src: string; alt: string }) {
+  const [imgSrc, setImgSrc] = useState(src || "/placeholder.svg")
+  
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt}
+      fill
+      className="object-cover"
+      unoptimized
+      onError={() => setImgSrc("/placeholder.svg")}
+    />
+  )
+}
+
 const categories = [
   { id: "all", label: "All Services" },
   { id: "orthodontics", label: "Orthodontics" },
@@ -116,13 +131,7 @@ export default function Services() {
                   className="bg-white border border-[var(--color-border)] rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   <div className="relative h-48">
-                    <Image 
-                      src={service.image || "/placeholder.svg"} 
-                      alt={service.name} 
-                      fill 
-                      className="object-cover"
-                      unoptimized
-                    />
+                    <ServiceImage src={service.image} alt={service.name} />
                   </div>
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-2">
