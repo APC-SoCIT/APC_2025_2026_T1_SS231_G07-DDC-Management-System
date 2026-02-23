@@ -298,6 +298,14 @@ function getTableRowCount(): number {
   return tbody.querySelectorAll("tr").length;
 }
 
+/** Click a status tab and wait for the UI to reflect the active state */
+async function clickTab(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name }).className).toContain("border-blue-600");
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -334,10 +342,12 @@ describe("Billing Page — Tab Rendering", () => {
     const paidTab = screen.getByRole("button", { name: "Paid" });
     const allTab = screen.getByRole("button", { name: "All" });
 
-    await userEvent.click(paidTab);
+    fireEvent.click(paidTab);
 
-    expect(paidTab.className).toContain("text-blue-600");
-    expect(allTab.className).not.toContain("border-blue-600");
+    await waitFor(() => {
+      expect(paidTab.className).toContain("text-blue-600");
+      expect(allTab.className).not.toContain("border-blue-600");
+    });
   });
 
   // UT-04: Only one tab active at a time
@@ -347,9 +357,9 @@ describe("Billing Page — Tab Rendering", () => {
     const tabs = ["All", "Pending", "Overdue", "Paid"];
 
     for (const tabName of tabs) {
-      const tab = screen.getByRole("button", { name: tabName });
-      await userEvent.click(tab);
+      await clickTab(tabName);
 
+      const tab = screen.getByRole("button", { name: tabName });
       // The clicked tab should be active
       expect(tab.className).toContain("border-blue-600");
 
@@ -382,8 +392,7 @@ describe("Billing Page — Filtering Logic", () => {
   test("'Pending' tab shows exactly 2 rows (status 'sent')", async () => {
     await renderPage();
 
-    const pendingTab = screen.getByRole("button", { name: "Pending" });
-    await userEvent.click(pendingTab);
+    await clickTab("Pending");
 
     expect(getTableRowCount()).toBe(2);
   });
@@ -392,8 +401,7 @@ describe("Billing Page — Filtering Logic", () => {
   test("'Overdue' tab shows exactly 1 row", async () => {
     await renderPage();
 
-    const overdueTab = screen.getByRole("button", { name: "Overdue" });
-    await userEvent.click(overdueTab);
+    await clickTab("Overdue");
 
     expect(getTableRowCount()).toBe(1);
   });
@@ -402,8 +410,7 @@ describe("Billing Page — Filtering Logic", () => {
   test("'Paid' tab shows exactly 2 rows", async () => {
     await renderPage();
 
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     expect(getTableRowCount()).toBe(2);
   });
@@ -413,8 +420,7 @@ describe("Billing Page — Filtering Logic", () => {
     await renderPage();
 
     // Switch to Paid tab
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     // Before applying patient filter — 2 paid invoices
     expect(getTableRowCount()).toBe(2);
@@ -446,8 +452,7 @@ describe("Billing Page — Filtering Logic", () => {
 
     await renderPage();
 
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     expect(screen.getByText("No paid invoices found.")).toBeInTheDocument();
     expect(getTableRowCount()).toBe(0);
@@ -460,8 +465,7 @@ describe("Billing Page — Filtering Logic", () => {
     const tabs = ["All", "Pending", "Overdue", "Paid"];
 
     for (const tabName of tabs) {
-      const tab = screen.getByRole("button", { name: tabName });
-      await userEvent.click(tab);
+      await clickTab(tabName);
 
       // INV-006 is cancelled — should never appear
       expect(screen.queryByText("INV-006")).not.toBeInTheDocument();
@@ -488,8 +492,7 @@ describe("Billing Page — Summary Cards", () => {
   test("'Paid' tab shows total settled amount", async () => {
     await renderPage();
 
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     // Total due of paid: 250 + 600 = 850
     expect(screen.getByText("Total Settled")).toBeInTheDocument();
@@ -507,8 +510,7 @@ describe("Billing Page — Table Rendering", () => {
   test("'Paid' tab does not show 'Record Payment' buttons", async () => {
     await renderPage();
 
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     expect(screen.queryByText("Record Payment")).not.toBeInTheDocument();
   });
@@ -517,8 +519,7 @@ describe("Billing Page — Table Rendering", () => {
   test("paid invoice status badge has green styling", async () => {
     await renderPage();
 
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     const badges = screen.getAllByText("Paid", { selector: "span" });
     // Filter to only the status badges (not the tab button)
@@ -535,8 +536,7 @@ describe("Billing Page — Table Rendering", () => {
   test("paid invoices show balance in green text", async () => {
     await renderPage();
 
-    const paidTab = screen.getByRole("button", { name: "Paid" });
-    await userEvent.click(paidTab);
+    await clickTab("Paid");
 
     // Balance cells should have green text
     const balanceCells = screen.getAllByText(/₱0\.00/);

@@ -64,6 +64,14 @@ jest.mock("@/lib/api", () => ({
   getPatients: (...args: any[]) => mockGetPatients(...args),
 }));
 
+// Mock clinic context with a stable reference to avoid triggering useEffect reruns
+jest.mock("@/lib/clinic-context", () => {
+  const selectedClinic = { id: 1, name: "Test Clinic" };
+  return {
+    useClinic: () => ({ selectedClinic }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
@@ -213,6 +221,14 @@ function getTableRowCount(): number {
   return tbody.querySelectorAll("tr").length;
 }
 
+/** Click a status tab and wait for the UI to reflect the active state */
+async function clickTab(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name }).className).toContain("border-blue-600");
+  });
+}
+
 function getInvoiceNumbersInTable(): string[] {
   const tbody = document.querySelector("tbody");
   if (!tbody) return [];
@@ -248,7 +264,7 @@ describe("Integration — Data Splitting", () => {
     expect(unpaidInvoices).not.toContain("INV-206"); // cancelled
 
     // Switch to Paid tab → shows paid only (2)
-    await userEvent.click(screen.getByRole("button", { name: "Paid" }));
+    await clickTab("Paid");
     expect(getTableRowCount()).toBe(2);
     const paidInvoices = getInvoiceNumbersInTable();
     expect(paidInvoices).toContain("INV-204");
@@ -261,7 +277,7 @@ describe("Integration — Data Splitting", () => {
     setupMocks(MIXED_INVOICES.filter((inv) => inv.status !== "paid"));
     await renderPage();
 
-    await userEvent.click(screen.getByRole("button", { name: "Paid" }));
+    await clickTab("Paid");
     expect(getTableRowCount()).toBe(0);
     expect(screen.getByText("No paid invoices found.")).toBeInTheDocument();
   });
@@ -276,7 +292,7 @@ describe("Integration — Data Splitting", () => {
     expect(getTableRowCount()).toBe(0);
 
     // Paid tab should show 2
-    await userEvent.click(screen.getByRole("button", { name: "Paid" }));
+    await clickTab("Paid");
     expect(getTableRowCount()).toBe(2);
   });
 });
@@ -297,10 +313,12 @@ describe("Integration — Payment Success Refresh", () => {
 
     // Click "Record Payment" for the first invoice
     const recordButtons = screen.getAllByText("Record Payment");
-    await userEvent.click(recordButtons[0]);
+    fireEvent.click(recordButtons[0]);
 
     // Modal should open
-    expect(screen.getByTestId("payment-modal")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("payment-modal")).toBeInTheDocument();
+    });
 
     // Simulate that after payment, INV-201 is now paid
     const updatedInvoices = MIXED_INVOICES.map((inv) =>
@@ -311,7 +329,7 @@ describe("Integration — Payment Success Refresh", () => {
     mockGetInvoices.mockResolvedValue(updatedInvoices);
 
     // Trigger onSuccess callback
-    await userEvent.click(screen.getByTestId("modal-success"));
+    fireEvent.click(screen.getByTestId("modal-success"));
 
     // Wait for data refresh
     await waitFor(() => {
@@ -324,7 +342,7 @@ describe("Integration — Payment Success Refresh", () => {
     });
 
     // Switch to Paid tab — INV-201 should now be there (3 paid total)
-    await userEvent.click(screen.getByRole("button", { name: "Paid" }));
+    await clickTab("Paid");
     await waitFor(() => {
       expect(getTableRowCount()).toBe(3);
     });
@@ -355,7 +373,7 @@ describe("Integration — Regression: Existing Tabs", () => {
   test("'Pending' tab correctly shows only sent invoices", async () => {
     await renderPage();
 
-    await userEvent.click(screen.getByRole("button", { name: "Pending" }));
+    await clickTab("Pending");
     expect(getTableRowCount()).toBe(2);
 
     const invoices = getInvoiceNumbersInTable();
@@ -368,7 +386,7 @@ describe("Integration — Regression: Existing Tabs", () => {
   test("'Overdue' tab correctly shows only overdue invoices", async () => {
     await renderPage();
 
-    await userEvent.click(screen.getByRole("button", { name: "Overdue" }));
+    await clickTab("Overdue");
     expect(getTableRowCount()).toBe(1);
 
     const invoices = getInvoiceNumbersInTable();
@@ -382,9 +400,11 @@ describe("Integration — Regression: Existing Tabs", () => {
 
     // Click first Record Payment button (for Alice — INV-201)
     const recordButtons = screen.getAllByText("Record Payment");
-    await userEvent.click(recordButtons[0]);
+    fireEvent.click(recordButtons[0]);
 
-    expect(screen.getByTestId("payment-modal")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("payment-modal")).toBeInTheDocument();
+    });
     expect(screen.getByTestId("modal-patient-id").textContent).toBe("1");
     expect(screen.getByTestId("modal-patient-name").textContent).toBe("Alice Smith");
   });
@@ -417,17 +437,17 @@ describe("Integration — Cross-Tab Patient Filter", () => {
     });
 
     // Pending tab: Alice has 1 sent invoice
-    await userEvent.click(screen.getByRole("button", { name: "Pending" }));
+    await clickTab("Pending");
     expect(getTableRowCount()).toBe(1);
     expect(screen.getByText("INV-201")).toBeInTheDocument();
 
     // Overdue tab: Alice has 1 overdue invoice
-    await userEvent.click(screen.getByRole("button", { name: "Overdue" }));
+    await clickTab("Overdue");
     expect(getTableRowCount()).toBe(1);
     expect(screen.getByText("INV-203")).toBeInTheDocument();
 
     // Paid tab: Alice has 1 paid invoice
-    await userEvent.click(screen.getByRole("button", { name: "Paid" }));
+    await clickTab("Paid");
     expect(getTableRowCount()).toBe(1);
     expect(screen.getByText("INV-204")).toBeInTheDocument();
   });
@@ -452,9 +472,9 @@ describe("Integration — Cross-Tab Patient Filter", () => {
     });
 
     // Clear filter
-    await userEvent.click(searchInput);
+    fireEvent.focus(searchInput);
     const clearOption = await screen.findByText("All Patients (Clear Selection)");
-    await userEvent.click(clearOption);
+    fireEvent.click(clearOption);
 
     // All tab should now show 3 again
     await waitFor(() => {

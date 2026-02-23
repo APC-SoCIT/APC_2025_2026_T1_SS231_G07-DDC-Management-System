@@ -281,11 +281,12 @@ describe('api.getPatientById', () => {
 })
 
 // ─────────────────────────────────────────────────────────────
-// getAllPatients — dead code removal verification
+// getAllPatients — legacy function verification
 // ─────────────────────────────────────────────────────────────
 
-describe('Dead code removal', () => {
-  test('getAllPatients no longer exists on api object', () => {
-    expect((api as any).getAllPatients).toBeUndefined()
+describe('Legacy getAllPatients', () => {
+  test('getAllPatients still exists on api object for backward compatibility', () => {
+    expect((api as any).getAllPatients).toBeDefined()
+    expect(typeof (api as any).getAllPatients).toBe('function')
   })
 })

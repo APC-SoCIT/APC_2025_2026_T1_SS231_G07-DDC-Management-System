@@ -20,7 +20,7 @@ import {
   Hourglass
 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
-import { api } from "@/lib/api"
+import { api, authenticatedFetch } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic, type ClinicLocation } from "@/lib/clinic-context"
 import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
@@ -387,11 +387,7 @@ export default function StaffAppointments() {
     if (!token) return
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
-        headers: {
-          'Authorization': `Token ${token}`,
-        },
-      })
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {}, token)
       
       if (response.ok) {
         const data = await response.json()
@@ -614,14 +610,11 @@ export default function StaffAppointments() {
     if (!token) return
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blockData),
-      })
+      }, token)
 
       if (response.ok) {
         const newBlockedSlot = await response.json()
@@ -672,12 +665,9 @@ export default function StaffAppointments() {
       variant: "warning",
       onConfirm: async () => {
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/${blockId}/`, {
+          const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/${blockId}/`, {
             method: 'DELETE',
-            headers: {
-              'Authorization': `Token ${token}`,
-            },
-          })
+          }, token)
 
           if (response.ok) {
             setBlockedTimeSlots(blockedTimeSlots.filter(slot => slot.id !== blockId))
