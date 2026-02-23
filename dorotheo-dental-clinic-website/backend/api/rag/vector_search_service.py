@@ -1,14 +1,21 @@
 """
 Vector search service for RAG.
 
-Performs cosine-similarity search over PageChunk embeddings stored in the DB.
-Uses pure Python math (no pgvector dependency) for maximum compatibility.
+Uses pgvector's native cosine-distance operator (<=>)  via Django ORM.
+This replaces the old pure-Python loop which loaded all chunks into memory.
+
+Benefits over the old approach:
+  - Postgres does the similarity computation — no Python loop
+  - ivfflat index makes it sub-linear at scale
+  - Only top_k rows are fetched (not all 2000+)
+  - Works with Supabase's managed Postgres out of the box
 """
 
 import logging
-import math
 import time
 from typing import List, Tuple, Optional
+
+from pgvector.django import CosineDistance
 
 from api.models import PageChunk
 from .embedding_service import generate_query_embedding
@@ -19,21 +26,6 @@ logger = logging.getLogger('rag.vector_search')
 
 DEFAULT_TOP_K = 5
 DEFAULT_SIMILARITY_THRESHOLD = 0.55   # Minimum cosine similarity to include
-MAX_CHUNKS_TO_SCAN = 2000             # Safety cap on DB rows scanned
-
-
-# ── Math helpers ───────────────────────────────────────────────────────────
-
-def _cosine_similarity(a: List[float], b: List[float]) -> float:
-    """Compute cosine similarity between two vectors."""
-    if len(a) != len(b) or not a:
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x * x for x in a))
-    mag_b = math.sqrt(sum(x * x for x in b))
-    if mag_a == 0 or mag_b == 0:
-        return 0.0
-    return dot / (mag_a * mag_b)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────
@@ -44,12 +36,15 @@ def search_similar_chunks(
     similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
 ) -> List[Tuple[PageChunk, float]]:
     """
-    Search for page chunks similar to the query text.
+    Search for page chunks similar to the query text using pgvector.
+
+    Uses Postgres's native <=> cosine-distance operator with an ivfflat index
+    for fast approximate nearest-neighbour search.
 
     Args:
         query: The user's question / search text.
         top_k: Maximum number of results to return.
-        similarity_threshold: Minimum cosine similarity score.
+        similarity_threshold: Minimum cosine similarity score (0–1).
 
     Returns:
         List of (PageChunk, similarity_score) tuples, sorted by score descending.
@@ -64,32 +59,27 @@ def search_similar_chunks(
             logger.warning("Could not generate query embedding – skipping RAG")
             return []
 
-        # 2. Fetch all chunks that have embeddings
-        chunks = PageChunk.objects.exclude(embedding=[]).order_by('page_id', 'chunk_index')[:MAX_CHUNKS_TO_SCAN]
-        if not chunks.exists():
-            logger.info("No indexed page chunks found – skipping RAG")
-            return []
+        # 2. pgvector query — runs entirely in Postgres
+        #    CosineDistance returns distance (0=identical, 2=opposite).
+        #    similarity = 1 - distance  →  higher is better.
+        qs = (
+            PageChunk.objects
+            .filter(embedding__isnull=False)
+            .annotate(distance=CosineDistance('embedding', query_embedding))
+            .filter(distance__lte=1.0 - similarity_threshold)   # distance threshold
+            .order_by('distance')
+            [:top_k]
+        )
 
-        # 3. Score each chunk
-        scored: List[Tuple[PageChunk, float]] = []
-        for chunk in chunks:
-            if not chunk.embedding:
-                continue
-            try:
-                score = _cosine_similarity(query_embedding, chunk.embedding)
-                if score >= similarity_threshold:
-                    scored.append((chunk, score))
-            except Exception:
-                continue
-
-        # 4. Sort by score descending and take top_k
-        scored.sort(key=lambda x: x[1], reverse=True)
-        results = scored[:top_k]
+        results: List[Tuple[PageChunk, float]] = [
+            (chunk, 1.0 - chunk.distance)
+            for chunk in qs
+        ]
 
         elapsed = time.time() - start
         logger.info(
-            "RAG vector search: query=%r scanned=%d hits=%d top_score=%.3f elapsed=%.2fs",
-            query[:60], len(chunks), len(results),
+            "RAG pgvector search: query=%r hits=%d top_score=%.3f elapsed=%.2fs",
+            query[:60], len(results),
             results[0][1] if results else 0.0,
             elapsed,
         )
