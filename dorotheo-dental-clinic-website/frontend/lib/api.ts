@@ -1,7 +1,7 @@
 // Normalize API base to always point to the backend API (prevents hitting Next.js frontend 404s)
 const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 const trimmedBase = rawBase.replace(/\/+$/, "")
-const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trimmedBase}/api`
+export const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trimmedBase}/api`
 
 // ---------------------------------------------------------------------------
 // JWT auth interceptor — module-level token store

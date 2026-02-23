@@ -3,7 +3,7 @@
 import { useState, useEffect, Fragment } from "react"
 import { Calendar as CalendarIcon, Clock, User, Plus, X, Edit, XCircle, ChevronDown, ChevronUp, FileText, Camera, Download, Search } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
-import { api } from "@/lib/api"
+import { api, API_BASE_URL } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
 import { getReadableColor, getServiceBadgeStyle } from "@/lib/utils"
@@ -395,7 +395,7 @@ export default function PatientAppointments() {
         setServices(patientAllowedServices)
 
         // Fetch blocked time slots
-        const blockedResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
+        const blockedResponse = await fetch(`${API_BASE_URL}/blocked-time-slots/`, {
           headers: {
             'Authorization': `Token ${token}`,
           },

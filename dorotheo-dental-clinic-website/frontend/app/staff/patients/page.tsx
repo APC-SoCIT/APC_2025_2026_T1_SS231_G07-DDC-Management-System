@@ -13,7 +13,7 @@ import {
   X,
   Users,
 } from "lucide-react"
-import { api } from "@/lib/api"
+import { api, API_BASE_URL } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
 interface Patient {
@@ -340,7 +340,7 @@ export default function StaffPatients() {
     
     try {
       // Use the API's delete endpoint for patients (users with user_type='patient')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${patientId}/`, {
+      const response = await fetch(`${API_BASE_URL}/users/${patientId}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Token ${token}`,

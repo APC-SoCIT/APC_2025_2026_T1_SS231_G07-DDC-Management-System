@@ -15,7 +15,7 @@ import {
   X,
   Users,
 } from "lucide-react"
-import { api } from "@/lib/api"
+import { api, API_BASE_URL } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
 interface Patient {
@@ -263,7 +263,7 @@ export default function OwnerPatients() {
     if (!confirmModal.patient || !token) return
     setActionLoading(true)
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${confirmModal.patient.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/users/${confirmModal.patient.id}/`, {
         method: 'DELETE',
         headers: { 'Authorization': `Token ${token}` },
       })

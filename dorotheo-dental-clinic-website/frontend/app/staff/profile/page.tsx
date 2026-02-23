@@ -6,7 +6,7 @@ import DentistCalendarAvailability from "@/components/dentist-calendar-availabil
 import QuickAvailabilityModal from "@/components/quick-availability-modal"
 import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
 import { useAuth } from "@/lib/auth"
-import { api } from "@/lib/api"
+import { api, API_BASE_URL } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
 
 export default function StaffProfile() {
@@ -248,7 +248,7 @@ export default function StaffProfile() {
               // First, delete existing availability for the selected dates to avoid duplicates
               const allDates = data.dates!;
               if (allDates.length > 0) {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/bulk_delete/`, {
+                await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
@@ -261,7 +261,7 @@ export default function StaffProfile() {
                 });
               }
               const promises = data.dates!.map(date =>
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/`, {
+                fetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
@@ -313,7 +313,7 @@ export default function StaffProfile() {
 
               // First, delete existing availability for recurring dates to avoid duplicates
               if (dates.length > 0) {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/bulk_delete/`, {
+                await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,
@@ -327,7 +327,7 @@ export default function StaffProfile() {
               }
 
               const promises = dates.map(date =>
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/dentist-availability/`, {
+                fetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
                     'Authorization': `Token ${token}`,

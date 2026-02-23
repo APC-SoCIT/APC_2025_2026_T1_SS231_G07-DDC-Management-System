@@ -18,7 +18,7 @@ import {
   Hourglass
 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
-import { api, authenticatedFetch } from "@/lib/api"
+import { api, authenticatedFetch, API_BASE_URL } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
 import { getServiceBadgeStyle } from "@/lib/utils"
@@ -384,7 +384,7 @@ export default function OwnerAppointments() {
     if (!token) return
     
     try {
-      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {}, token)
+      const response = await authenticatedFetch(`${API_BASE_URL}/blocked-time-slots/`, {}, token)
       
       if (response.ok) {
         const data = await response.json()
@@ -602,7 +602,7 @@ export default function OwnerAppointments() {
     if (!token) return
 
     try {
-      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/blocked-time-slots/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blockData),
@@ -647,7 +647,7 @@ export default function OwnerAppointments() {
       variant: "warning",
       onConfirm: async () => {
         try {
-          const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/blocked-time-slots/${blockId}/`, {
+          const response = await authenticatedFetch(`${API_BASE_URL}/blocked-time-slots/${blockId}/`, {
             method: 'DELETE',
           }, token)
 

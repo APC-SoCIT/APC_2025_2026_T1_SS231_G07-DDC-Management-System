@@ -4,7 +4,7 @@ import { useState, useEffect, Fragment, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Calendar, ChevronDown, ChevronUp, Clock, FileText, Calendar as CalendarIcon, Plus, X, Download, Camera, Eye, MapPin, Upload } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { api } from "@/lib/api"
+import { api, API_BASE_URL } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useClinic } from "@/lib/clinic-context"
 import { getServiceBadgeStyle } from "@/lib/utils"
@@ -166,7 +166,7 @@ export default function PatientAppointmentsPage() {
     const fetchDentistAvailability = async () => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/dentist-availability/?dentist_id=${newAppointment.dentist}`,
+          `${API_BASE_URL}/dentist-availability/?dentist_id=${newAppointment.dentist}`,
           {
             headers: {
               Authorization: `Token ${token}`,
@@ -202,7 +202,7 @@ export default function PatientAppointmentsPage() {
     const fetchBookedSlots = async () => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'}/booked-slots/?date=${newAppointment.date}`,
+          `${API_BASE_URL}/booked-slots/?date=${newAppointment.date}`,
           {
             headers: {
               Authorization: `Token ${token}`,
