@@ -276,7 +276,7 @@ export default function StaffDashboard() {
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 text-xs text-white bg-gray-800 rounded px-2 py-1.5 opacity-0 group-hover:opacity-100 pointer-events-none z-50 leading-snug">
                 {selectedClinic === "all"
                   ? "All registered patients in the system, including those with no appointments yet."
-                  : "Patients with at least one appointment at this clinic. 'All Clinics' includes patients who haven't booked here, so totals won't always add up."}
+                  : "Patients with at least one appointment at this clinic. 'All Clinics' includes patients who haven't booked here, so totals won't always add up"}
               </span>
             </span>
           </div>
