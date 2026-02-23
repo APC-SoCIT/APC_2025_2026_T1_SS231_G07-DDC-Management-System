@@ -183,7 +183,6 @@ export default function PatientDocumentsPage() {
       setIsDeleting(false)
     }
   }
-  }
 
   const handleDownloadImage = (fileUrl: string, filename: string) => {
     fetch(fileUrl)
@@ -270,7 +269,7 @@ export default function PatientDocumentsPage() {
           </div>
         )}
         <div onClick={() => setSelectedDocument(doc)} className="flex items-start gap-3">
-          <FileText className="w-8 h-8 text-gray-600 flex-shrink-0" />
+          <FileText className="w-8 h-8 text-gray-600 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600">
@@ -320,7 +319,7 @@ export default function PatientDocumentsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-primary)"></div>
       </div>
     )
   }
