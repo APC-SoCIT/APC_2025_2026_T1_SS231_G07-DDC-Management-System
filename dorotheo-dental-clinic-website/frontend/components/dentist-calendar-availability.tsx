@@ -24,6 +24,7 @@ function getCalendarAuthHeader(token: string): string {
 interface DentistAvailabilityProps {
   dentistId: number | undefined
   selectedClinicId?: number | null // null means "All Clinics"
+  onDateClick?: (dateStr: string) => void // Callback when a date is clicked on the calendar
 }
 
 interface SelectedDate {
@@ -35,7 +36,7 @@ interface SelectedDate {
   applyToAllClinics?: boolean
 }
 
-export default function DentistCalendarAvailability({ dentistId, selectedClinicId }: DentistAvailabilityProps) {
+export default function DentistCalendarAvailability({ dentistId, selectedClinicId, onDateClick }: DentistAvailabilityProps) {
   const { token } = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDates, setSelectedDates] = useState<Record<string, SelectedDate>>({})
@@ -260,6 +261,13 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       return // Don't allow selecting past dates
     }
 
+    // If onDateClick callback is provided, use the QuickAvailabilityModal via parent
+    if (onDateClick) {
+      onDateClick(dateStr)
+      return
+    }
+
+    // Fallback: show the old inline time modal
     setActiveDate(dateStr)
     setRepeatMode(false)
     setSelectedRepeatDays([])

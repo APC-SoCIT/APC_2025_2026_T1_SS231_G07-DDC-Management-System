@@ -15,6 +15,9 @@ export default function StaffProfile() {
   const [isEditing, setIsEditing] = useState(false)
   const [showQuickAvailability, setShowQuickAvailability] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [quickAvailInitialDates, setQuickAvailInitialDates] = useState<string[] | undefined>(undefined)
+  const [quickAvailInitialAllClinics, setQuickAvailInitialAllClinics] = useState<boolean | undefined>(undefined)
+  const [quickAvailInitialClinicId, setQuickAvailInitialClinicId] = useState<number | null | undefined>(undefined)
   const [successData, setSuccessData] = useState<{
     mode: 'specific' | 'recurring';
     dateCount?: number;
@@ -208,7 +211,13 @@ export default function StaffProfile() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-semibold text-[var(--color-text)]">My Schedule</h2>
             <button
-              onClick={() => setShowQuickAvailability(true)}
+              onClick={() => {
+                // Clear initial values so modal opens fresh
+                setQuickAvailInitialDates(undefined)
+                setQuickAvailInitialAllClinics(undefined)
+                setQuickAvailInitialClinicId(undefined)
+                setShowQuickAvailability(true)
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors font-medium"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,6 +229,20 @@ export default function StaffProfile() {
           <DentistCalendarAvailability 
             dentistId={user?.id} 
             selectedClinicId={typeof selectedClinic === 'object' && selectedClinic !== null ? selectedClinic.id : null}
+            onDateClick={(dateStr) => {
+              // Pre-select the clicked date
+              setQuickAvailInitialDates([dateStr])
+              // Pre-select clinic based on the current clinic selector
+              const clinicId = typeof selectedClinic === 'object' && selectedClinic !== null ? selectedClinic.id : null
+              if (clinicId) {
+                setQuickAvailInitialAllClinics(false)
+                setQuickAvailInitialClinicId(clinicId)
+              } else {
+                setQuickAvailInitialAllClinics(true)
+                setQuickAvailInitialClinicId(null)
+              }
+              setShowQuickAvailability(true)
+            }}
           />
         </div>
       )}
@@ -227,7 +250,16 @@ export default function StaffProfile() {
       {/* Quick Availability Modal */}
       <QuickAvailabilityModal
         isOpen={showQuickAvailability}
-        onClose={() => setShowQuickAvailability(false)}
+        onClose={() => {
+          setShowQuickAvailability(false)
+          // Clear initial values so next open from button starts fresh
+          setQuickAvailInitialDates(undefined)
+          setQuickAvailInitialAllClinics(undefined)
+          setQuickAvailInitialClinicId(undefined)
+        }}
+        initialDates={quickAvailInitialDates}
+        initialApplyToAllClinics={quickAvailInitialAllClinics}
+        initialClinicId={quickAvailInitialClinicId}
         onSave={async (data) => {
           if (!token || !user) return;
 

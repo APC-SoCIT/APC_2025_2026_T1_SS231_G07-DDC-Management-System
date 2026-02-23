@@ -17,13 +17,19 @@ interface QuickAvailabilityModalProps {
     clinicId?: number;
   }) => void;
   existingAvailability?: any[];
+  initialDates?: string[];
+  initialApplyToAllClinics?: boolean;
+  initialClinicId?: number | null;
 }
 
 export default function QuickAvailabilityModal({
   isOpen,
   onClose,
   onSave,
-  existingAvailability = []
+  existingAvailability = [],
+  initialDates,
+  initialApplyToAllClinics,
+  initialClinicId,
 }: QuickAvailabilityModalProps) {
   const { allClinics } = useClinic();
   const [mode, setMode] = useState<'specific' | 'recurring'>('specific');
@@ -42,6 +48,48 @@ export default function QuickAvailabilityModal({
       setSelectedClinicId(allClinics[0].id);
     }
   }, [applyToAllClinics, allClinics]);
+
+  // Initialize state from props when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      // Reset to specific dates mode
+      setMode('specific');
+      
+      // Pre-select dates if provided
+      if (initialDates && initialDates.length > 0) {
+        setSelectedDates(initialDates);
+        // Navigate the mini calendar to the month of the first initial date
+        const firstDate = new Date(initialDates[0] + 'T00:00:00');
+        setCurrentMonth(new Date(firstDate.getFullYear(), firstDate.getMonth(), 1));
+      } else {
+        setSelectedDates([]);
+      }
+      
+      // Pre-select clinic if provided
+      if (initialApplyToAllClinics !== undefined) {
+        setApplyToAllClinics(initialApplyToAllClinics);
+        if (!initialApplyToAllClinics && initialClinicId) {
+          setSelectedClinicId(initialClinicId);
+        } else if (initialApplyToAllClinics) {
+          setSelectedClinicId(null);
+        }
+      } else {
+        // Default: apply to all clinics
+        setApplyToAllClinics(true);
+        setSelectedClinicId(null);
+      }
+      
+      // Reset other state
+      setSelectedDaysOfWeek([]);
+      setSetAsRecurring(false);
+      setStartHour('09');
+      setStartMinute('00');
+      setStartPeriod('AM');
+      setEndHour('05');
+      setEndMinute('00');
+      setEndPeriod('PM');
+    }
+  }, [isOpen, initialDates, initialApplyToAllClinics, initialClinicId]);
   
   // Drag selection states
   const [isDragging, setIsDragging] = useState(false);
