@@ -20,6 +20,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── Guard: fail fast if required secrets are missing ─────────────────
+      - name: Verify required secrets are set
+        run: |
+          MISSING=()
+          [ -z "$SECRET_KEY"     ] && MISSING+=("SECRET_KEY")
+          [ -z "$DATABASE_URL"   ] && MISSING+=("DATABASE_URL")
+          [ -z "$GEMINI_API_KEY" ] && MISSING+=("GEMINI_API_KEY")
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "❌ Missing required secrets: ${MISSING[*]}"
+            echo "Add them in GitHub → Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "✅ All required secrets are set."
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
       - name: Set up Python version
         uses: actions/setup-python@v4
         with:
@@ -32,9 +50,29 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-        
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
-      
+
+      # ── Validate migrations can load (catches missing packages early) ─────
+      - name: Check migrations load without errors
+        working-directory: ./dorotheo-dental-clinic-website/backend
+        run: |
+          source venv/bin/activate
+          python manage.py migrate --check --dry-run 2>&1 || true
+          python -c "
+          import django, os, sys
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dental_clinic.settings')
+          django.setup()
+          from django.db.migrations.loader import MigrationLoader
+          from django.db import connection
+          # Just import — will raise if any migration file has a bad import
+          loader = MigrationLoader(None, ignore_no_migrations=True)
+          print('✅ All migration files imported successfully.')
+          "
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          DEBUG: False
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
       - name: Collect static files
         working-directory: ./dorotheo-dental-clinic-website/backend
         run: |
@@ -44,6 +82,7 @@ jobs:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           DEBUG: False
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           
       - name: Zip artifact for deployment
         working-directory: ./dorotheo-dental-clinic-website/backend
