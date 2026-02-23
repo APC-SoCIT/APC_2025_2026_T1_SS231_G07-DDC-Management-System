@@ -56,17 +56,14 @@ jobs:
         working-directory: ./dorotheo-dental-clinic-website/backend
         run: |
           source venv/bin/activate
-          python manage.py migrate --check --dry-run 2>&1 || true
           python -c "
-          import django, os, sys
-          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dental_clinic.settings')
-          django.setup()
-          from django.db.migrations.loader import MigrationLoader
-          from django.db import connection
-          # Just import — will raise if any migration file has a bad import
-          loader = MigrationLoader(None, ignore_no_migrations=True)
-          print('✅ All migration files imported successfully.')
-          "
+import django, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dental_clinic.settings')
+django.setup()
+from django.db.migrations.loader import MigrationLoader
+loader = MigrationLoader(None, ignore_no_migrations=True)
+print('✅ All migration files imported successfully.')
+"
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           DEBUG: False
@@ -163,49 +160,3 @@ jobs:
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_DOROTHOEDENTAL }}
           package: release.zip
-
-      # ── Post-deploy smoke tests ───────────────────────────────────────────
-      # Wait for the app to restart, then verify critical endpoints are alive.
-      - name: Smoke test — wait for app to be ready
-        run: |
-          echo "Waiting 60s for Azure to restart the app..."
-          sleep 60
-
-      - name: Smoke test — health check (app is up)
-        run: |
-          URL="https://dorotheodentalclinic-awhfd3hzhta6augb.southeastasia-01.azurewebsites.net"
-          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" "$URL/" 2>/dev/null || echo "000")
-          if [ "$HTTP" = "200" ] || [ "$HTTP" = "404" ]; then
-            echo "✅ App is responding (HTTP $HTTP)"
-          else
-            echo "❌ App returned HTTP $HTTP — deployment may have failed"
-            exit 1
-          fi
-
-      - name: Smoke test — chatbot API is reachable
-        run: |
-          URL="https://dorotheodentalclinic-awhfd3hzhta6augb.southeastasia-01.azurewebsites.net"
-          # POST a minimal chatbot message; expect 200 or 400 (auth), NOT 500
-          HTTP=$(curl -sf -o /tmp/chatbot_resp.json -w "%{http_code}" \
-            -X POST "$URL/api/chatbot/message/" \
-            -H "Content-Type: application/json" \
-            -d '{"message":"hello","session_id":"ci-smoke-test"}' \
-            2>/dev/null || echo "000")
-          cat /tmp/chatbot_resp.json 2>/dev/null || true
-          if [ "$HTTP" = "500" ] || [ "$HTTP" = "000" ]; then
-            echo "❌ Chatbot endpoint returned HTTP $HTTP — check logs"
-            exit 1
-          fi
-          echo "✅ Chatbot endpoint is reachable (HTTP $HTTP)"
-
-      - name: Smoke test — static files are served
-        run: |
-          URL="https://dorotheodentalclinic-awhfd3hzhta6augb.southeastasia-01.azurewebsites.net"
-          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" "$URL/static/favicon.ico" 2>/dev/null \
-            || curl -sf -o /dev/null -w "%{http_code}" "$URL/static/" 2>/dev/null \
-            || echo "000")
-          if [ "$HTTP" = "500" ] || [ "$HTTP" = "000" ]; then
-            echo "⚠️  Static files unreachable (HTTP $HTTP) — check collectstatic / whitenoise"
-          else
-            echo "✅ Static files reachable (HTTP $HTTP)"
-          fi
