@@ -19,3 +19,4 @@ django-ratelimit==4.1.0
 django-storages[azure]==1.14.2
 azure-storage-blob==12.19.0
 django-redis==5.4.0
+pgvector==0.3.6
