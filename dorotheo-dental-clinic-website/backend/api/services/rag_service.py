@@ -594,7 +594,11 @@ def build_db_context(msg: str, user=None) -> str:
                 parts.append('\n'.join(lines))
 
     # User's appointments
-    if user and any(w in low for w in ['my appointment', 'my booking', 'my schedule']):
+    if user and any(w in low for w in [
+        'my appointment', 'my booking', 'my schedule',
+        'upcoming appointment', 'appointment time',
+        'time of my', 'show me my',
+    ]):
         appts = Appointment.objects.filter(
             patient=user,
             status__in=['confirmed', 'pending', 'reschedule_requested'],

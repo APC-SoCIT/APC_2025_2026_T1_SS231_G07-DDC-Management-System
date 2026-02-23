@@ -48,11 +48,25 @@ RESTRICTED_KW = [
     'connection string', 'config', 'schema', 'table name',
 ]
 
+# Keywords that indicate user/account info probing (subset of RESTRICTED_KW)
+_USER_INFO_KW = [
+    'password', 'admin', 'credential', 'superuser', 'staff password',
+    'token',
+]
+
 
 def _is_safe(msg: str) -> bool:
     """True if message doesn't contain restricted keywords."""
     low = msg.lower()
     return not any(kw in low for kw in RESTRICTED_KW)
+
+
+def _get_restricted_response(msg: str) -> str:
+    """Return differentiated response based on what sensitive info was probed."""
+    low = msg.lower()
+    if any(kw in low for kw in _USER_INFO_KW):
+        return "I cannot share sensitive user or account information."
+    return "I cannot share sensitive information about the system of the clinic."
 
 
 def _full_security_check(msg: str, user_id=None) -> tuple:
@@ -68,10 +82,7 @@ def _full_security_check(msg: str, user_id=None) -> tuple:
 
     # Legacy keyword check
     if not _is_safe(msg):
-        return False, build_reply(
-            "I'm here to assist you with clinic-related questions. "
-            "Let me know how I can help."
-        )
+        return False, build_reply(_get_restricted_response(msg))
 
     return True, None
 
@@ -219,8 +230,9 @@ ANTI-PATTERNS (STRICTLY FORBIDDEN):
 - NEVER output raw database-style text.
 
 SMART LENGTH CONTROL:
-Before sending any reply, ensure total lines < 22. If more, compress
-by grouping repeated information and removing redundancy.
+Keep responses concise and well-structured, but NEVER cut off mid-sentence.
+Always finish your thought completely. If a longer response is needed to fully
+answer the patient's question, that is acceptable. Prioritize completeness over brevity.
 
 WHAT YOU CAN HELP WITH:
 - Dental services and procedures information
@@ -281,7 +293,7 @@ Your role is to:
    Dorotheo Dental and Diagnostic Center so a dentist can properly evaluate them
 
 MOBILE-FIRST FORMATTING (MANDATORY):
-- Keep total response under 18 lines.
+- Keep responses well-structured but NEVER cut off mid-sentence. Always complete your thoughts.
 - Maximum 2–3 lines per paragraph.
 - Use `### ` for ALL section headers with ONE emoji each (e.g., `### 🦷 What You Can Do`).
 - Use markdown `-` bullets for ALL lists — one item per line, vertically stacked. NEVER use `•`.

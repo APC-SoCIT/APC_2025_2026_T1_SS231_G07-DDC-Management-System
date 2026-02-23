@@ -74,6 +74,37 @@ SENSITIVE_INFO_PATTERNS = [
     r"(?:fallback|failover)\s+(?:logic|model|strategy)",
 ]
 
+# ── Categorised Sensitive Info Patterns ─────────────────────────────────
+# User / account information probing
+SENSITIVE_USER_INFO_PATTERNS = [
+    r"(?:admin|staff|owner|patient|user|doctor|dentist)\s*(?:password|credential|login|account|email|number|address)",
+    r"(?:password|credential|login)\s*(?:of|for|from)\s+(?:admin|staff|owner|patient|user|doctor|dentist)",
+    r"(?:give|show|tell|share|reveal)\s+(?:me\s+)?(?:the\s+)?(?:patient|user|staff|admin|doctor|dentist)\s+(?:info|data|details|record|list|account)",
+    r"(?:list|show|give)\s+(?:me\s+)?(?:all\s+)?(?:patients?|users?|staff|admins?|accounts?|records?)",
+    r"(?:who\s+(?:is|are)\s+the\s+(?:admin|owner|staff|patient))",
+    r"(?:personal|private)\s+(?:info|data|detail|record)\s+(?:of|from|about)",
+]
+
+# System / technical information probing
+SENSITIVE_SYSTEM_INFO_PATTERNS = [
+    r"(?:api|secret|private)\s*key",
+    r"(?:database|db)\s*(?:schema|structure|table|credential|password)",
+    r"(?:supabase|postgres|mysql|redis)\s*(?:url|credential|password|connection)",
+    r"(?:environment|env)\s*variable",
+    r"(?:model|llm|ai)\s*(?:you\s+(?:use|are|using)|configuration|prompt)",
+    r"what\s+model\s+(?:are\s+you|do\s+you)\s+(?:use|using)",
+    r"(?:show|give|reveal|tell)\s+(?:me\s+)?(?:your|the)\s+(?:source|code|backend|architecture)",
+    r"(?:internal|hidden)\s+(?:endpoint|api|route|url)",
+    r"(?:error|stack)\s*trace",
+    r"(?:log|debug)\s*(?:file|output|message)",
+    r"(?:connection|conn)\s*string",
+    r"(?:rate\s+limit|throttle)\s+(?:logic|config|setting)",
+    r"(?:fallback|failover)\s+(?:logic|model|strategy)",
+]
+
+_sensitive_user_re = [re.compile(p, re.IGNORECASE) for p in SENSITIVE_USER_INFO_PATTERNS]
+_sensitive_system_re = [re.compile(p, re.IGNORECASE) for p in SENSITIVE_SYSTEM_INFO_PATTERNS]
+
 ABNORMAL_INPUT_PATTERNS = [
     r".{500,}",                     # Excessively long messages
     r"[^\x00-\x7F]{50,}",         # Large blocks of non-ASCII
@@ -124,16 +155,42 @@ def detect_prompt_injection(message: str) -> bool:
     return False
 
 
-def detect_sensitive_info_probe(message: str) -> bool:
-    """Check if user is probing for sensitive system information."""
+def detect_sensitive_info_probe(message: str) -> tuple:
+    """
+    Check if user is probing for sensitive system information.
+
+    Returns:
+        (detected: bool, category: str | None)
+        category is 'user_info' or 'system_info' when detected.
+    """
+    # Check user/account info probes first (more specific)
+    for pattern in _sensitive_user_re:
+        if pattern.search(message):
+            logger.info(
+                "Sensitive user-info probe detected: pattern=%s input=%.100s",
+                pattern.pattern, message,
+            )
+            return True, 'user_info'
+
+    # Then check system/technical info probes
+    for pattern in _sensitive_system_re:
+        if pattern.search(message):
+            logger.info(
+                "Sensitive system-info probe detected: pattern=%s input=%.100s",
+                pattern.pattern, message,
+            )
+            return True, 'system_info'
+
+    # Legacy catch-all
     for pattern in _sensitive_re:
         if pattern.search(message):
             logger.info(
                 "Sensitive info probe detected: pattern=%s input=%.100s",
                 pattern.pattern, message,
             )
-            return True
-    return False
+            return True, 'system_info'
+
+    return False, None
 
 
 def detect_abnormal_input(message: str) -> bool:
@@ -174,6 +231,10 @@ def check_message_security(
         "Let me know how I can help."
     )
 
+    # Differentiated responses for sensitive info probing
+    user_info_response = "I cannot share sensitive user or account information."
+    system_info_response = "I cannot share sensitive information about the system of the clinic."
+
     # Check SQL injection
     if detect_sql_injection(message):
         _log_security_event('sql_injection', message, user_id)
@@ -184,10 +245,14 @@ def check_message_security(
         _log_security_event('prompt_injection', message, user_id)
         return False, 'prompt_injection', safe_response
 
-    # Check sensitive info probing
-    if detect_sensitive_info_probe(message):
+    # Check sensitive info probing (with category)
+    detected, category = detect_sensitive_info_probe(message)
+    if detected:
         _log_security_event('sensitive_probe', message, user_id)
-        return False, 'sensitive_probe', safe_response
+        if category == 'user_info':
+            return False, 'sensitive_probe', user_info_response
+        else:
+            return False, 'sensitive_probe', system_info_response
 
     # Check abnormal input
     if detect_abnormal_input(message):

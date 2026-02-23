@@ -63,6 +63,15 @@ def handle_reschedule(user, msg: str, hist: list, detected_lang: str) -> dict:
         if auto_match:
             return _build_date_picker(auto_match, today, is_tl)
 
+        # Check if user mentioned a mismatched service+date combo
+        mismatch_msg = bsvc.get_appointment_mismatch_message(msg, upcoming, is_tl, action='reschedule')
+        if mismatch_msg:
+            qr = []
+            for a in upcoming:
+                svc = a.service.name if a.service else 'Appointment'
+                qr.append(f"{svc} \u2013 {bsvc.fmt_date(a.date)} at {bsvc.fmt_time(a.time)}")
+            return build_reply(mismatch_msg, qr, tag='[RESCHED_STEP_1]')
+
         if is_tl:
             header = "### I-reschedule \u2013 Pumili ng Appointment\n"
             footer = "\nAlin pong appointment ang gusto ninyong i-reschedule?"
@@ -75,7 +84,7 @@ def handle_reschedule(user, msg: str, hist: list, detected_lang: str) -> dict:
         qr = []
         for a in upcoming:
             svc = a.service.name if a.service else 'Appointment'
-            label = f"{svc} \u2013 {bsvc.fmt_date(a.date)}"
+            label = f"{svc} \u2013 {bsvc.fmt_date(a.date)} at {bsvc.fmt_time(a.time)}"
             lines.append(f"- **{label}**")
             qr.append(label)
         lines.append(footer)
@@ -88,10 +97,14 @@ def handle_reschedule(user, msg: str, hist: list, detected_lang: str) -> dict:
 
         appt = bsvc.match_appointment(msg, upcoming)
         if not appt:
+            # Check if user mentioned a mismatched service+date combo
+            mismatch_msg = bsvc.get_appointment_mismatch_message(msg, upcoming, is_tl, action='reschedule')
             qr = []
             for a in upcoming:
                 svc = a.service.name if a.service else 'Appointment'
-                qr.append(f"{svc} \u2013 {bsvc.fmt_date(a.date)}")
+                qr.append(f"{svc} \u2013 {bsvc.fmt_date(a.date)} at {bsvc.fmt_time(a.time)}")
+            if mismatch_msg:
+                return build_reply(mismatch_msg, qr, tag='[RESCHED_STEP_1]')
             err = (
                 "Hindi ko po ma-identify kung aling appointment ang tinutukoy ninyo. "
                 "Puwede po bang pumili mula sa mga opsyon sa ibaba?"
