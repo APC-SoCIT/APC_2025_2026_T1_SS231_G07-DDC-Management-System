@@ -303,7 +303,7 @@ export default function OwnerDashboard() {
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 text-xs text-white bg-gray-800 rounded px-2 py-1.5 opacity-0 group-hover:opacity-100 pointer-events-none z-50 leading-snug">
                 {selectedClinic === "all"
                   ? "Active patients across all clinics."
-                  : "Active patients with at least one appointment at this clinic. May not sum to the 'All Clinics' total."}
+                  : "Active patients with at least one confirmed/upcoming appointment at this clinic. May not sum to the 'All Clinics' total."}
               </span>
             </span>
           </div>
