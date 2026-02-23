@@ -673,8 +673,8 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
             # Get clinic filter from query params
             clinic_id = request.query_params.get('clinic')
             
-            # Build base query
-            queryset = User.objects.filter(user_type='patient').order_by('date_joined', 'id')
+            # Build base query (exclude archived patients by default)
+            queryset = User.objects.filter(user_type='patient', is_archived=False).order_by('date_joined', 'id')
             
             # Apply clinic filter if provided and user is owner
             if clinic_id and request.user.user_type == 'owner':
@@ -765,23 +765,25 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
                 {'error': 'Only staff and owner can access patient statistics.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        base_queryset = User.objects.filter(user_type='patient', is_archived=False)
+        all_patients = User.objects.filter(user_type='patient')
+        non_archived = User.objects.filter(user_type='patient', is_archived=False)
 
         clinic_id = request.query_params.get('clinic')
         if clinic_id and request.user.user_type == 'owner':
             try:
-                base_queryset = base_queryset.filter(assigned_clinic_id=int(clinic_id))
+                all_patients = all_patients.filter(assigned_clinic_id=int(clinic_id))
+                non_archived = non_archived.filter(assigned_clinic_id=int(clinic_id))
             except (ValueError, TypeError):
                 pass
 
-        total_patients = base_queryset.count()
-        active_patients = base_queryset.filter(is_active_patient=True).count()
-        inactive_patients = base_queryset.filter(is_active_patient=False).count()
+        total_patients = all_patients.count()
+        active_patients = non_archived.count()  # active = total - archived
+        archived_patients = total_patients - active_patients
 
         return Response({
             'total_patients': total_patients,
             'active_patients': active_patients,
-            'inactive_patients': inactive_patients,
+            'inactive_patients': archived_patients,
         })
 
     @action(detail=False, methods=['get'])
@@ -1884,13 +1886,16 @@ class DocumentViewSet(AuditContextMixin, viewsets.ModelViewSet):
         return queryset
     
     def destroy(self, request, *args, **kwargs):
-        """Only owners can delete documents"""
-        if request.user.user_type != 'owner':
-            return Response(
-                {'error': 'Only owners can delete documents'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        return super().destroy(request, *args, **kwargs)
+        """Owners and staff can delete any document; patients can delete their own documents"""
+        document = self.get_object()
+        if request.user.user_type in ('owner', 'staff'):
+            return super().destroy(request, *args, **kwargs)
+        if request.user.user_type == 'patient' and document.patient == request.user:
+            return super().destroy(request, *args, **kwargs)
+        return Response(
+            {'error': 'You do not have permission to delete this document'},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
 
 class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
@@ -2021,8 +2026,12 @@ class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def low_stock_count(self, request):
-        """Get count of items with low stock"""
-        low_stock_items = [item for item in InventoryItem.objects.all() if item.is_low_stock]
+        """Get count of items with low stock, optionally filtered by clinic"""
+        queryset = InventoryItem.objects.all()
+        clinic_id = request.query_params.get('clinic_id', None)
+        if clinic_id is not None:
+            queryset = queryset.filter(clinic_id=clinic_id)
+        low_stock_items = [item for item in queryset if item.is_low_stock]
         return Response({'count': len(low_stock_items)})
 
 

@@ -493,7 +493,7 @@ export default function OwnerPatients() {
             <Users className="w-4 h-4 text-green-600" />
           </div>
           <div>
-            <p className="text-xl font-bold text-[var(--color-text)] leading-none">{isLoading ? "..." : totalCount}</p>
+            <p className="text-xl font-bold text-[var(--color-text)] leading-none">{isLoading ? "..." : totalCount + totalArchivedCount}</p>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Total Patients</p>
           </div>
         </div>
@@ -502,7 +502,7 @@ export default function OwnerPatients() {
             <Users className="w-4 h-4 text-purple-600" />
           </div>
           <div>
-            <p className="text-xl font-bold text-[var(--color-text)] leading-none">{isLoading ? "..." : Math.max(0, totalCount - totalArchivedCount)}</p>
+            <p className="text-xl font-bold text-[var(--color-text)] leading-none">{isLoading ? "..." : totalCount}</p>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Active Patients</p>
           </div>
         </div>

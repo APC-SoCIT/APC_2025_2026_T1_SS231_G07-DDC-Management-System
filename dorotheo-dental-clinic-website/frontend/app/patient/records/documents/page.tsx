@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { FileText, Calendar, Eye, Download, X } from "lucide-react"
+import { FileText, Calendar, Eye, Download, X, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ClinicBadge } from "@/components/clinic-badge"
+import ConfirmDeleteModal from "@/components/confirm-delete-modal"
 
 interface ClinicLocation {
   id: number
@@ -44,6 +45,8 @@ export default function Documents() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteDocId, setDeleteDocId] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -130,6 +133,32 @@ export default function Documents() {
     setSelectedDocument(doc)
   }
 
+  const handleDeleteDocument = (docId: number) => {
+    setDeleteDocId(docId)
+  }
+
+  const confirmDeleteDocument = async () => {
+    if (!token || deleteDocId === null) return
+    try {
+      setIsDeleting(true)
+      await api.deleteDocument(deleteDocId, token)
+      setSelectedDocument(null)
+      setDeleteDocId(null)
+      // Refresh documents
+      if (user?.id) {
+        const docs = await api.getDocuments(user.id, token)
+        const IMAGE_TYPES = ['xray', 'dental_image', 'scan']
+        const docList = Array.isArray(docs) ? docs : []
+        setDocuments(docList.filter((doc: any) => !IMAGE_TYPES.includes(doc.document_type)))
+      }
+    } catch (error) {
+      console.error('Failed to delete document:', error)
+      alert('Failed to delete document. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const getDocumentTypeLabel = (type: string) => {
     switch (type) {
       case 'xray':
@@ -214,6 +243,13 @@ export default function Documents() {
             title="Download"
           >
             <Download className="w-4 h-4 text-gray-600" />
+          </button>
+          <button
+            onClick={() => handleDeleteDocument(doc.id)}
+            className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4 text-red-500" />
           </button>
         </div>
       </div>
@@ -452,6 +488,15 @@ export default function Documents() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteDocId !== null}
+        title="Delete Document"
+        message="Are you sure you want to delete this document? This action cannot be undone."
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteDocId(null)}
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

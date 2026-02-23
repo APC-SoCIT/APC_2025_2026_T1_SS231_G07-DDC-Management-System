@@ -622,8 +622,9 @@ export const api = {
     if (!response.ok) throw new Error('Failed to delete inventory item')
   },
 
-  getLowStockCount: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/low_stock_count/`, {
+  getLowStockCount: async (token: string, clinicId?: number) => {
+    const params = clinicId ? `?clinic_id=${clinicId}` : ''
+    const response = await fetch(`${API_BASE_URL}/inventory/low_stock_count/${params}`, {
       headers: { Authorization: getAuthHeader(token) },
     })
     if (!response.ok) throw new Error('Failed to fetch low stock count')
