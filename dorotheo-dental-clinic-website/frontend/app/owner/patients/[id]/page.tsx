@@ -337,7 +337,7 @@ export default function PatientDetailPage() {
             <div className="flex items-start gap-8">
               {/* Patient Avatar/Image */}
               <div className="relative">
-                <div className="w-28 h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 shadow-lg">
+                <div className="w-28 h-28 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-4xl font-bold shrink-0 shadow-lg">
                   {patient.first_name?.[0]}{patient.last_name?.[0]}
                 </div>
               </div>
@@ -350,7 +350,7 @@ export default function PatientDetailPage() {
                   </h1>
                   <button
                     onClick={() => router.push(`/owner/patients/${patientId}/edit`)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-(--color-primary) text-white rounded-lg hover:bg-(--color-primary-dark) transition-colors"
                     title="Edit Patient"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -521,7 +521,7 @@ export default function PatientDetailPage() {
           </button>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="flex items-center gap-2 px-4 py-2 bg-(--color-primary) text-white rounded-lg hover:bg-(--color-primary-dark)"
           >
             <Upload className="w-4 h-4" />
             Upload Document
@@ -654,7 +654,7 @@ export default function PatientDetailPage() {
                       >
                         <div onClick={() => setSelectedDocument(doc)} className="cursor-pointer">
                           <div className="flex items-start gap-3">
-                            <FileText className="w-8 h-8 text-gray-600 flex-shrink-0" />
+                            <FileText className="w-8 h-8 text-gray-600 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600">

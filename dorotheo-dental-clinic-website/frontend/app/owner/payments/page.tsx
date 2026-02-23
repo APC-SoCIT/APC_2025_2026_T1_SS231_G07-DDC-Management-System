@@ -164,16 +164,16 @@ export default function OwnerPaymentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">
+          <h1 className="text-3xl font-display font-bold text-(--color-primary) mb-2">
             Patient Payments
           </h1>
-          <p className="text-[var(--color-text-muted)]">
+          <p className="text-(--color-text-muted)">
             Record payments and manage unpaid invoices
           </p>
         </div>
         <Link
           href="/owner/payments/history"
-          className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-(--color-primary) text-white rounded-lg hover:bg-(--color-primary-dark) transition-colors"
         >
           <History className="w-5 h-5" />
           View Payment History
@@ -391,7 +391,7 @@ export default function OwnerPaymentsPage() {
                         onClick={() =>
                           handleRecordPayment(invoice.patient, invoice.patient_name || "Patient")
                         }
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-(--color-primary) text-white text-sm font-medium rounded-lg hover:bg-(--color-primary-dark) transition-colors"
                       >
                         <CreditCard className="w-4 h-4" />
                         Record Payment
