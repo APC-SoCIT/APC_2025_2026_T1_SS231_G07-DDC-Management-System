@@ -30,7 +30,11 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const loadClinics = async () => {
     try {
       setIsLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      // Normalize API base the same way lib/api.ts does:
+      // NEXT_PUBLIC_API_URL may or may not include the "/api" segment.
+      const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const trimmedBase = rawBase.replace(/\/+$/, '');
+      const apiUrl = trimmedBase.endsWith('/api') ? trimmedBase : `${trimmedBase}/api`;
       const url = `${apiUrl}/locations/`;
       console.log('[ClinicContext] Fetching clinics from:', url);
       

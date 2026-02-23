@@ -39,6 +39,33 @@ SENSITIVE_FIELDS = {
 }
 
 
+def _strip_port_from_ip(ip: str) -> str:
+    """
+    Remove port number from an IP address string if present.
+
+    Some reverse proxies (e.g. Azure App Service) forward the client address
+    as ``IP:port`` in REMOTE_ADDR or X-Forwarded-For, which is not valid for
+    PostgreSQL's ``inet`` field type.
+
+    Handles:
+    - IPv4 with port:  ``192.168.1.1:57091``  →  ``192.168.1.1``
+    - IPv6 with port:  ``[::1]:8080``          →  ``::1``
+    - Plain IPv4/IPv6: returned unchanged
+    - ``'Unknown'``:   returned unchanged
+    """
+    if not ip or ip == 'Unknown':
+        return ip
+    # Bracketed IPv6 with port: [::1]:port → ::1
+    if ip.startswith('['):
+        bracket_end = ip.find(']')
+        if bracket_end != -1:
+            return ip[1:bracket_end]
+    # IPv4 with port: exactly one colon means host:port
+    if ':' in ip and ip.count(':') == 1:
+        return ip.rsplit(':', 1)[0]
+    return ip
+
+
 def get_client_ip(request):
     """
     Extract client IP address from Django request object.
@@ -64,11 +91,13 @@ def get_client_ip(request):
         # X-Forwarded-For can contain multiple IPs (client, proxy1, proxy2, ...)
         # The first IP is the original client
         ip = x_forwarded_for.split(',')[0].strip()
-        return ip
+        return _strip_port_from_ip(ip)
     
     # Fallback to REMOTE_ADDR (direct connection)
+    # On Azure/some proxies REMOTE_ADDR may include a port (e.g. "1.2.3.4:57091")
+    # which is invalid for PostgreSQL's inet field type.
     ip = request.META.get('REMOTE_ADDR', 'Unknown')
-    return ip
+    return _strip_port_from_ip(ip)
 
 
 def get_user_agent(request):
