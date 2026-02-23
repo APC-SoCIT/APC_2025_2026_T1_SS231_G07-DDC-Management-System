@@ -7,6 +7,7 @@ import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import UnifiedDocumentUpload from "@/components/unified-document-upload"
 import { ClinicBadge } from "@/components/clinic-badge"
+import ConfirmDeleteModal from "@/components/confirm-delete-modal"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 const BACKEND_URL = API_BASE_URL.replace('/api', '')
@@ -61,6 +62,8 @@ export default function PatientDocumentsPage() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('all')
+  const [deleteDocId, setDeleteDocId] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!token || !patientId) return
@@ -159,20 +162,27 @@ export default function PatientDocumentsPage() {
   const handleDeleteDocument = async (docId: number) => {
     if (!token) return
     
-    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-      return
-    }
+    setDeleteDocId(docId)
+  }
+
+  const confirmDeleteDocument = async () => {
+    if (!token || deleteDocId === null) return
 
     try {
-      await api.deleteDocument(docId, token)
+      setIsDeleting(true)
+      await api.deleteDocument(deleteDocId, token)
       // Close modal if open
       setSelectedDocument(null)
+      setDeleteDocId(null)
       // Refresh data
       await fetchData()
     } catch (error) {
       console.error('Failed to delete document:', error)
       alert('Failed to delete document. Please try again.')
+    } finally {
+      setIsDeleting(false)
     }
+  }
   }
 
   const handleDownloadImage = (fileUrl: string, filename: string) => {
@@ -603,6 +613,16 @@ export default function PatientDocumentsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteDocId !== null}
+        title="Delete Document"
+        message="Are you sure you want to delete this document? This action cannot be undone."
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteDocId(null)}
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

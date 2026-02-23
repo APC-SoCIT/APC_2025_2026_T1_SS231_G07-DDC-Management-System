@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, FileText, Upload, Download, X, Activity, Scan, Image as ImageIcon, FileHeart, StickyNote } from "lucide-react"
+import { ArrowLeft, FileText, Upload, Download, X, Activity, Scan, Image as ImageIcon, FileHeart, StickyNote, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import UnifiedDocumentUpload from "@/components/unified-document-upload"
 import { ClinicBadge } from "@/components/clinic-badge"
+import ConfirmDeleteModal from "@/components/confirm-delete-modal"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 const BACKEND_URL = API_BASE_URL.replace('/api', '')
@@ -61,6 +62,8 @@ export default function StaffPatientFilesPage() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('all')
+  const [deleteDocId, setDeleteDocId] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!token || !patientId) return
@@ -161,6 +164,25 @@ export default function StaffPatientFilesPage() {
   const noteCount = documents.filter(d => d.document_type === 'note').length
   const reportCount = documents.filter(d => d.document_type === 'report').length
 
+  const handleDeleteDocument = (id: number) => {
+    setDeleteDocId(id)
+  }
+
+  const confirmDeleteDocument = async () => {
+    if (!deleteDocId || !token) return
+    setIsDeleting(true)
+    try {
+      await api.deleteDocument(deleteDocId, token)
+      setDocuments(prev => prev.filter(d => d.id !== deleteDocId))
+      if (selectedDocument?.id === deleteDocId) setSelectedDocument(null)
+    } catch (error) {
+      console.error('Failed to delete document:', error)
+    } finally {
+      setIsDeleting(false)
+      setDeleteDocId(null)
+    }
+  }
+
   const handleDownloadImage = (fileUrl: string, filename: string) => {
     fetch(fileUrl)
       .then(response => response.blob())
@@ -222,6 +244,21 @@ export default function StaffPatientFilesPage() {
           {doc.description && (
             <p className="text-xs text-gray-600 mt-1 line-clamp-2">{doc.description}</p>
           )}
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDownloadImage(fileUrl, `${doc.title || 'image'}-${doc.uploaded_at}.jpg`) }}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            >
+              <Download className="w-3 h-3" />
+              Download
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id) }}
+              className="flex items-center justify-center px-2 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       )
     }
@@ -270,6 +307,24 @@ export default function StaffPatientFilesPage() {
               </p>
             )}
           </div>
+        </div>
+        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => {
+              const fileUrl = doc.file_url || doc.file
+              handleDownloadImage(fileUrl, doc.title || 'document')
+            }}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+          >
+            <Download className="w-3 h-3" />
+            Download
+          </button>
+          <button
+            onClick={() => handleDeleteDocument(doc.id)}
+            className="flex items-center justify-center px-2 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
         </div>
       </div>
     )
@@ -535,6 +590,13 @@ export default function StaffPatientFilesPage() {
                 Download
               </button>
               <button
+                onClick={() => handleDeleteDocument(selectedDocument.id)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+              <button
                 onClick={() => setSelectedDocument(null)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
@@ -544,6 +606,15 @@ export default function StaffPatientFilesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteDocId !== null}
+        title="Delete File"
+        message="Are you sure you want to delete this file? This action cannot be undone."
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteDocId(null)}
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

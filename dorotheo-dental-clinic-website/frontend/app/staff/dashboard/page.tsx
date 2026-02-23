@@ -53,7 +53,7 @@ export default function StaffDashboard() {
         setAllAppointments(appointments)
 
         // Fetch low stock count
-        const stockData = await api.getLowStockCount(token)
+        const stockData = await api.getLowStockCount(token, clinicId)
         setLowStockCount(stockData.count)
 
         // Fetch staff members for birthdays
