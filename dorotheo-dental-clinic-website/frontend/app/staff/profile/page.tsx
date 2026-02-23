@@ -6,7 +6,7 @@ import DentistCalendarAvailability from "@/components/dentist-calendar-availabil
 import QuickAvailabilityModal from "@/components/quick-availability-modal"
 import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
 import { useAuth } from "@/lib/auth"
-import { api, API_BASE_URL } from "@/lib/api"
+import { api, API_BASE_URL, getAuthHeaderUtil } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
 
 export default function StaffProfile() {
@@ -251,7 +251,7 @@ export default function StaffProfile() {
                 await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -264,7 +264,7 @@ export default function StaffProfile() {
                 fetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -316,7 +316,7 @@ export default function StaffProfile() {
                 await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -330,7 +330,7 @@ export default function StaffProfile() {
                 fetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({

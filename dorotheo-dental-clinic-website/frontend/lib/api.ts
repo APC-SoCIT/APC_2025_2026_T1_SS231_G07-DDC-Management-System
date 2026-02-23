@@ -121,12 +121,15 @@ async function _jwtRefresh(): Promise<string | null> {
  * JWT access tokens contain dots (header.payload.signature).
  * Legacy DRF tokens are hex strings without dots.
  */
-function getAuthHeader(token: string): string {
+export function getAuthHeaderUtil(token: string): string {
   if (token.includes('.')) {
     return 'Bearer ' + token
   }
   return 'Token ' + token
 }
+
+// Keep internal alias for backward compatibility
+const getAuthHeader = getAuthHeaderUtil;
 
 interface LoginResponse {
   token: string

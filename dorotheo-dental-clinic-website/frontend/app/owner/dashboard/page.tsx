@@ -110,11 +110,24 @@ export default function OwnerDashboard() {
     .filter(apt => apt.date === todayStr)
     .sort((a, b) => a.time.localeCompare(b.time))
 
-  // Categorize appointments by patient status (default to pending if no status set)
-  const pendingAppointments = todayAppointments.filter(apt => !apt.patient_status || apt.patient_status === 'pending')
+  // Categorize appointments by patient status (default to confirmed if no status set)
+  const confirmedAppointments = todayAppointments.filter(apt => !apt.patient_status || apt.patient_status === 'pending')
   const waitingAppointments = todayAppointments.filter(apt => apt.patient_status === 'waiting')
   const ongoingAppointments = todayAppointments.filter(apt => apt.patient_status === 'ongoing')
   const doneAppointments = todayAppointments.filter(apt => apt.patient_status === 'done')
+
+  // Get dynamic status badge color
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-100 text-green-700'
+      case 'waiting': return 'bg-purple-100 text-purple-700'
+      case 'ongoing': return 'bg-blue-100 text-blue-700'
+      case 'completed': return 'bg-teal-100 text-teal-700'
+      case 'missed': return 'bg-yellow-100 text-yellow-800'
+      case 'cancelled': return 'bg-red-100 text-red-700'
+      default: return 'bg-gray-100 text-gray-700'
+    }
+  }
 
   // Handle patient status change (waiting, ongoing, done)
   const handlePatientStatusChange = async (appointmentId: number, newPatientStatus: 'waiting' | 'ongoing' | 'done') => {
@@ -298,19 +311,19 @@ export default function OwnerDashboard() {
           <p className="text-center py-8 text-[var(--color-text-muted)]">Loading appointments...</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Pending Column */}
+            {/* Confirmed Column */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Pending ({pendingAppointments.length})</h3>
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Confirmed ({confirmedAppointments.length})</h3>
               </div>
               <div className="divide-y divide-gray-200 max-h-[300px] overflow-y-auto">
-                {pendingAppointments.length > 0 ? (
-                  pendingAppointments.map((apt) => (
+                {confirmedAppointments.length > 0 ? (
+                  confirmedAppointments.map((apt) => (
                     <div key={apt.id} className="p-4 hover:bg-gray-50 transition-colors">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeColor(apt.status)}`}>{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
                         {(() => {
@@ -330,7 +343,7 @@ export default function OwnerDashboard() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-gray-500 italic py-4 px-4">No pending</p>
+                  <p className="text-sm text-gray-500 italic py-4 px-4">No confirmed</p>
                 )}
               </div>
             </div>
@@ -347,7 +360,7 @@ export default function OwnerDashboard() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeColor(apt.status)}`}>{apt.status}</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
                         {(() => {
@@ -383,7 +396,7 @@ export default function OwnerDashboard() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeColor('ongoing')}`}>ongoing</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
                         {(() => {
@@ -418,7 +431,7 @@ export default function OwnerDashboard() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-[var(--color-primary)]">{formatTime(apt.time)}</span>
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">{apt.status}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeColor('completed')}`}>completed</span>
                         </div>
                         <p className="text-sm font-medium text-gray-900">{apt.patient_name}</p>
                         {(() => {

@@ -6,7 +6,7 @@ import DentistCalendarAvailability from "@/components/dentist-calendar-availabil
 import QuickAvailabilityModal from "@/components/quick-availability-modal"
 import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
 import { useAuth } from "@/lib/auth"
-import { api, API_BASE_URL } from "@/lib/api"
+import { api, API_BASE_URL, getAuthHeaderUtil } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
 
 export default function OwnerProfile() {
@@ -63,7 +63,7 @@ export default function OwnerProfile() {
       const response = await fetch(`${API_BASE_URL}/users/${user.id}/`, {
         method: "PATCH",
         headers: {
-          Authorization: `Token ${token}`,
+          Authorization: getAuthHeaderUtil(token!),
           "Content-Type": "application/json",
         },
         body: JSON.stringify(updateData),
@@ -259,7 +259,7 @@ export default function OwnerProfile() {
                 await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -273,7 +273,7 @@ export default function OwnerProfile() {
                 fetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -341,7 +341,7 @@ export default function OwnerProfile() {
                 await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -355,7 +355,7 @@ export default function OwnerProfile() {
                 fetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Token ${token}`,
+                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({

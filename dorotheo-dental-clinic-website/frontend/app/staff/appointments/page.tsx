@@ -105,7 +105,7 @@ export default function StaffAppointments() {
   const { token } = useAuth()
   const { selectedClinic, allClinics } = useClinic()
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "pending" | "completed" | "missed" | "cancelled">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "ongoing" | "completed" | "missed" | "cancelled">("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
   const [editingRow, setEditingRow] = useState<number | null>(null)
@@ -339,14 +339,8 @@ export default function StaffAppointments() {
       // Handle paginated response
       const allResponse = Array.isArray(allResponseRaw) ? allResponseRaw : (allResponseRaw.results || [])
       
-      // Auto-set today's confirmed appointments to pending status
-      const today = new Date().toISOString().split('T')[0]
-      const processedAppointments = allResponse.map((apt: Appointment) => {
-        if (apt.date === today && apt.status === 'confirmed') {
-          return { ...apt, status: 'pending' as const }
-        }
-        return apt
-      })
+      // Keep appointments as-is (no client-side status transformation)
+      const processedAppointments = allResponse
       setAllAppointments(processedAppointments)
       
       // Filter appointments locally based on selected clinic
@@ -527,7 +521,7 @@ export default function StaffAppointments() {
       apt.date === newAppointment.date &&
       apt.time === newAppointment.time &&
       apt.service === Number(newAppointment.service) &&
-      (apt.status === 'pending' || apt.status === 'confirmed')
+      (apt.status === 'confirmed')
     )
 
     if (hasDuplicate) {
@@ -703,24 +697,33 @@ export default function StaffAppointments() {
     setShowConfirmModal(true)
   }
 
+  // Get the effective display status considering patient_status workflow
+  const getEffectiveStatus = (apt: Appointment): string => {
+    if (apt.patient_status === 'ongoing') return 'ongoing'
+    if (apt.patient_status === 'waiting' || apt.status === 'waiting') return 'waiting'
+    if (apt.patient_status === 'done') return 'completed'
+    if (apt.status === 'pending') return 'confirmed'
+    return apt.status
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
         return "bg-green-100 text-green-700"
       case "waiting":
         return "bg-purple-100 text-purple-700"
-      case "pending":
-        return "bg-yellow-100 text-yellow-700"
+      case "ongoing":
+        return "bg-blue-100 text-blue-700"
+      case "cancelled":
+        return "bg-red-100 text-red-700"
+      case "completed":
+        return "bg-teal-100 text-teal-700"
+      case "missed":
+        return "bg-yellow-100 text-yellow-800"
       case "reschedule_requested":
         return "bg-orange-100 text-orange-700"
       case "cancel_requested":
         return "bg-red-100 text-red-700"
-      case "cancelled":
-        return "bg-red-100 text-red-700"
-      case "completed":
-        return "bg-blue-100 text-blue-700"
-      case "missed":
-        return "bg-yellow-100 text-yellow-800"
       default:
         return "bg-gray-100 text-gray-700"
     }
@@ -734,6 +737,16 @@ export default function StaffAppointments() {
         return "Cancellation Requested"
       case "waiting":
         return "Waiting"
+      case "ongoing":
+        return "Ongoing"
+      case "confirmed":
+        return "Confirmed"
+      case "cancelled":
+        return "Cancelled"
+      case "completed":
+        return "Completed"
+      case "missed":
+        return "Missed"
       default:
         return status.charAt(0).toUpperCase() + status.slice(1)
     }
@@ -898,6 +911,66 @@ export default function StaffAppointments() {
             type: "error",
             title: "Failed",
             message: "Failed to approve appointment."
+          })
+        }
+      }
+    })
+    setShowConfirmModal(true)
+  }
+
+  const handleMarkOngoing = async (appointment: Appointment) => {
+    if (!token) return
+    
+    setConfirmModalConfig({
+      title: "Mark as Ongoing?",
+      message: "Are you sure you want to mark this appointment as ongoing? This indicates the patient is currently being treated.",
+      variant: "success",
+      onConfirm: async () => {
+        try {
+          await api.updateAppointment(appointment.id, { patient_status: "ongoing", status: "confirmed" }, token)
+          setAppointments(appointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, patient_status: "ongoing" as const, status: "confirmed" as const } : apt
+          ))
+          setAllAppointments(allAppointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, patient_status: "ongoing" as const, status: "confirmed" as const } : apt
+          ))
+        } catch (error) {
+          console.error("Error marking appointment as ongoing:", error)
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Failed",
+            message: "Failed to mark appointment as ongoing."
+          })
+        }
+      }
+    })
+    setShowConfirmModal(true)
+  }
+
+  const handleMarkWaiting = async (appointment: Appointment) => {
+    if (!token) return
+    
+    setConfirmModalConfig({
+      title: "Mark as Waiting?",
+      message: "Are you sure you want to mark this appointment as waiting? This indicates the patient has arrived and is waiting.",
+      variant: "success",
+      onConfirm: async () => {
+        try {
+          await api.updateAppointment(appointment.id, { patient_status: "waiting", status: "waiting" }, token)
+          setAppointments(appointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, patient_status: "waiting" as const, status: "waiting" as const } : apt
+          ))
+          setAllAppointments(allAppointments.map(apt => 
+            apt.id === appointment.id ? { ...apt, patient_status: "waiting" as const, status: "waiting" as const } : apt
+          ))
+        } catch (error) {
+          console.error("Error marking appointment as waiting:", error)
+          setAlertModal({
+            isOpen: true,
+            type: "error",
+            title: "Failed",
+            message: "Failed to mark appointment as waiting."
           })
         }
       }
@@ -1111,8 +1184,9 @@ export default function StaffAppointments() {
         apt.dentist_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         apt.status?.toLowerCase().includes(searchQuery.toLowerCase())
       
-      // Filter by status
-      const matchesStatus = statusFilter === "all" || apt.status === statusFilter
+      // Filter by status using effective status
+      const effectiveStatus = getEffectiveStatus(apt)
+      const matchesStatus = statusFilter === "all" || effectiveStatus === statusFilter
       
       // Filter by clinic
       const matchesClinic = selectedClinic === "all" || 
@@ -1271,14 +1345,14 @@ export default function StaffAppointments() {
             Waiting
           </button>
           <button
-            onClick={() => setStatusFilter("pending")}
+            onClick={() => setStatusFilter("ongoing")}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              statusFilter === "pending"
+              statusFilter === "ongoing"
                 ? "bg-[var(--color-primary)] text-white"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            Pending
+            Ongoing
           </button>
           <button
             onClick={() => setStatusFilter("missed")}
@@ -1431,14 +1505,14 @@ export default function StaffAppointments() {
                     </td>
                     <td className="px-3 py-3 text-xs text-[var(--color-text-muted)]">{apt.dentist_name || "Not Assigned"}</td>
                     <td className="px-3 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
-                        {formatStatus(apt.status)}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(getEffectiveStatus(apt))}`}>
+                        {formatStatus(getEffectiveStatus(apt))}
                       </span>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                        {/* Complete Button - Only for confirmed/pending appointments */}
-                        {(apt.status === "confirmed" || apt.status === "pending") && (
+                        {/* Complete Button - Only for confirmed appointments */}
+                        {(apt.status === "confirmed" || apt.status === "waiting") && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1453,8 +1527,38 @@ export default function StaffAppointments() {
                             <span>Done</span>
                           </button>
                         )}
-                        {/* Mark as Missed Button - Only for confirmed/pending appointments */}
-                        {(apt.status === "confirmed" || apt.status === "pending") && (
+                        {/* Ongoing Button - Only for confirmed appointments that are not already ongoing */}
+                        {(apt.status === "confirmed" || apt.status === "waiting") && apt.patient_status !== "ongoing" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMarkOngoing(apt)
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-medium text-xs"
+                            title="Mark as Ongoing"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>Ongoing</span>
+                          </button>
+                        )}
+                        {/* Waiting Button - Only for confirmed appointments that are not already waiting */}
+                        {(apt.status === "confirmed") && apt.patient_status !== "waiting" && apt.patient_status !== "ongoing" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleMarkWaiting(apt)
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded transition-colors font-medium text-xs"
+                            title="Mark as Waiting"
+                          >
+                            <Hourglass className="w-3 h-3" />
+                            <span>Waiting</span>
+                          </button>
+                        )}
+                        {/* Mark as Missed Button - Only for confirmed appointments */}
+                        {(apt.status === "confirmed") && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1469,8 +1573,8 @@ export default function StaffAppointments() {
                             <span>Miss</span>
                           </button>
                         )}
-                        {/* Cancel Button - Only for pending and confirmed appointments */}
-                        {(apt.status === "pending" || apt.status === "confirmed") && (
+                        {/* Cancel Button - Only for confirmed appointments */}
+                        {(apt.status === "confirmed") && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1483,8 +1587,8 @@ export default function StaffAppointments() {
                             <span>Cancel</span>
                           </button>
                         )}
-                        {/* Edit Button - Only for pending and confirmed appointments (for rescheduling) */}
-                        {(apt.status === "pending" || apt.status === "confirmed") && (
+                        {/* Edit Button - Only for confirmed appointments (for rescheduling) */}
+                        {(apt.status === "confirmed") && (
                           <button
                             onClick={(e) => handleEdit(apt, e)}
                             className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-medium text-xs"
@@ -1570,7 +1674,6 @@ export default function StaffAppointments() {
                                     onChange={(e) => setEditedData({ ...editedData, status: e.target.value as Appointment["status"] })}
                                     className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                                   >
-                                    <option value="pending">Pending</option>
                                     <option value="confirmed">Confirmed</option>
                                     <option value="cancelled">Cancelled</option>
                                     <option value="completed">Completed</option>

@@ -9,6 +9,18 @@ const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const trimmedBase = rawBase.replace(/\/+$/, "")
 const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trimmedBase}/api`
 
+/**
+ * Returns the correct Authorization header value based on token format.
+ * JWT access tokens contain dots (header.payload.signature).
+ * Legacy DRF tokens are hex strings without dots.
+ */
+function getCalendarAuthHeader(token: string): string {
+  if (token.includes('.')) {
+    return 'Bearer ' + token
+  }
+  return 'Token ' + token
+}
+
 interface DentistAvailabilityProps {
   dentistId: number | undefined
   selectedClinicId?: number | null // null means "All Clinics"
@@ -110,7 +122,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
       
       const response = await fetch(url, {
         headers: {
-          Authorization: `Token ${token}`,
+          Authorization: getCalendarAuthHeader(token),
         },
       })
 
@@ -337,7 +349,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
+            Authorization: getCalendarAuthHeader(token),
           },
           body: JSON.stringify(requestBody),
         }
@@ -397,7 +409,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
+            Authorization: getCalendarAuthHeader(token),
           },
           body: JSON.stringify(deleteBody),
         }
@@ -476,7 +488,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
         fetchUrl += `&clinic_id=${selectedClinicId}`
       }
       const deleteResponse = await fetch(fetchUrl, {
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: getCalendarAuthHeader(token) },
       })
 
       if (deleteResponse.ok) {
@@ -505,7 +517,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Token ${token}`,
+                Authorization: getCalendarAuthHeader(token),
               },
               body: JSON.stringify(deleteBody),
             }
@@ -551,7 +563,7 @@ export default function DentistCalendarAvailability({ dentistId, selectedClinicI
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Token ${token}`,
+              Authorization: getCalendarAuthHeader(token),
             },
             body: JSON.stringify(saveBody),
           }

@@ -99,6 +99,9 @@ class AuditContextMixin:
         
         IMPORTANT: Injects audit context before save() so post_save signal
         handler can access _audit_actor.
+        
+        NOTE: Properly handles M2M fields by extracting them before save()
+        and using .set() after save(), matching DRF's default behavior.
         """
         if hasattr(self, 'request') and self.request.user and self.request.user.is_authenticated:
             # Store audit context from request
@@ -115,12 +118,39 @@ class AuditContextMixin:
                 instance._audit_ip = audit_ip
                 instance._audit_user_agent = audit_user_agent
                 
-                # Apply updates using the default logic
+                # Extract M2M fields before save (they need .set() not setattr)
+                from django.db import models as django_models
+                m2m_fields = []
+                try:
+                    for field in instance._meta.get_fields():
+                        if isinstance(field, (django_models.ManyToManyField, django_models.ManyToManyRel, django_models.ManyToOneRel)):
+                            if field.name in validated_data:
+                                m2m_fields.append((field.name, validated_data.pop(field.name)))
+                except Exception:
+                    pass
+                
+                # Also check for reverse M2M (source fields from serializer)
+                model_fields = {f.name for f in instance._meta.get_fields()}
+                for field in list(validated_data.keys()):
+                    try:
+                        model_field = instance._meta.get_field(field)
+                        if isinstance(model_field, django_models.ManyToManyField):
+                            m2m_fields.append((field, validated_data.pop(field)))
+                    except Exception:
+                        pass
+                
+                # Apply non-M2M updates
                 for attr, value in validated_data.items():
                     setattr(instance, attr, value)
                 
                 # Now save (post_save signal will have access to _audit_actor)
                 instance.save()
+                
+                # Now handle M2M fields after save
+                for field_name, value in m2m_fields:
+                    field = getattr(instance, field_name)
+                    field.set(value)
+                
                 return instance
             
             # Temporarily replace update method
