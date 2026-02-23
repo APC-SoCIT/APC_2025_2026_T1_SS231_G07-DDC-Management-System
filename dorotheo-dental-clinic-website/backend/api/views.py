@@ -419,6 +419,7 @@ def logout(request):
 
 @permission_classes([AllowAny])
 @api_view(['POST'])
+@ratelimit(key='ip', rate='3/h', block=True)
 def request_password_reset(request):
     """Request a password reset token"""
     email = request.data.get('email')
@@ -478,6 +479,7 @@ def request_password_reset(request):
 
 @permission_classes([AllowAny])
 @api_view(['POST'])
+@ratelimit(key='ip', rate='5/h', block=True)
 def reset_password(request):
     """Reset password using token"""
     token = request.data.get('token')
