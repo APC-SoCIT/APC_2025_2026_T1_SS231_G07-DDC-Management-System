@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar as CalendarIcon, Users, Clock, AlertTriangle, ChevronLeft, ChevronRight, Cake } from "lucide-react"
+import { Calendar as CalendarIcon, Users, Clock, AlertTriangle, ChevronLeft, ChevronRight, Cake, Info } from "lucide-react"
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -54,7 +54,7 @@ export default function OwnerDashboard() {
         console.log('[Owner Dashboard] Sample appointment dates:', appointments.slice(0, 3).map((a: any) => a.date))
         setAllAppointments(appointments)
 
-        // Fetch low stock count
+        // Fetch low stock count - filter by clinic if not "all"
         const stockData = await api.getLowStockCount(token, clinicId)
         setLowStockCount(stockData.count)
 
@@ -271,7 +271,20 @@ export default function OwnerDashboard() {
           <p className="text-xl font-bold text-[var(--color-text)] mb-0.5">
             {isLoading ? "..." : totalPatients}
           </p>
-          <p className="text-xs text-[var(--color-text-muted)]">Total Patients</p>
+          <div className="flex items-center gap-1">
+            <p className="text-xs text-[var(--color-text-muted)]">Total Patients</p>
+            <span className="relative group cursor-help shrink-0">
+              <Info className="w-3 h-3 text-[var(--color-text-muted)]" />
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 text-xs text-white bg-gray-800 rounded px-2 py-1.5 opacity-0 group-hover:opacity-100 pointer-events-none z-50 leading-snug">
+                {selectedClinic === "all"
+                  ? "All registered patients in the system, including those with no appointments yet."
+                  : "Patients with at least one appointment at this clinic. 'All Clinics' includes patients who haven't booked here, so totals won't always add up."}
+              </span>
+            </span>
+          </div>
+          {selectedClinic !== "all" && (
+            <p className="text-xs text-[var(--color-text-muted)] italic mt-0.5">Seen at this clinic</p>
+          )}
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[var(--color-border)]">
@@ -283,7 +296,20 @@ export default function OwnerDashboard() {
           <p className="text-xl font-bold text-[var(--color-text)] mb-0.5">
             {isLoading ? "..." : activePatients}
           </p>
-          <p className="text-xs text-[var(--color-text-muted)]">Active Patients</p>
+          <div className="flex items-center gap-1">
+            <p className="text-xs text-[var(--color-text-muted)]">Active Patients</p>
+            <span className="relative group cursor-help shrink-0">
+              <Info className="w-3 h-3 text-[var(--color-text-muted)]" />
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 text-xs text-white bg-gray-800 rounded px-2 py-1.5 opacity-0 group-hover:opacity-100 pointer-events-none z-50 leading-snug">
+                {selectedClinic === "all"
+                  ? "Active patients across all clinics."
+                  : "Active patients with at least one appointment at this clinic. May not sum to the 'All Clinics' total."}
+              </span>
+            </span>
+          </div>
+          {selectedClinic !== "all" && (
+            <p className="text-xs text-[var(--color-text-muted)] italic mt-0.5">Active at this clinic</p>
+          )}
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-[var(--color-border)]">

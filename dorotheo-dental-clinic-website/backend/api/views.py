@@ -769,10 +769,14 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
         non_archived = User.objects.filter(user_type='patient', is_archived=False)
 
         clinic_id = request.query_params.get('clinic')
-        if clinic_id and request.user.user_type == 'owner':
+        if clinic_id:
             try:
-                all_patients = all_patients.filter(assigned_clinic_id=int(clinic_id))
-                non_archived = non_archived.filter(assigned_clinic_id=int(clinic_id))
+                # Filter patients who have at least one appointment at this clinic
+                patient_ids = Appointment.objects.filter(
+                    clinic_id=int(clinic_id)
+                ).values_list('patient_id', flat=True).distinct()
+                all_patients = all_patients.filter(id__in=patient_ids)
+                non_archived = non_archived.filter(id__in=patient_ids)
             except (ValueError, TypeError):
                 pass
 
@@ -2026,11 +2030,14 @@ class InventoryItemViewSet(AuditContextMixin, viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def low_stock_count(self, request):
-        """Get count of items with low stock, optionally filtered by clinic"""
+        """Get count of items with low stock, optionally filtered by clinic."""
         queryset = InventoryItem.objects.all()
-        clinic_id = request.query_params.get('clinic_id', None)
-        if clinic_id is not None:
-            queryset = queryset.filter(clinic_id=clinic_id)
+        clinic_id = request.query_params.get('clinic_id')
+        if clinic_id:
+            try:
+                queryset = queryset.filter(clinic_id=int(clinic_id))
+            except (ValueError, TypeError):
+                pass
         low_stock_items = [item for item in queryset if item.is_low_stock]
         return Response({'count': len(low_stock_items)})
 
