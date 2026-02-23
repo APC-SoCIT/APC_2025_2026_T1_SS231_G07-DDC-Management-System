@@ -904,25 +904,31 @@ export default function PatientAppointments() {
       const allDocs = await api.getDocuments(user.id, token)
       console.log('[APPOINTMENT FILES] All documents:', allDocs)
       console.log('[APPOINTMENT FILES] Looking for appointment ID:', appointmentId)
+
+      const IMAGE_TYPES = ['xray', 'dental_image', 'scan']
       
-      const aptDocs = allDocs.filter((doc: any) => {
+      const aptAllDocs = allDocs.filter((doc: any) => {
         console.log('[APPOINTMENT FILES] Document appointment:', doc.appointment, 'Target:', appointmentId)
         return doc.appointment === appointmentId
       })
-      console.log('[APPOINTMENT FILES] Filtered documents for appointment:', aptDocs)
-      
-      // Fetch images for this appointment
-      const allImages = await api.getPatientTeethImages(user.id, token)
-      console.log('[APPOINTMENT FILES] All images:', allImages)
-      
-      const aptImages = allImages.filter((img: any) => {
-        console.log('[APPOINTMENT FILES] Image appointment:', img.appointment, 'Target:', appointmentId)
-        return img.appointment === appointmentId
-      })
-      console.log('[APPOINTMENT FILES] Filtered images for appointment:', aptImages)
+      console.log('[APPOINTMENT FILES] Filtered documents for appointment:', aptAllDocs)
+
+      // Separate non-image documents from image-typed documents
+      const aptDocs = aptAllDocs.filter((doc: any) => !IMAGE_TYPES.includes(doc.document_type))
+      const aptImageDocs: TeethImage[] = aptAllDocs
+        .filter((doc: any) => IMAGE_TYPES.includes(doc.document_type))
+        .map((doc: any) => ({
+          id: doc.id,
+          image_url: doc.file_url || doc.file,
+          uploaded_at: doc.uploaded_at,
+          notes: doc.description || doc.title || '',
+        }))
+
+      console.log('[APPOINTMENT FILES] Non-image docs:', aptDocs)
+      console.log('[APPOINTMENT FILES] Image docs from Document model:', aptImageDocs)
 
       setAppointmentDocuments({ ...appointmentDocuments, [appointmentId]: aptDocs })
-      setAppointmentImages({ ...appointmentImages, [appointmentId]: aptImages })
+      setAppointmentImages({ ...appointmentImages, [appointmentId]: aptImageDocs })
     } catch (error) {
       console.error("Error loading appointment files:", error)
     } finally {

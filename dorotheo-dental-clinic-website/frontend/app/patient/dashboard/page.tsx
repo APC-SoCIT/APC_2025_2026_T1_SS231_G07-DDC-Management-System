@@ -25,6 +25,7 @@ interface Appointment {
 export default function PatientDashboard() {
   const { user, token } = useAuth()
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+  const [totalRecords, setTotalRecords] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   
   useEffect(() => {
@@ -33,7 +34,11 @@ export default function PatientDashboard() {
       
       try {
         setIsLoading(true)
-        const data = await api.getAppointments(token)
+        const [data, docs] = await Promise.all([
+          api.getAppointments(token),
+          api.getDocuments(null, token).catch(() => []),
+        ])
+        setTotalRecords(Array.isArray(docs) ? docs.length : 0)
         
         // Filter upcoming appointments (today or future, not cancelled/completed/missed)
         const todayDate = new Date()
@@ -103,7 +108,7 @@ export default function PatientDashboard() {
               <FileText className="w-6 h-6 text-green-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">0</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mb-1">{totalRecords}</p>
           <p className="text-sm text-[var(--color-text-muted)]">Total Records</p>
         </div>
 

@@ -86,6 +86,17 @@ export default function StaffPatientFilesPage() {
   useEffect(() => {
     if (selectedDocument) {
       const fileUrl = selectedDocument.file_url || selectedDocument.file
+      const isImage = selectedDocument.document_type === 'xray' ||
+        selectedDocument.document_type === 'dental_image' ||
+        selectedDocument.document_type === 'scan'
+      if (isImage) {
+        // Skip blob fetch for images — render directly via <img>
+        if (pdfBlobUrl) {
+          URL.revokeObjectURL(pdfBlobUrl)
+          setPdfBlobUrl(null)
+        }
+        return
+      }
       // Fetch file as blob and create object URL
       fetch(fileUrl)
         .then(res => res.blob())
@@ -497,7 +508,7 @@ export default function StaffPatientFilesPage() {
                 <img
                   src={selectedDocument.file_url || selectedDocument.file}
                   alt={selectedDocument.title}
-                  className="max-w-full h-auto mx-auto"
+                  className="max-w-full max-h-[70vh] object-contain mx-auto"
                 />
               ) : pdfBlobUrl ? (
                 <iframe

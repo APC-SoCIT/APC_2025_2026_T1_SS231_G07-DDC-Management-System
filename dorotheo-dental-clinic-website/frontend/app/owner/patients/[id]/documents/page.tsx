@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, FileText, Upload, Download, X, Activity, Scan, Image as ImageIcon, FileHeart, StickyNote } from "lucide-react"
+import { ArrowLeft, FileText, Upload, Download, X, Activity, Scan, Image as ImageIcon, FileHeart, StickyNote, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import UnifiedDocumentUpload from "@/components/unified-document-upload"
@@ -156,6 +156,25 @@ export default function PatientDocumentsPage() {
   const noteCount = safeDocuments.filter(d => d.document_type === 'note').length
   const reportCount = safeDocuments.filter(d => d.document_type === 'report').length
 
+  const handleDeleteDocument = async (docId: number) => {
+    if (!token) return
+    
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await api.deleteDocument(docId, token)
+      // Close modal if open
+      setSelectedDocument(null)
+      // Refresh data
+      await fetchData()
+    } catch (error) {
+      console.error('Failed to delete document:', error)
+      alert('Failed to delete document. Please try again.')
+    }
+  }
+
   const handleDownloadImage = (fileUrl: string, filename: string) => {
     fetch(fileUrl)
       .then(response => response.blob())
@@ -190,15 +209,14 @@ export default function PatientDocumentsPage() {
       return (
         <div
           key={doc.id}
-          onClick={() => setSelectedDocument(doc)}
-          className="border border-gray-200 rounded-lg p-3 hover:shadow-md cursor-pointer transition-all group"
+          className="border border-gray-200 rounded-lg p-3 hover:shadow-md cursor-pointer transition-all relative group"
         >
           {doc.clinic_data && (
             <div className="mb-2">
               <ClinicBadge clinic={doc.clinic_data} size="sm" />
             </div>
           )}
-          <div className="relative rounded overflow-hidden mb-2 bg-gray-100">
+          <div onClick={() => setSelectedDocument(doc)} className="relative rounded overflow-hidden mb-2 bg-gray-100">
             <img
               src={fileUrl}
               alt={doc.title}
@@ -209,7 +227,7 @@ export default function PatientDocumentsPage() {
             />
           </div>
           {doc.title && (
-            <h4 className="font-medium text-sm text-gray-900 mb-1 line-clamp-1 group-hover:text-blue-600">{doc.title}</h4>
+            <h4 onClick={() => setSelectedDocument(doc)} className="font-medium text-sm text-gray-900 mb-1 line-clamp-1 group-hover:text-blue-600">{doc.title}</h4>
           )}
           <p className="text-xs text-gray-500">
             {new Date(doc.uploaded_at).toLocaleDateString()}
@@ -217,6 +235,16 @@ export default function PatientDocumentsPage() {
           {doc.description && (
             <p className="text-xs text-gray-600 mt-1 line-clamp-2">{doc.description}</p>
           )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleDeleteDocument(doc.id)
+            }}
+            className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
+            title="Delete image"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
         </div>
       )
     }
@@ -224,15 +252,14 @@ export default function PatientDocumentsPage() {
     return (
       <div
         key={doc.id}
-        onClick={() => setSelectedDocument(doc)}
-        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group"
+        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer relative group"
       >
         {doc.clinic_data && (
           <div className="mb-2">
             <ClinicBadge clinic={doc.clinic_data} size="sm" />
           </div>
         )}
-        <div className="flex items-start gap-3">
+        <div onClick={() => setSelectedDocument(doc)} className="flex items-start gap-3">
           <FileText className="w-8 h-8 text-gray-600 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -266,6 +293,16 @@ export default function PatientDocumentsPage() {
             )}
           </div>
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDeleteDocument(doc.id)
+          }}
+          className="absolute top-2 right-2 p-1.5 text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          title="Delete document"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
     )
   }
@@ -455,9 +492,16 @@ export default function PatientDocumentsPage() {
 
       {/* Document Preview Modal */}
       {selectedDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedDocument(null)}
+        >
+          <div 
+            className="relative w-full max-w-6xl h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold text-gray-900 truncate">
                   {selectedDocument.title || "Document"}
@@ -473,43 +517,63 @@ export default function PatientDocumentsPage() {
                     <ClinicBadge clinic={selectedDocument.clinic_data} size="sm" />
                   )}
                 </div>
-                {selectedDocument.appointment_date && (
-                  <div className="mt-2 pt-2 border-t border-gray-200">
-                    <p className="text-xs font-medium text-gray-700 mb-1">Linked Appointment:</p>
-                    <p className="text-xs text-gray-600">
-                      {new Date(selectedDocument.appointment_date).toLocaleDateString()} at {selectedDocument.appointment_time}
-                    </p>
-                    {selectedDocument.service_name && (
-                      <p className="text-xs text-gray-600">Service: {selectedDocument.service_name}</p>
-                    )}
-                    {selectedDocument.dentist_name && (
-                      <p className="text-xs text-gray-600">Dentist: {selectedDocument.dentist_name}</p>
-                    )}
-                  </div>
-                )}
               </div>
-              <button
-                onClick={() => setSelectedDocument(null)}
-                className="ml-4 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDeleteDocument(selectedDocument.id)}
+                  className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete document"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Delete</span>
+                </button>
+                <button
+                  onClick={() => setSelectedDocument(null)}
+                  className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
+
+            {/* Document Info */}
+            {selectedDocument.appointment_date && (
+              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+                <p className="text-sm font-medium text-gray-700 mb-1">Linked Appointment:</p>
+                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                  <span>
+                    <strong>Date:</strong> {new Date(selectedDocument.appointment_date).toLocaleDateString()} at {selectedDocument.appointment_time}
+                  </span>
+                  {selectedDocument.service_name && (
+                    <span>
+                      <strong>Service:</strong> {selectedDocument.service_name}
+                    </span>
+                  )}
+                  {selectedDocument.dentist_name && (
+                    <span>
+                      <strong>Dentist:</strong> {selectedDocument.dentist_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             
-            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+            {/* Document / Image Viewer */}
+            <div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center">
               {(selectedDocument.document_type === 'xray' || 
                 selectedDocument.document_type === 'dental_image' || 
                 selectedDocument.document_type === 'scan') ? (
                 <img
                   src={selectedDocument.file_url || selectedDocument.file}
                   alt={selectedDocument.title}
-                  className="max-w-full h-auto mx-auto"
+                  className="max-w-full max-h-[70vh] object-contain"
                 />
               ) : pdfBlobUrl ? (
                 <iframe
                   src={pdfBlobUrl}
-                  className="w-full h-full min-h-[500px]"
-                  title={selectedDocument.title}
+                  className="w-full h-full border-0"
+                  title={selectedDocument.title || "Document Preview"}
+                  style={{ minHeight: '600px' }}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">

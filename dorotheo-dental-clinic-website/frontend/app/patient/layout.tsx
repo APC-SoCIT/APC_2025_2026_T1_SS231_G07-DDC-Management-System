@@ -27,13 +27,14 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
       if (!user?.id || !token) return
 
       try {
-        // Check for documents
+        // Fetch all documents once and split by type
         const docs = await api.getDocuments(user.id, token)
-        setHasDocuments(docs && docs.length > 0)
-
-        // Check for images
-        const images = await api.getPatientTeethImages(user.id, token)
-        setHasImages(images && images.length > 0)
+        const docList = Array.isArray(docs) ? docs : []
+        const IMAGE_TYPES = ['xray', 'dental_image', 'scan']
+        // Documents section: non-image types
+        setHasDocuments(docList.filter((d: any) => !IMAGE_TYPES.includes(d.document_type)).length > 0)
+        // Images section: xray, dental_image, scan document types
+        setHasImages(docList.filter((d: any) => IMAGE_TYPES.includes(d.document_type)).length > 0)
       } catch (error) {
         console.error("Error checking data availability:", error)
       }

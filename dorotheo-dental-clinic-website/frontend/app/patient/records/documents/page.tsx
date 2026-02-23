@@ -52,8 +52,11 @@ export default function Documents() {
       try {
         setIsLoading(true)
         const docs = await api.getDocuments(user.id, token)
-        // Ensure docs is always an array
-        setDocuments(Array.isArray(docs) ? docs : [])
+        // Ensure docs is always an array, and exclude image types (xray, dental_image, scan)
+        // which belong in the Teeth and X-Ray Images section
+        const IMAGE_TYPES = ['xray', 'dental_image', 'scan']
+        const docList = Array.isArray(docs) ? docs : []
+        setDocuments(docList.filter((doc: any) => !IMAGE_TYPES.includes(doc.document_type)))
       } catch (error) {
         console.error("Error fetching documents:", error)
         setDocuments([])

@@ -120,9 +120,11 @@ export default function PatientDetailPage() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [selectedDocument, showUploadModal])
 
+  const IMAGE_DOC_TYPES = ['xray', 'dental_image', 'scan']
+
   useEffect(() => {
-    if (selectedDocument) {
-      // Fetch PDF as blob and create object URL
+    if (selectedDocument && !IMAGE_DOC_TYPES.includes(selectedDocument.document_type)) {
+      // Fetch PDF as blob and create object URL (skip for image types)
       fetch(selectedDocument.file)
         .then(res => res.blob())
         .then(blob => {
@@ -134,7 +136,7 @@ export default function PatientDetailPage() {
           setPdfBlobUrl(null)
         })
     } else {
-      // Clean up blob URL when modal closes
+      // Clean up blob URL when modal closes or image type selected
       if (pdfBlobUrl) {
         URL.revokeObjectURL(pdfBlobUrl)
         setPdfBlobUrl(null)
@@ -682,9 +684,15 @@ export default function PatientDetailPage() {
               </div>
             )}
 
-            {/* PDF Viewer */}
-            <div className="flex-1 overflow-auto bg-gray-100">
-              {pdfBlobUrl ? (
+            {/* Document / Image Viewer */}
+            <div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center">
+              {IMAGE_DOC_TYPES.includes(selectedDocument.document_type) ? (
+                <img
+                  src={selectedDocument.file_url || selectedDocument.file}
+                  alt={selectedDocument.title || 'Dental image'}
+                  className="max-w-full max-h-[70vh] object-contain"
+                />
+              ) : pdfBlobUrl ? (
                 <iframe
                   src={pdfBlobUrl}
                   className="w-full h-full border-0"
@@ -698,6 +706,7 @@ export default function PatientDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>

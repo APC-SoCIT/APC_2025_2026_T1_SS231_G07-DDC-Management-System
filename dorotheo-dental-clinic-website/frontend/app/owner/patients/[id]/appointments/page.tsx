@@ -1369,11 +1369,11 @@ export default function PatientAppointmentsPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-6 min-h-0">
+            <div className="flex-1 overflow-auto p-6 min-h-0 flex items-center justify-center">
               <img
                 src={selectedImage.image_url}
                 alt="Dental image"
-                className="w-full h-auto max-h-full object-contain mx-auto"
+                className="max-w-full max-h-[calc(95vh-120px)] object-contain"
               />
             </div>
           </div>

@@ -122,9 +122,11 @@ export default function PatientDetailPage() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [selectedDocument, showUploadModal])
 
+  const IMAGE_DOC_TYPES = ['xray', 'dental_image', 'scan']
+
   useEffect(() => {
-    if (selectedDocument) {
-      // Fetch PDF as blob and create object URL
+    if (selectedDocument && !IMAGE_DOC_TYPES.includes(selectedDocument.document_type)) {
+      // Fetch PDF as blob and create object URL (skip for image types)
       fetch(selectedDocument.file)
         .then(res => res.blob())
         .then(blob => {
@@ -136,7 +138,7 @@ export default function PatientDetailPage() {
           setPdfBlobUrl(null)
         })
     } else {
-      // Clean up blob URL when modal closes
+      // Clean up blob URL when modal closes or image type selected
       if (pdfBlobUrl) {
         URL.revokeObjectURL(pdfBlobUrl)
         setPdfBlobUrl(null)
@@ -531,10 +533,9 @@ export default function PatientDetailPage() {
                     .map((doc) => (
                       <div
                         key={doc.id}
-                        onClick={() => setSelectedDocument(doc)}
-                        className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors group"
+                        className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors relative group"
                       >
-                        <div className="flex items-center gap-3">
+                        <div onClick={() => setSelectedDocument(doc)} className="flex items-center gap-3">
                           <FileText className="w-8 h-8 text-blue-600" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
@@ -545,6 +546,16 @@ export default function PatientDetailPage() {
                             </p>
                           </div>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteDocument(doc.id)
+                          }}
+                          className="absolute top-2 right-2 p-1.5 text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete document"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     ))}
                 </div>
@@ -757,9 +768,15 @@ export default function PatientDetailPage() {
               </div>
             )}
 
-            {/* PDF Viewer */}
-            <div className="flex-1 overflow-auto bg-gray-100">
-              {pdfBlobUrl ? (
+            {/* Document / Image Viewer */}
+            <div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center">
+              {IMAGE_DOC_TYPES.includes(selectedDocument.document_type) ? (
+                <img
+                  src={selectedDocument.file_url || selectedDocument.file}
+                  alt={selectedDocument.title || 'Dental image'}
+                  className="max-w-full max-h-[70vh] object-contain"
+                />
+              ) : pdfBlobUrl ? (
                 <iframe
                   src={pdfBlobUrl}
                   className="w-full h-full border-0"
