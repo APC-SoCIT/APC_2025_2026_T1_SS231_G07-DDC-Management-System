@@ -40,6 +40,14 @@ from . import security_monitor as secmon
 
 logger = logging.getLogger('chatbot.booking')
 
+# Sentinels returned by parse_date() for explicit user errors.
+# All are truthy so `parse_date(msg) or parse_date(combined)` short-circuits.
+INVALID_DATE = object()    # e.g. "feb 30" — date doesn't exist in the calendar
+PAST_DATE = object()       # e.g. "jan 5" when today is Feb 24
+FAR_FUTURE_DATE = object() # e.g. "2027 march 10" — beyond MAX_FUTURE_DAYS
+
+_DATE_SENTINELS = (INVALID_DATE, PAST_DATE, FAR_FUTURE_DATE)
+
 
 # ── Date/Time Parse Constants ──────────────────────────────────────────────
 
@@ -149,7 +157,11 @@ def get_available_slots(
     Return list of available time slots for a dentist on a date at a clinic.
     Respects DentistAvailability, existing bookings, and blocked slots.
     All data comes from the database — NO hallucination.
+    
+    Uses timezone-safe server time to filter past slots.
     """
+    from django.utils import timezone as tz
+
     avail_qs = DentistAvailability.objects.filter(
         dentist=dentist, date=date, is_available=True,
     )
@@ -163,8 +175,15 @@ def get_available_slots(
     booked = get_booked_times(dentist, date)
     blocked = get_blocked_ranges(date, clinic)
 
-    # Filter out past time slots when the date is today
-    now_time = datetime.now().time() if date == datetime.now().date() else None
+    # Filter out past time slots when the date is today (timezone-safe)
+    now = tz.now()
+    now_time = now.time() if date == now.date() else None
+
+    # Enforce MAX_FUTURE_DAYS limit
+    from .booking_validation_service import MAX_FUTURE_DAYS
+    max_date = now.date() + timedelta(days=MAX_FUTURE_DAYS)
+    if date > max_date:
+        return []
 
     slots = []
     for t in generate_slots(avail.start_time, avail.end_time):
@@ -255,13 +274,32 @@ def recommend_alt_clinic(
 
 # ── Entity Extraction (Structured, Deterministic) ─────────────────────────
 
-def parse_date(msg: str) -> Optional[date_obj]:
+def parse_date(msg: str):
     """
     Extract a date from user message using regex and date parsing.
     Supports English, Tagalog, and common date formats.
+
+    Returns:
+        date_obj   – a valid future date was found
+        INVALID_DATE – the user explicitly typed an impossible date (e.g. "feb 30")
+        None       – no date-like pattern was recognised at all
+
+    Rejects dates beyond MAX_FUTURE_DAYS to prevent far-future bookings.
     """
+    from .booking_validation_service import MAX_FUTURE_DAYS
+    
     today = datetime.now().date()
+    max_date = today + timedelta(days=MAX_FUTURE_DAYS)
     low = msg.lower()
+    
+    def _validate_and_return(d: date_obj):
+        """Reject past dates and dates beyond the allowed future window."""
+        if d < today:
+            return PAST_DATE
+        if d > max_date:
+            logger.warning("Date %s exceeds MAX_FUTURE_DAYS (%d). Rejected.", d, MAX_FUTURE_DAYS)
+            return FAR_FUTURE_DATE
+        return d
 
     # 0. Explicit multi-word range keywords — return None so _parse_month_only handles them
     if re.search(r'\bnext month\b|\bsusunod na buwan\b', low):
@@ -284,20 +322,23 @@ def parse_date(msg: str) -> Optional[date_obj]:
                 d = date_obj(year, mnum, day)
                 if not explicit_year and d < today:
                     d = date_obj(today.year + 1, mnum, day)
-                return d
+                return _validate_and_return(d)
             except ValueError:
-                continue
+                # The user wrote a real month name but an impossible day
+                # (e.g. "feb 30", "april 31").  Signal this explicitly so
+                # the caller can tell the user instead of silently ignoring it.
+                return INVALID_DATE
 
     # Relative date keywords (English & Tagalog)
     ngayon_match = re.search(r'(?<![a-z])ngayon(?![a-z])', low)
     if 'today' in low or ngayon_match:
-        return today
+        return _validate_and_return(today)
     if 'tomorrow' in low or 'bukas' in low:
-        return today + timedelta(days=1)
+        return _validate_and_return(today + timedelta(days=1))
     if 'the day after tomorrow' in low or 'samakalawa' in low or 'makalawa' in low:
-        return today + timedelta(days=2)
+        return _validate_and_return(today + timedelta(days=2))
     if re.search(r'\bnext week\b|\bsusunod na linggo\b', low):
-        return today + timedelta(days=(7 - today.weekday()))
+        return _validate_and_return(today + timedelta(days=(7 - today.weekday())))
 
     # MM/DD format
     m = re.search(r'(\d{1,2})[/-](\d{1,2})', msg)
@@ -306,15 +347,15 @@ def parse_date(msg: str) -> Optional[date_obj]:
             d = date_obj(today.year, int(m.group(1)), int(m.group(2)))
             if d < today:
                 d = date_obj(today.year + 1, int(m.group(1)), int(m.group(2)))
-            return d
+            return _validate_and_return(d)
         except ValueError:
-            pass
+            return INVALID_DATE
 
     # Day of week — use word-boundary match to prevent 'month' triggering 'mon'
     for dname, dnum in DAYS_OF_WEEK.items():
         if re.search(r'\b' + re.escape(dname) + r'\b', low):
             ahead = (dnum - today.weekday()) % 7 or 7
-            return today + timedelta(days=ahead)
+            return _validate_and_return(today + timedelta(days=ahead))
 
     return None
 
@@ -437,27 +478,67 @@ def find_clinic(msg: str) -> Optional[ClinicLocation]:
     for c in ClinicLocation.objects.all():
         if c.name.lower() in low:
             return c
-    # Partial matching
+    # Partial matching — require the clinic-name word to appear as a full word
+    # (word boundary) so that e.g. "baclaran" never matches "bacoor".
     for c in ClinicLocation.objects.all():
         for word in c.name.lower().split():
-            if len(word) > 3 and word not in ('dental', 'clinic', 'dorotheo') and word in low:
+            if (
+                len(word) > 3
+                and word not in ('dental', 'clinic', 'dorotheo')
+                and re.search(r'\b' + re.escape(word) + r'\b', low)
+            ):
                 return c
     return None
 
 
-def find_service(msg: str) -> Optional[Service]:
-    """Match service from message using aliases and DB lookup."""
+def _has_unmatched_location_hint(msg: str) -> bool:
+    """
+    Return True when the message looks like it's specifying a place
+    (e.g. "at baclaran", "sa taguig") but that place doesn't match any
+    known clinic.  Used to suppress stale-history clinic bleeding.
+    """
+    # Match "at <word>" or "sa <word>" style phrases
+    m = re.search(r'\b(?:at|sa|in|near)\s+([a-zA-ZÑñ]{4,})', msg, re.IGNORECASE)
+    if not m:
+        return False
+    candidate = m.group(1).lower()
+    # If any known clinic matches the candidate, it's NOT unmatched
+    for c in ClinicLocation.objects.all():
+        if candidate in c.name.lower():
+            return False
+        for word in c.name.lower().split():
+            if len(word) > 3 and word not in ('dental', 'clinic', 'dorotheo'):
+                if re.search(r'\b' + re.escape(word) + r'\b', candidate):
+                    return False
+    return True
+
+
+def find_service(msg: str, patient_only: bool = True) -> Optional[Service]:
+    """
+    Match service from message using aliases and DB lookup.
+    
+    Args:
+        patient_only: If True (default), only match services with patient_bookable=True.
+                      This prevents patients/chatbot from booking restricted services
+                      like extraction, root canal, etc.
+    """
     low = msg.lower()
 
     # Check aliases first
     for svc_name, aliases in SERVICE_ALIASES.items():
         if any(alias in low for alias in aliases):
-            match = Service.objects.filter(name__icontains=svc_name).first()
+            qs = Service.objects.filter(name__icontains=svc_name)
+            if patient_only:
+                qs = qs.filter(patient_bookable=True)
+            match = qs.first()
             if match:
                 return match
 
     # Exact name match with word boundaries (fallback)
-    for s in Service.objects.all():
+    qs = Service.objects.all()
+    if patient_only:
+        qs = qs.filter(patient_bookable=True)
+    for s in qs:
         sname = s.name.lower()
         pattern = r'(?:^|[\s,.:;!?-])' + re.escape(sname) + r'(?:$|[\s,.:;!?-])'
         if re.search(pattern, low):
@@ -477,11 +558,18 @@ def gather_booking_context(
     Extract structured booking entities from current message and history.
 
     If is_fresh=True, only uses current message (avoids stale context).
+
+    Returns a dict with keys:
+        clinic, dentist, date, time, service,
+        invalid_date_msg (str | None) — set when user typed an impossible
+                                        date like "feb 30".
     """
+    invalid_date_msg: Optional[str] = None
+
     if is_fresh:
         clinic = find_clinic(msg)
         dentist = find_dentist(msg)
-        date = parse_date(msg)
+        _raw_date = parse_date(msg)
         time_val = parse_time(msg)
         service = find_service(msg)
     else:
@@ -492,14 +580,49 @@ def gather_booking_context(
             [m['content'] for m in filtered_hist if m['role'] == 'user'] + [msg]
         )
 
-        clinic = find_clinic(msg) or find_clinic(combined_user)
+        # Don't let history bleed a clinic through when the user is
+        # explicitly naming a location that doesn't match any known clinic
+        # (e.g. "at baclaran" vs the real clinic "Bacoor").
+        clinic_from_msg = find_clinic(msg)
+        if clinic_from_msg:
+            clinic = clinic_from_msg
+        elif _has_unmatched_location_hint(msg):
+            clinic = None   # user named a place we don't recognise — don't guess
+        else:
+            clinic = find_clinic(combined_user)
+
         dentist = find_dentist(msg)
         if not dentist and _has_step_tag(filtered_hist, '[BOOK_STEP_3'):
             dentist = find_dentist(combined_user)
 
-        date = parse_date(msg) or parse_date(combined_user)
+        _raw_date = parse_date(msg)
+        if _raw_date is None:
+            _raw_date = parse_date(combined_user)
         time_val = parse_time(msg) or parse_time(combined_user)
         service = find_service(msg) or find_service(combined_user)
+
+    # Resolve date sentinels (INVALID_DATE, PAST_DATE, FAR_FUTURE_DATE)
+    if _raw_date is INVALID_DATE:
+        invalid_date_msg = (
+            "That date doesn't exist in the calendar. "
+            "Please choose a valid date (e.g. February only has 28 or 29 days)."
+        )
+        date = None
+    elif _raw_date is PAST_DATE:
+        invalid_date_msg = (
+            "You cannot book an appointment in the past. "
+            "Please select a future date."
+        )
+        date = None
+    elif _raw_date is FAR_FUTURE_DATE:
+        from .booking_validation_service import MAX_FUTURE_DAYS
+        invalid_date_msg = (
+            f"Booking beyond our allowed scheduling window is not permitted. "
+            f"Appointments can only be booked up to {MAX_FUTURE_DAYS} days in advance."
+        )
+        date = None
+    else:
+        date = _raw_date
 
     # Infer clinic from dentist if dentist is known but not clinic
     if dentist and not clinic:
@@ -511,6 +634,7 @@ def gather_booking_context(
         'date': date,
         'time': time_val,
         'service': service,
+        'invalid_date_msg': invalid_date_msg,
     }
 
 
@@ -703,12 +827,15 @@ def create_appointment(
     """
     Create an appointment inside a Django atomic transaction.
     Uses centralized booking_validation_service for ALL constraint checks.
+    
+    SLOT-VERIFIED: The appointment is linked to a verified DentistAvailability
+    record. If no valid slot exists, booking is rejected.
 
     Returns:
         (appointment, None) on success
         (None, error_message) on validation failure
     """
-    # Centralized validation (Rules A-E)
+    # Centralized validation (Rules A-K, including slot verification)
     is_valid, error_msg = validate_new_booking(
         patient=patient,
         dentist=dentist,
@@ -725,11 +852,29 @@ def create_appointment(
         )
         return None, error_msg
 
+    # Get the validated availability slot
+    avail_slot = validate_new_booking.last_validated_slot
+    if not avail_slot:
+        # This should never happen if validate_new_booking passed,
+        # but guard defensively
+        secmon.log_invalid_booking_attempt(
+            user_id=patient.id,
+            reason='missing_validated_slot',
+            details='Validation passed but no slot reference found',
+        )
+        logger.error(
+            "CRITICAL: validate_new_booking passed but last_validated_slot is None. "
+            "patient=%s dentist=%s date=%s time=%s",
+            patient.id, dentist.id, date, time_val,
+        )
+        return None, "Internal error: slot verification failed. Please try again."
+
     appt = Appointment.objects.create(
         patient=patient,
         dentist=dentist,
         service=service,
         clinic=clinic,
+        availability_slot=avail_slot,
         date=date,
         time=time_val,
         status='confirmed',
@@ -739,8 +884,10 @@ def create_appointment(
     secmon.record_booking_attempt(patient.id)
 
     logger.info(
-        "Appointment created: id=%d user=%s clinic=%s dentist=%s date=%s time=%s service=%s",
-        appt.id, patient.id, clinic.name, dentist.get_full_name(), date, time_val, service.name,
+        "Appointment created: id=%d user=%s clinic=%s dentist=%s date=%s time=%s "
+        "service=%s availability_slot=%d",
+        appt.id, patient.id, clinic.name, dentist.get_full_name(),
+        date, time_val, service.name, avail_slot.id,
     )
 
     return appt, None

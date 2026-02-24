@@ -237,6 +237,11 @@ class Service(models.Model):
     color = models.CharField(max_length=7, default='#10b981', help_text="Hex color code (e.g., #10b981)")
     image = models.ImageField(upload_to='services/', null=True, blank=True)
     clinics = models.ManyToManyField('ClinicLocation', related_name='services', blank=True, help_text="Clinics where this service is offered")
+    patient_bookable = models.BooleanField(
+        default=False,
+        help_text="Whether patients can book this service themselves (via chatbot or frontend). "
+                  "Only Cleaning and Consultation should be True. Staff can book any service."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -264,6 +269,12 @@ class Appointment(models.Model):
     dentist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dentist_appointments', db_index=True)
     service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True)
     clinic = models.ForeignKey('ClinicLocation', on_delete=models.CASCADE, related_name='appointments', null=True, blank=True, help_text="Clinic where appointment occurs")
+    availability_slot = models.ForeignKey(
+        'DentistAvailability', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='booked_appointments',
+        help_text="The verified availability slot this appointment was booked against. "
+                  "Required for all new bookings to prevent hallucinated appointments."
+    )
     date = models.DateField()
     time = models.TimeField()
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='confirmed', db_index=True)
@@ -300,6 +311,16 @@ class Appointment(models.Model):
             models.Index(fields=['patient', 'status', '-date'], name='apt_patient_status_date_idx'),
             models.Index(fields=['status', '-completed_at'], name='apt_completed_at_idx'),
             models.Index(fields=['dentist', 'date'], name='apt_dentist_date_idx'),
+            # Booking safety indexes (from migration 0041)
+            models.Index(fields=['dentist', 'date', 'time', 'status'], name='idx_apt_dentist_slot_status'),
+            models.Index(fields=['availability_slot'], name='idx_apt_availability_slot'),
+            models.Index(fields=['clinic', 'dentist', 'date', 'time'], name='idx_apt_clinic_dentist_dt'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(date__gte='2020-01-01'),
+                name='appointment_date_lower_bound',
+            ),
         ]
 
     def __str__(self):

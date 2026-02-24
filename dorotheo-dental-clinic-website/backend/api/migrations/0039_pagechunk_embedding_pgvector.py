@@ -27,27 +27,83 @@ from pgvector.django import VectorField
 EMBEDDING_DIM = 3072
 
 
+def _is_postgres(schema_editor):
+    return schema_editor.connection.vendor == 'postgresql'
+
+
+def enable_pgvector(apps, schema_editor):
+    if _is_postgres(schema_editor):
+        schema_editor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+
+
 def backfill_embeddings(apps, schema_editor):
     """
     Copy existing JSON embeddings into the new vector column using raw SQL.
-    Postgres: jsonb::text is already '[1.0, 2.0, ...]' which pgvector accepts.
-    Rows with empty/null embeddings are left as NULL.
+    Postgres only — jsonb::text is already '[1.0, 2.0, ...]' which pgvector accepts.
     """
-    from django.db import connection
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            UPDATE api_pagechunk
-            SET embedding_vec = CASE
-                WHEN embedding IS NOT NULL
-                     AND jsonb_typeof(embedding) = 'array'
-                     AND jsonb_array_length(embedding) > 0
-                THEN embedding::text::vector
-                ELSE NULL
-            END
-        """)
+    if not _is_postgres(schema_editor):
+        return
+    schema_editor.execute("""
+        UPDATE api_pagechunk
+        SET embedding_vec = CASE
+            WHEN embedding IS NOT NULL
+                 AND jsonb_typeof(embedding) = 'array'
+                 AND jsonb_array_length(embedding) > 0
+            THEN embedding::text::vector
+            ELSE NULL
+        END
+    """)
+
+
+def add_vector_field(apps, schema_editor):
+    """Add VectorField column on PostgreSQL, skip on SQLite."""
+    if not _is_postgres(schema_editor):
+        return
+    PageChunk = apps.get_model('api', 'PageChunk')
+    field = VectorField(dimensions=EMBEDDING_DIM, null=True, blank=True)
+    field.set_attributes_from_name('embedding_vec')
+    with schema_editor.connection.schema_editor() as se:
+        se.add_field(PageChunk, field)
+
+
+def remove_old_field(apps, schema_editor):
+    """Remove old JSONField and rename vec field on PostgreSQL, skip on SQLite."""
+    if not _is_postgres(schema_editor):
+        return
+    PageChunk = apps.get_model('api', 'PageChunk')
+    # Drop old embedding JSONField
+    for f in PageChunk._meta.local_fields:
+        if f.name == 'embedding':
+            with schema_editor.connection.schema_editor() as se:
+                se.remove_field(PageChunk, f)
+            break
+
+
+def rename_vec_field(apps, schema_editor):
+    """Rename embedding_vec → embedding on PostgreSQL, skip on SQLite."""
+    if not _is_postgres(schema_editor):
+        return
+    schema_editor.execute(
+        "ALTER TABLE api_pagechunk RENAME COLUMN embedding_vec TO embedding;"
+    )
+
+
+def create_ivfflat_index(apps, schema_editor):
+    if not _is_postgres(schema_editor):
+        return
+    schema_editor.execute("""
+        CREATE INDEX IF NOT EXISTS pagechunk_embedding_cosine_idx
+        ON api_pagechunk
+        USING ivfflat (embedding vector_cosine_ops)
+        WITH (lists = 50);
+    """)
 
 
 class Migration(migrations.Migration):
+    """
+    Upgrade PageChunk.embedding from JSONField → pgvector VectorField.
+    Completely skipped on non-PostgreSQL backends (e.g. SQLite for tests).
+    """
 
     dependencies = [
         ('api', '0038_add_patient_pagination_indexes'),
@@ -55,48 +111,13 @@ class Migration(migrations.Migration):
 
     operations = [
         # ── 1. Enable pgvector ─────────────────────────────────────────────
-        migrations.RunSQL(
-            sql="CREATE EXTENSION IF NOT EXISTS vector;",
-            reverse_sql=migrations.RunSQL.noop,
-        ),
+        migrations.RunPython(enable_pgvector, migrations.RunPython.noop),
 
-        # ── 2. Add temporary Vector column ────────────────────────────────
-        migrations.AddField(
-            model_name='pagechunk',
-            name='embedding_vec',
-            field=VectorField(dimensions=EMBEDDING_DIM, null=True, blank=True),
-        ),
-
-        # ── 3. Backfill existing JSON embeddings → vector ──────────────────
-        migrations.RunPython(
-            backfill_embeddings,
-            reverse_code=migrations.RunPython.noop,
-        ),
-
-        # ── 4. Drop old JSONField ──────────────────────────────────────────
-        migrations.RemoveField(
-            model_name='pagechunk',
-            name='embedding',
-        ),
-
-        # ── 5. Rename embedding_vec → embedding ───────────────────────────
-        migrations.RenameField(
-            model_name='pagechunk',
-            old_name='embedding_vec',
-            new_name='embedding',
-        ),
-
-        # ── 6. Create ivfflat cosine-similarity index ──────────────────────
-        # NOTE: 'lists' should be roughly sqrt(row_count).
-        # For small tables (<10k rows), lists=50 is fine.
-        # For larger tables, increase lists. Re-create index after bulk inserts.
-        migrations.RunSQL(
-            sql="""
-                CREATE INDEX IF NOT EXISTS pagechunk_embedding_cosine_idx
-                ON api_pagechunk
-                USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = 50);
-            """,
-            reverse_sql="DROP INDEX IF EXISTS pagechunk_embedding_cosine_idx;",
-        ),
+        # ── 2-6. All pgvector operations wrapped in RunPython for safety ───
+        # On SQLite these are all no-ops; the model keeps JSONField
+        migrations.RunPython(add_vector_field, migrations.RunPython.noop),
+        migrations.RunPython(backfill_embeddings, migrations.RunPython.noop),
+        migrations.RunPython(remove_old_field, migrations.RunPython.noop),
+        migrations.RunPython(rename_vec_field, migrations.RunPython.noop),
+        migrations.RunPython(create_ivfflat_index, migrations.RunPython.noop),
     ]

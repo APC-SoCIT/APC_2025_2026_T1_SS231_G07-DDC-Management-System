@@ -1136,8 +1136,24 @@ class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
         return missed_count
     
     def create(self, request, *args, **kwargs):
-        """Create appointment with comprehensive booking validation"""
+        """Create appointment with SLOT-VERIFIED booking validation.
+        
+        All bookings MUST pass through centralized validation which verifies:
+        1. Slot exists in DentistAvailability table
+        2. Slot is available (not booked, not blocked)
+        3. Time is in the future (timezone-safe)
+        4. Date is within allowed future window (90 days)
+        5. Dentist is active
+        6. No double-booking
+        7. One appointment per week per patient
+        
+        This validation runs identically in local, production, and staging.
+        NO environment flags may bypass it.
+        """
         from datetime import datetime, timedelta
+        from .services.booking_validation_service import (
+            validate_new_booking, validate_slot_exists, MAX_FUTURE_DAYS,
+        )
         
         # Extract data from request
         appointment_date = request.data.get('date')
@@ -1177,122 +1193,117 @@ class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validation checks
-        if appointment_date and appointment_time:
-            # Normalize time to HH:MM format for comparison
+        # Validate required fields
+        if not all([appointment_date, appointment_time, dentist_id, service_id, clinic_id]):
+            return Response(
+                {
+                    'error': 'Missing required fields',
+                    'message': 'All fields (date, time, dentist, service, clinic) are required.',
+                    'required_fields': ['date', 'time', 'dentist', 'service', 'clinic'],
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse date
+        try:
+            appt_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid date format', 'message': 'Date must be in YYYY-MM-DD format.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse time - normalize to HH:MM
+        try:
             time_normalized = appointment_time[:5] if len(appointment_time) > 5 else appointment_time
-            
-            # Convert date string to date object for comparisons
-            try:
-                appt_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
-            except ValueError:
-                return Response(
-                    {'error': 'Invalid date format'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # 1. Check for duplicate booking (same patient, same date, same time, same service)
-            duplicate_appointments = Appointment.objects.filter(
-                patient=patient,
-                date=appointment_date,
-                time__startswith=time_normalized,
-                service_id=service_id,
-                status__in=['confirmed', 'pending']
+            parts = time_normalized.split(':')
+            from datetime import time as time_obj
+            appt_time = time_obj(int(parts[0]), int(parts[1]))
+        except (ValueError, TypeError, IndexError):
+            return Response(
+                {'error': 'Invalid time format', 'message': 'Time must be in HH:MM format.'},
+                status=status.HTTP_400_BAD_REQUEST
             )
-            
-            if duplicate_appointments.exists():
-                return Response(
-                    {
-                        'error': 'Duplicate booking',
-                        'message': 'You already have an appointment for this service at this time. Please choose a different time slot.'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # 2. Check if patient already has appointment with same dentist on same day/time (different location)
-            if dentist_id:
-                same_dentist_appointments = Appointment.objects.filter(
-                    dentist_id=dentist_id,
-                    date=appointment_date,
-                    time__startswith=time_normalized,
-                    status__in=['confirmed', 'pending']
-                ).exclude(clinic_id=clinic_id)
-                
-                if same_dentist_appointments.exists():
-                    existing_appt = same_dentist_appointments.first()
-                    return Response(
-                        {
-                            'error': 'Dentist conflict',
-                            'message': f'This dentist already has an appointment at {existing_appt.clinic.name} at this time. Please choose a different time or dentist.'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            # 3. Check for one week interval rule - patient can only book once per week
-            # Calculate week start (Monday) and end (Sunday) for the appointment date
-            week_start = appt_date - timedelta(days=appt_date.weekday())  # Monday
-            week_end = week_start + timedelta(days=6)  # Sunday
-            
-            logger.info(f"[Weekly Check] Patient: {patient.id}, Week: {week_start} to {week_end}")
-            
-            existing_weekly_appointments = Appointment.objects.filter(
-                patient=patient,
-                date__gte=week_start,
-                date__lte=week_end,
-                status__in=['confirmed', 'pending']
+        
+        # Resolve dentist
+        try:
+            dentist = User.objects.get(id=dentist_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Dentist not found'},
+                status=status.HTTP_400_BAD_REQUEST
             )
-            
-            logger.info(f"[Weekly Check] Found {existing_weekly_appointments.count()} existing appointments")
-            
-            if existing_weekly_appointments.exists():
-                existing_appt = existing_weekly_appointments.first()
-                logger.warning(f"[Weekly Check] BLOCKING: Existing appointment on {existing_appt.date}")
-                return Response(
-                    {
-                        'error': 'Weekly limit exceeded',
-                        'message': f'You can only book one appointment per week. You already have an appointment scheduled for {existing_appt.date}. Please wait until next week to book another appointment.'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # 4. Check for general time slot conflict (any appointment at same time)
-            existing_appointments = Appointment.objects.filter(
-                date=appointment_date,
-                time__startswith=time_normalized,
-                status__in=['confirmed', 'pending']
-            ).exclude(status='cancelled')
-            
-            if existing_appointments.exists():
-                return Response(
-                    {
-                        'error': 'Time slot conflict',
-                        'message': f'An appointment already exists at {appointment_time} on {appointment_date}. Please choose a different time slot.'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        
+        # Resolve service
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            return Response(
+                {'error': 'Service not found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Resolve clinic
+        try:
+            clinic = ClinicLocation.objects.get(id=clinic_id)
+        except ClinicLocation.DoesNotExist:
+            return Response(
+                {'error': 'Clinic not found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # ═══════════════════════════════════════════════════════════════
+        # CENTRALIZED SLOT-VERIFIED VALIDATION
+        # This is the SAME validation used by the chatbot booking flow.
+        # NO bypass logic exists between local and production.
+        # Staff/owners can book any service; patients can only book
+        # patient_bookable services (Cleaning, Consultation).
+        # ═══════════════════════════════════════════════════════════════
+        booked_by_staff = getattr(request.user, 'role', 'patient') in ('staff', 'owner')
+        is_valid, error_msg = validate_new_booking(
+            patient=patient,
+            dentist=dentist,
+            service=service,
+            clinic=clinic,
+            target_date=appt_date,
+            target_time=appt_time,
+            booked_by_staff=booked_by_staff,
+        )
+        
+        if not is_valid:
+            logger.warning(
+                "[Booking REJECTED] patient=%s reason=%s date=%s time=%s dentist=%s clinic=%s",
+                patient.id, error_msg, appt_date, appt_time, dentist_id, clinic_id,
+            )
+            return Response(
+                {
+                    'error': 'Booking validation failed',
+                    'message': error_msg,
+                    'rejection_reason': error_msg,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get validated availability slot
+        avail_slot = validate_new_booking.last_validated_slot
+        
+        # Inject availability_slot into request data for serializer
+        mutable_data = request.data.copy()
+        if avail_slot:
+            mutable_data['availability_slot'] = avail_slot.id
+        request._full_data = mutable_data
         
         # Call parent create which will call perform_create
         try:
             response = super().create(request, *args, **kwargs)
+            logger.info(
+                "[Booking CREATED] patient=%s date=%s time=%s dentist=%s clinic=%s slot=%s",
+                patient.id, appt_date, appt_time, dentist_id, clinic_id,
+                avail_slot.id if avail_slot else 'NONE',
+            )
             return response
         except Exception as e:
-            # If something fails during serialization but appointment was created,
-            # try to return the created appointment data
-            logger.error(f"Error during appointment creation response: {str(e)}")
-            
-            # Check if appointment was created despite error
-            if appointment_date and appointment_time:
-                recent_appointment = Appointment.objects.filter(
-                    date=appointment_date,
-                    time__startswith=time_normalized
-                ).order_by('-created_at').first()
-                
-                if recent_appointment:
-                    # Appointment was created, return success response
-                    serializer = self.get_serializer(recent_appointment)
-                    return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-            # Re-raise if appointment wasn't created
+            logger.error(f"Error during appointment creation: {str(e)}")
             raise
     
     def perform_create(self, serializer):
