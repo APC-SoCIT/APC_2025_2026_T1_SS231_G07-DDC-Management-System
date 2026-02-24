@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Camera, Download, X, Activity, Image as ImageIcon, Scan, FileHeart, FileText, Trash2 } from "lucide-react"
+import { Download, X, Activity, Image as ImageIcon, Scan, FileHeart, FileText } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ClinicBadge } from "@/components/clinic-badge"
-import ConfirmDeleteModal from "@/components/confirm-delete-modal"
 
 interface ClinicLocation {
   id: number
@@ -41,8 +40,6 @@ export default function TeethImages() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<TeethImage | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('all')
-  const [deleteDocId, setDeleteDocId] = useState<number | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -113,25 +110,6 @@ export default function TeethImages() {
   const dentalImageCount = allImages.filter(img => img.document_type === 'dental_image').length
   const scanCount = allImages.filter(img => img.document_type === 'scan').length
 
-  const handleDeleteImage = (id: number) => {
-    setDeleteDocId(id)
-  }
-
-  const confirmDeleteImage = async () => {
-    if (!deleteDocId || !token) return
-    setIsDeleting(true)
-    try {
-      await api.deleteDocument(deleteDocId, token)
-      setAllImages(prev => prev.filter(img => img.id !== deleteDocId))
-      if (selectedImage?.id === deleteDocId) setSelectedImage(null)
-    } catch (error) {
-      console.error('Failed to delete image:', error)
-    } finally {
-      setIsDeleting(false)
-      setDeleteDocId(null)
-    }
-  }
-
   const handleDownloadImage = (imageUrl: string, filename: string) => {
     fetch(imageUrl)
       .then(response => response.blob())
@@ -199,12 +177,6 @@ export default function TeethImages() {
         >
           <Download className="w-3 h-3" />
           Download
-        </button>
-        <button
-          onClick={() => handleDeleteImage(image.id)}
-          className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors cursor-pointer"
-        >
-          <Trash2 className="w-3 h-3" />
         </button>
       </div>
     </div>
@@ -359,13 +331,6 @@ export default function TeethImages() {
                       <Download className="w-4 h-4" />
                       Download
                     </button>
-                    <button
-                      onClick={() => handleDeleteImage(selectedImage.id)}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </button>
                   </div>
                 </div>
 
@@ -381,14 +346,6 @@ export default function TeethImages() {
         </div>
       )}
 
-      <ConfirmDeleteModal
-        isOpen={deleteDocId !== null}
-        title="Delete Image"
-        message="Are you sure you want to delete this image? This action cannot be undone."
-        onConfirm={confirmDeleteImage}
-        onCancel={() => setDeleteDocId(null)}
-        isLoading={isDeleting}
-      />
     </div>
   )
 }
