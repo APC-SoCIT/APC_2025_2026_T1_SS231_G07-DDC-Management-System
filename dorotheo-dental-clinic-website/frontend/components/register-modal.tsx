@@ -334,6 +334,16 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
 
   if (!isOpen) return null
 
+  // Helper to compute days in a given month (1-indexed), leap-year aware
+  const getDaysInMonth = (month: number, year: number): number =>
+    new Date(year, month, 0).getDate()
+
+  // Parse birthday parts directly from string to avoid UTC timezone issues
+  const birthdayParts = formData.birthday ? formData.birthday.split('-') : null
+  const currentBirthdayYear = birthdayParts ? parseInt(birthdayParts[0]) : new Date().getFullYear() - 20
+  const currentBirthdayMonth = birthdayParts ? parseInt(birthdayParts[1]) : 1
+  const daysInSelectedMonth = getDaysInMonth(currentBirthdayMonth, currentBirthdayYear)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       {showSuccess ? (
@@ -393,18 +403,22 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
 
             <div>
               <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Birthday</label>
-              <div className={`grid grid-cols-3 gap-2 p-2 rounded-lg ${
-                missingFields.includes('birthday') || invalidFields.includes('birthday') ? 'border-2 border-red-500 bg-red-50' : ''
-              }`}>
+              <div
+                className={`grid gap-2 rounded-lg ${missingFields.includes('birthday') || invalidFields.includes('birthday') ? 'p-2 border-2 border-red-500 bg-red-50' : ''}`}
+                style={{ gridTemplateColumns: '2.2fr 1fr 1.6fr' }}
+              >
                 <select
                   required
-                  value={formData.birthday ? new Date(formData.birthday).getMonth() + 1 : ''}
+                  value={formData.birthday ? parseInt(formData.birthday.split('-')[1]) : ''}
                   onChange={(e) => {
                     const month = e.target.value
                     if (month && formData.birthday) {
-                      const date = new Date(formData.birthday)
-                      date.setMonth(parseInt(month) - 1)
-                      setFormData({ ...formData, birthday: date.toISOString().split('T')[0] })
+                      const parts = formData.birthday.split('-')
+                      const year = parseInt(parts[0])
+                      const currentDay = parseInt(parts[2])
+                      const maxDays = getDaysInMonth(parseInt(month), year)
+                      const clampedDay = Math.min(currentDay, maxDays)
+                      setFormData({ ...formData, birthday: `${parts[0]}-${month.padStart(2, '0')}-${clampedDay.toString().padStart(2, '0')}` })
                     } else if (month) {
                       const year = new Date().getFullYear() - 20
                       const day = 1
@@ -437,9 +451,12 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                         // Select the month
                         const month = monthNum.toString()
                         if (formData.birthday) {
-                          const date = new Date(formData.birthday)
-                          date.setMonth(parseInt(month) - 1)
-                          setFormData({ ...formData, birthday: date.toISOString().split('T')[0] })
+                          const parts = formData.birthday.split('-')
+                          const year = parseInt(parts[0])
+                          const currentDay = parseInt(parts[2])
+                          const maxDays = getDaysInMonth(parseInt(month), year)
+                          const clampedDay = Math.min(currentDay, maxDays)
+                          setFormData({ ...formData, birthday: `${parts[0]}-${month.padStart(2, '0')}-${clampedDay.toString().padStart(2, '0')}` })
                         } else {
                           const year = new Date().getFullYear() - 20
                           const day = 1
@@ -453,9 +470,12 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                         const timer = setTimeout(() => {
                           const month = monthNum.toString()
                           if (formData.birthday) {
-                            const date = new Date(formData.birthday)
-                            date.setMonth(parseInt(month) - 1)
-                            setFormData({ ...formData, birthday: date.toISOString().split('T')[0] })
+                            const parts = formData.birthday.split('-')
+                            const year = parseInt(parts[0])
+                            const currentDay = parseInt(parts[2])
+                            const maxDays = getDaysInMonth(parseInt(month), year)
+                            const clampedDay = Math.min(currentDay, maxDays)
+                            setFormData({ ...formData, birthday: `${parts[0]}-${month.padStart(2, '0')}-${clampedDay.toString().padStart(2, '0')}` })
                           } else {
                             const year = new Date().getFullYear() - 20
                             const day = 1
@@ -485,13 +505,12 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                 </select>
                 <select
                   required
-                  value={formData.birthday ? new Date(formData.birthday).getDate() : ''}
+                  value={formData.birthday ? parseInt(formData.birthday.split('-')[2]) : ''}
                   onChange={(e) => {
                     const day = e.target.value
                     if (day && formData.birthday) {
-                      const date = new Date(formData.birthday)
-                      date.setDate(parseInt(day))
-                      setFormData({ ...formData, birthday: date.toISOString().split('T')[0] })
+                      const parts = formData.birthday.split('-')
+                      setFormData({ ...formData, birthday: `${parts[0]}-${parts[1]}-${day.padStart(2, '0')}` })
                     } else if (day) {
                       const year = new Date().getFullYear() - 20
                       const month = 1
@@ -501,19 +520,22 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                   className="w-full px-3 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
                   <option value="">Day</option>
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                  {Array.from({ length: daysInSelectedMonth }, (_, i) => i + 1).map(day => (
                     <option key={day} value={day}>{day}</option>
                   ))}
                 </select>
                 <select
                   required
-                  value={formData.birthday ? new Date(formData.birthday).getFullYear() : ''}
+                  value={formData.birthday ? parseInt(formData.birthday.split('-')[0]) : ''}
                   onChange={(e) => {
                     const year = e.target.value
                     if (year && formData.birthday) {
-                      const date = new Date(formData.birthday)
-                      date.setFullYear(parseInt(year))
-                      setFormData({ ...formData, birthday: date.toISOString().split('T')[0] })
+                      const parts = formData.birthday.split('-')
+                      const month = parseInt(parts[1])
+                      const currentDay = parseInt(parts[2])
+                      const maxDays = getDaysInMonth(month, parseInt(year))
+                      const clampedDay = Math.min(currentDay, maxDays)
+                      setFormData({ ...formData, birthday: `${year}-${parts[1]}-${clampedDay.toString().padStart(2, '0')}` })
                     } else if (year) {
                       const month = 1
                       const day = 1
@@ -546,9 +568,12 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                           if (yearNum >= minYear && yearNum <= currentYear) {
                             const year = yearNum.toString()
                             if (formData.birthday) {
-                              const date = new Date(formData.birthday)
-                              date.setFullYear(parseInt(year))
-                              setFormData({ ...formData, birthday: date.toISOString().split('T')[0] })
+                              const parts = formData.birthday.split('-')
+                              const month = parseInt(parts[1])
+                              const currentDay = parseInt(parts[2])
+                              const maxDays = getDaysInMonth(month, yearNum)
+                              const clampedDay = Math.min(currentDay, maxDays)
+                              setFormData({ ...formData, birthday: `${year}-${parts[1]}-${clampedDay.toString().padStart(2, '0')}` })
                             } else {
                               const month = 1
                               const day = 1
