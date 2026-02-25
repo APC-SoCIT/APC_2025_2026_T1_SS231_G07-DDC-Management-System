@@ -1109,7 +1109,7 @@ class PageChunk(models.Model):
     """
     page_id = models.CharField(max_length=255, db_index=True, help_text="Unique identifier for the source page")
     chunk_text = models.TextField(help_text="The text content of this chunk")
-    embedding = models.JSONField(default=list, help_text="Embedding vector stored as JSON array of floats")
+    embedding = models.JSONField(null=True, blank=True, default=None, help_text="Embedding vector stored as JSON array of floats (pgvector on Supabase)")
     page_title = models.CharField(max_length=500, blank=True, default='')
     section_title = models.CharField(max_length=500, blank=True, default='')
     source_url = models.URLField(max_length=1000, blank=True, default='')

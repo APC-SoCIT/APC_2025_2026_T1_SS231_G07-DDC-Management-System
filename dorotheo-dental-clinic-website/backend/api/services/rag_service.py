@@ -168,7 +168,7 @@ def validate_index() -> Dict:
     """
     try:
         total = PageChunk.objects.count()
-        with_embeddings = PageChunk.objects.exclude(embedding=[]).count()
+        with_embeddings = PageChunk.objects.exclude(embedding__isnull=True).count()
 
         is_operational = with_embeddings > 0
 

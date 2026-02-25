@@ -23,8 +23,8 @@ def phase2_post_repair():
     print("=" * 60)
     
     total = PageChunk.objects.count()
-    with_emb = PageChunk.objects.exclude(embedding=[]).count()
-    without_emb = PageChunk.objects.filter(embedding=[]).count()
+    with_emb = PageChunk.objects.exclude(embedding__isnull=True).count()
+    without_emb = PageChunk.objects.filter(embedding__isnull=True).count()
     
     print("Total PageChunks:", total)
     print("Chunks WITH embeddings:", with_emb)
@@ -34,7 +34,7 @@ def phase2_post_repair():
         latest = PageChunk.objects.order_by('-updated_at').first()
         print("Last modified:", latest.updated_at)
         if with_emb > 0:
-            sample = PageChunk.objects.exclude(embedding=[]).first()
+            sample = PageChunk.objects.exclude(embedding__isnull=True).first()
             print("Embedding dimension:", len(sample.embedding))
             
         # Show all indexed pages

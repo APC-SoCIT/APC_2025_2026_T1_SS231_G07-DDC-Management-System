@@ -291,7 +291,7 @@ def _validate_rag_index(result: ValidationResult):
         from api.models import PageChunk
 
         total_chunks = PageChunk.objects.count()
-        chunks_with_embeddings = PageChunk.objects.exclude(embedding=[]).count()
+        chunks_with_embeddings = PageChunk.objects.exclude(embedding__isnull=True).count()
 
         result.embedding_count = chunks_with_embeddings
 

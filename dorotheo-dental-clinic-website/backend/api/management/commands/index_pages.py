@@ -424,7 +424,7 @@ class Command(BaseCommand):
                     PageChunk.objects.create(
                         page_id=page_id,
                         chunk_text=chunk_text,
-                        embedding=embedding or [],
+                        embedding=embedding or None,
                         page_title=page_title,
                         section_title=section_title,
                         source_url=source_url,
