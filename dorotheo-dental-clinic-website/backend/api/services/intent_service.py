@@ -582,6 +582,21 @@ def _is_out_of_scope(text: str) -> bool:
     if any(dw in low for dw in dental_words):
         return False
 
+    # SECOND: Date/time/calendar questions are NEVER out-of-scope.
+    # These are relevant to scheduling and clinic operations.
+    date_time_words = [
+        'date', 'petsa', 'araw', 'day', 'today', 'tomorrow', 'yesterday',
+        'kahapon', 'bukas', 'ngayon', 'next week', 'last week',
+        'next month', 'this month', 'next monday', 'next tuesday',
+        'what time', 'anong oras', 'what day', 'anong araw',
+        'what is the date', 'what date', 'when is', 'what is today',
+        'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+        'saturday', 'sunday', 'lunes', 'martes', 'miyerkules',
+        'huwebes', 'biyernes', 'sabado', 'linggo',
+    ]
+    if any(dw in low for dw in date_time_words):
+        return False
+
     # Check keyword matches
     if _matches_keywords(low, OUT_OF_SCOPE_KEYWORDS):
         return True

@@ -307,8 +307,11 @@ def parse_date(msg: str):
     Rejects dates beyond MAX_FUTURE_DAYS to prevent far-future bookings.
     """
     from .booking_validation_service import MAX_FUTURE_DAYS
-    
-    today = datetime.now().date()
+    from django.utils import timezone as _tz
+
+    # ALWAYS use Philippines local time so "today"/"tomorrow" resolve correctly
+    # regardless of the server's UTC offset.
+    today = _tz.localtime(_tz.now()).date()
     max_date = today + timedelta(days=MAX_FUTURE_DAYS)
     low = msg.lower()
     

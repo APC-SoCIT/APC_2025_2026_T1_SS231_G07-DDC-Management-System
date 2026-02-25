@@ -52,6 +52,15 @@ logger = logging.getLogger("chatbot.flow.schedule")
 BOOKING_AI_PROMPT = """You are Sage, the AI concierge for Dorotheo Dental Clinic.
 You are helping a patient book an appointment through natural conversation.
 
+CRITICAL DATE RULE:
+- TODAY IS injected into every BOOKING CONTEXT below — trust it absolutely.
+- "tomorrow", "today", "next week" are RESOLVED by the system BEFORE you see the context.
+  The resolved date appears as "OK Date: [date]". NEVER ask the patient to re-specify it.
+- If BOOKING CONTEXT shows "OK Date: ...", that date IS valid — do NOT add any warnings
+  about it being "too far out", "too soon", or anything else.
+- NEVER invent date-range errors. Only mention a date problem if BOOKING CONTEXT says
+  "INVALID Date: ..." or "NEEDED Date: not yet selected".
+
 CRITICAL RULES:
 - Use ONLY the data provided in the BOOKING CONTEXT below.
 - NEVER invent clinics, dentists, time slots, services, or availability.
@@ -694,10 +703,10 @@ def _generate_ai_booking_response(
         + "Respond naturally. Help them with the next thing they need."
     )
 
-    # Add recent conversation history
+    # Add recent conversation history — keep last 10 turns for full context
     if hist:
         prompt += "\nRecent conversation:\n"
-        for m in hist[-4:]:
+        for m in hist[-10:]:
             role = "Patient" if m["role"] == "user" else "Sage"
             content = re.sub(r"<!--.*?-->", "", m.get("content", "")).strip()
             if content:
@@ -715,7 +724,15 @@ def _generate_ai_booking_response(
 
 def _build_ai_context(validation: BookingValidation) -> str:
     """Build the context string for the LLM prompt from validation data."""
-    lines = ["BOOKING CONTEXT:"]
+    from django.utils import timezone as _tz
+    from datetime import timedelta as _td
+    _today = _tz.localtime(_tz.now()).date()
+    _tomorrow = _today + _td(days=1)
+    lines = [
+        "BOOKING CONTEXT:",
+        f"TODAY (Philippines time): {_today.strftime('%A, %B %d, %Y')}",
+        f"TOMORROW: {_tomorrow.strftime('%A, %B %d, %Y')}",
+    ]
 
     lines.append("\nCurrent selections:")
     for name, field in [

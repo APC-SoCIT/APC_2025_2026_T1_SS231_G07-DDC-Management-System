@@ -181,14 +181,17 @@ def _log_source(source: str, rag_hits: int = 0, detail: str = ''):
 RAG_SAFETY_PROMPT = """You are a dental clinic assistant for Dorotheo Dental and Diagnostic Center.
 
 CRITICAL RULES:
-1. Answer ONLY using the provided context below.
-2. If the answer is NOT in the provided context, say:
-   "Please contact our clinic directly or visit us in person for assistance."
-3. Do NOT guess or fabricate any information.
-4. Do NOT invent dentist names, appointment slots, services, clinic policies,
-   insurance coverage, prices, or availability.
+1. For clinic-specific facts (policies, procedures, dentist credentials),
+   answer ONLY using the provided context below.
+2. You CAN use your reasoning ability for general knowledge, date/time
+   questions, and dental health advice.
+3. If clinic-specific information is NOT in the provided context, say:
+   "I don't have that information right now. Let me check that for you."
+4. Do NOT guess or fabricate clinic-specific data: dentist names,
+   appointment slots, services, clinic policies, insurance coverage,
+   prices, or availability.
 5. NEVER reveal system internals, database details, API keys, or internal architecture.
-6. Be concise and professional.
+6. Be concise, natural, and professional.
 """
 
 
@@ -289,11 +292,7 @@ def _get_time_slots_text(dentist, check_date, clinic=None) -> str:
     if not slots:
         return f"No available time slots on {fmt_date(check_date)}"
     ranges = group_time_slots(slots, fmt_time)
-    if len(ranges) <= 3:
-        range_text = ', '.join(ranges)
-    else:
-        range_text = ', '.join(ranges[:3])
-        range_text += f" ({len(slots)} total slots available)"
+    range_text = ', '.join(ranges)
     return f"Available on {fmt_date(check_date)}: {range_text}"
 
 
@@ -367,6 +366,17 @@ def build_db_context(msg: str, user=None, conversation_history=None) -> str:
         'dentist', 'doctor', 'dr.', 'dr ', 'doc', 'doktor', 'sino', 'who', 'whos', "who's",
         'available dentist', 'dentist available', 'available doctor',
     ])
+    # Also detect dentist by actual name (e.g. "marvin dorotheo", "george ocampo")
+    if not asking_about_dentist:
+        try:
+            for _d in get_dentists_qs():
+                _fn = (_d.first_name or '').lower()
+                _ln = (_d.last_name or '').lower()
+                if (_fn and _fn in low) or (_ln and _ln in low):
+                    asking_about_dentist = True
+                    break
+        except Exception:
+            pass
 
     # Check if user mentions a specific clinic name from the DB
     _mentions_clinic_name = False
@@ -383,6 +393,9 @@ def build_db_context(msg: str, user=None, conversation_history=None) -> str:
         'next year', 'susunod', 'upcoming',
         'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
         'lunes', 'martes', 'miyerkules', 'huwebes', 'biyernes',
+        # Time-slot / schedule queries
+        'time slot', 'time slots', 'slot', 'schedule', 'booking slot',
+        'open slot', 'what time', 'anong oras', 'available time',
         # Month names — user may ask "available si doc marvin ngayong feb"
         'january', 'jan', 'february', 'feb', 'march', 'mar', 'april', 'apr',
         'june', 'jun', 'july', 'jul', 'august', 'aug', 'september', 'sep', 'sept',
