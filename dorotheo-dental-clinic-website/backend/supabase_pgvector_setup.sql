@@ -41,7 +41,7 @@ ORDER BY ordinal_position;
 SELECT indexname, indexdef
 FROM pg_indexes
 WHERE tablename = 'api_pagechunk';
--- Should show pagechunk_embedding_cosine_idx using ivfflat.
+-- Should show pagechunk_embedding_cosine_idx using hnsw.
 
 
 -- ── STEP 5: Create match_page_chunks SQL function ─────────────────────────
@@ -128,9 +128,9 @@ CREATE POLICY "No public access to page chunks"
 
 -- REINDEX INDEX CONCURRENTLY pagechunk_embedding_cosine_idx;
 
--- Or increase lists if you have >10k chunks:
+-- Or rebuild with hnsw if you have many chunks:
 -- DROP INDEX IF EXISTS pagechunk_embedding_cosine_idx;
 -- CREATE INDEX pagechunk_embedding_cosine_idx
 --   ON api_pagechunk
---   USING ivfflat (embedding vector_cosine_ops)
---   WITH (lists = 100);   -- use ~sqrt(row_count)
+--   USING hnsw (embedding vector_cosine_ops)
+--   WITH (m = 16, ef_construction = 64);

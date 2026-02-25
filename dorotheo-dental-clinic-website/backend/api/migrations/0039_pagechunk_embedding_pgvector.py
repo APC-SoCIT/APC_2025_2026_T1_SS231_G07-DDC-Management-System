@@ -89,13 +89,19 @@ def rename_vec_field(apps, schema_editor):
 
 
 def create_ivfflat_index(apps, schema_editor):
+    """
+    Create a vector similarity index.
+    Uses HNSW instead of ivfflat because ivfflat has a hard 2000-dimension
+    limit in pgvector, while gemini-embedding-001 produces 3072-dim vectors.
+    HNSW supports up to 4000 dimensions and offers better recall anyway.
+    """
     if not _is_postgres(schema_editor):
         return
     schema_editor.execute("""
         CREATE INDEX IF NOT EXISTS pagechunk_embedding_cosine_idx
         ON api_pagechunk
-        USING ivfflat (embedding vector_cosine_ops)
-        WITH (lists = 50);
+        USING hnsw (embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64);
     """)
 
 
