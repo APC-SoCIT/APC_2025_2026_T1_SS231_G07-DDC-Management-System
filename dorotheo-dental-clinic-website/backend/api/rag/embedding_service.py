@@ -18,6 +18,12 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger('rag.embedding')
 
+# ── Embedding configuration ─────────────────────────────────────────────────
+# Must match EMBEDDING_DIM in migration 0039 and the pgvector column dimensions.
+# Default 3072 from gemini-embedding-001 exceeds pgvector HNSW 2000-dim limit,
+# so we truncate to 768 via Matryoshka output_dimensionality.
+EMBEDDING_DIM = 768
+
 # In-memory embedding cache (query → embedding)
 _embedding_cache: dict = {}
 _CACHE_MAX_SIZE = 500
@@ -68,6 +74,7 @@ def generate_embedding(text: str, use_cache: bool = True) -> Optional[List[float
             model="models/gemini-embedding-001",
             content=text,
             task_type="RETRIEVAL_DOCUMENT",
+            output_dimensionality=EMBEDDING_DIM,
         )
         embedding = result['embedding']
         elapsed = time.time() - start
@@ -110,6 +117,7 @@ def generate_query_embedding(text: str) -> Optional[List[float]]:
             model="models/gemini-embedding-001",
             content=text,
             task_type="RETRIEVAL_QUERY",
+            output_dimensionality=EMBEDDING_DIM,
         )
         embedding = result['embedding']
         elapsed = time.time() - start

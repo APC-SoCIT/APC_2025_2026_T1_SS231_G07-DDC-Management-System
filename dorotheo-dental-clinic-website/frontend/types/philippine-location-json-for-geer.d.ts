@@ -25,12 +25,12 @@ declare module "philippine-location-json-for-geer" {
     mun_code: string
   }
 
-  interface Region {
+  interface Region 
     id: number
     psgc_code: string
     name: string
     reg_code: string
-  }
+  
 
   export const regions: Region[]
   export const provinces: Province[]

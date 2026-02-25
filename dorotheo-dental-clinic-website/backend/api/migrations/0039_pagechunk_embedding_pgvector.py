@@ -14,7 +14,8 @@ Steps:
     (This migration also runs it, but having it pre-enabled is safer.)
 
 ⚠️  EMBEDDING DIMENSION must match your model.
-    gemini-embedding-001 → 3072 dims (default below).
+    gemini-embedding-001 with output_dimensionality=768 → 768 dims.
+    (Default 3072 exceeds pgvector's HNSW 2000-dim limit on Supabase.)
     Verify: open Django shell → from api.rag.embedding_service import generate_embedding
             e = generate_embedding("test"); print(len(e))
     If different, change EMBEDDING_DIM below AND in api/models.py BEFORE migrating.
@@ -24,7 +25,9 @@ from django.db import migrations
 from pgvector.django import VectorField
 
 # ── CHANGE THIS if your embedding dimension differs ─────────────────────────
-EMBEDDING_DIM = 3072
+# Using 768 instead of 3072 to stay within pgvector HNSW index 2000-dim limit.
+# gemini-embedding-001 supports Matryoshka truncation via output_dimensionality.
+EMBEDDING_DIM = 768
 
 
 def _is_postgres(schema_editor):
@@ -91,9 +94,8 @@ def rename_vec_field(apps, schema_editor):
 def create_ivfflat_index(apps, schema_editor):
     """
     Create a vector similarity index.
-    Uses HNSW instead of ivfflat because ivfflat has a hard 2000-dimension
-    limit in pgvector, while gemini-embedding-001 produces 3072-dim vectors.
-    HNSW supports up to 4000 dimensions and offers better recall anyway.
+    Uses HNSW (better recall than ivfflat). Both index types have a 2000-dim
+    limit on Supabase's pgvector. We use 768-dim embeddings to stay safe.
     """
     if not _is_postgres(schema_editor):
         return

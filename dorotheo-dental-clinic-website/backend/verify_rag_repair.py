@@ -166,7 +166,7 @@ if __name__ == '__main__':
     print("=" * 60)
     print(f"Vector store type:       Local SQLite DB (Django ORM + JSONField)")
     print(f"Embedding model:         models/gemini-embedding-001 (Google Gemini)")
-    print(f"Embedding dimension:     3072")
+    print(f"Embedding dimension:     768")
     print(f"Initial vector count:    0")
     print(f"Post-fix vector count:   {with_emb}")
     print(f"Total chunks indexed:    {total}")
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     print("Exact fix applied:")
     print("  1. Set GEMINI_API_KEY in .env")
     print("  2. Ran: python manage.py index_pages --reindex")
-    print("  3. Generated 3072-dim Gemini embeddings for all page content")
+    print("  3. Generated 768-dim Gemini embeddings for all page content")
     print()
     
     all_pass = retrieval_ok and prompt_ok and final_ok and with_emb > 0
