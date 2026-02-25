@@ -1,29 +1,33 @@
 """
-Schedule (Booking) Flow — Context-Aware, Non-Linear
-────────────────────────────────────────────────────
-Instead of a step-locked wizard that processes one field per turn,
-this flow:
+Schedule (Booking) Flow — Conversational, Fully Validated
+=========================================================
+Architecture (NO wizard behaviour):
+1. Extract ALL entities from the user message + history at once.
+2. Validate ALL fields against the database in a single pass.
+3. Classify issues into invalid_fields / missing_fields.
+4. Respond ONCE:
+   a. If any field is invalid → explain ALL invalid issues conversationally.
+   b. If no invalid but some missing → ask naturally for missing info.
+   c. If everything valid → show deterministic confirmation summary.
+5. Pending-request lock and one-booking-per-week rule are checked
+   BEFORE any other validation.
 
-1. Parses ALL entities from the user's message + history
-2. Validates ALL provided fields simultaneously
-3. Collects missing_fields[] and invalid_fields[]
-4. Responds with a SINGLE message covering all issues
+No step-by-step prompts. No wizard cards. No "Please select…" language.
+Session state tracked via booking_memory.ConversationState.
 
-Dependency chain:  clinic → dentist → date → time  (service is independent)
-If a prerequisite is missing/invalid, downstream fields are noted as
-"also needed" rather than validated.
-
-All database queries go through booking_service.
-All responses are language-aware via the lang module.
-No LLM calls — this is a pure deterministic flow.
+Dependency chain: clinic → dentist → date → time  (service independent)
+All DB queries go through booking_service.
+All LLM calls go through llm_service (circuit breaker).
 """
 
+import re
 import logging
 from dataclasses import dataclass, field as dc_field
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import timedelta
+from typing import List, Optional, Any
 
 from django.db.models import Q
+from django.utils import timezone as tz
 
 from ..models import (
     Appointment, DentistAvailability,
@@ -31,392 +35,430 @@ from ..models import (
 )
 from ..services import booking_service as bsvc
 from ..services import intent_service as isvc
+from ..services.llm_service import get_llm_service
+from ..services.booking_validation_service import validate_one_booking_per_week
 from .. import booking_memory as bmem
 from .. import language_detection as lang
 from ..views import create_appointment_notification, create_patient_notification
 from . import build_reply
 
-logger = logging.getLogger('chatbot.flow.schedule')
+logger = logging.getLogger("chatbot.flow.schedule")
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ======================================================================
+# BOOKING AI SYSTEM PROMPT
+# ======================================================================
+
+BOOKING_AI_PROMPT = """You are Sage, the AI concierge for Dorotheo Dental Clinic.
+You are helping a patient book an appointment through natural conversation.
+
+CRITICAL RULES:
+- Use ONLY the data provided in the BOOKING CONTEXT below.
+- NEVER invent clinics, dentists, time slots, services, or availability.
+- NEVER show step numbers, wizard headers, or form-like formatting.
+- NEVER say "Please select…" — always speak naturally and conversationally.
+- You must explain ALL issues at once, not one at a time.
+  For example if the clinic is invalid AND the date is in the past, mention BOTH.
+- Respond naturally as if having a friendly conversation.
+- Be concise: 2-4 sentences max unless listing options.
+- If the patient provided invalid data, explain why and suggest alternatives.
+- Match the patient's language (English or Filipino/Tagalog).
+
+RESPONSE PRIORITY (MANDATORY):
+1. If ANY fields are INVALID → explain ALL invalid issues conversationally.
+   Do NOT continue booking until resolved.
+2. If NO invalid fields but some are MISSING → ask naturally for missing info.
+   You may group the ask: "Which clinic and date work for you?"
+3. If EVERYTHING is valid → the system handles confirmation (you won't be called).
+
+FORMATTING:
+- Keep responses SHORT and mobile-friendly.
+- Use **bold** for key data (names, dates, times).
+- When listing options (clinics, dentists, dates, times), use markdown bullets (-).
+- Do NOT use section headers (### ) or wizard-style titles.
+- Maximum 6 items in any list.
+- Do NOT repeat information the patient already provided.
+
+SERVICES (IMPORTANT):
+- Online self-booking is restricted by the clinic owner to **Cleaning** and **Consultation** only.
+- The clinic DOES perform other services (Tooth Extraction, Whitening, Braces, Filling, Veneers, etc.),
+  but those CANNOT be booked online by patients.
+- If a patient requests a service not in the bookable list, explain this owner restriction clearly:
+  say something like "That service is available at our clinic, but it can't be booked online —
+  you'd need to call or visit us in person to schedule it. For online booking I can only
+  set you up for a **Cleaning** or **Consultation**."
+- NEVER say 'we don't offer that service' — the clinic offers it, just not via online booking.
+
+EXAMPLE GOOD RESPONSES:
+- "Great choice! Dr. Cruz is available at Bacoor. When would you like to come in?"
+- "It looks like we don't have a Magallanes branch. We currently have **Bacoor**, **Alabang**, and **Poblacion**."
+- "That time is taken, but here are the open times on March 15:\n- **9:00 AM**\n- **10:00 AM**\n- **2:00 PM**"
+- "Tooth extractions are done at our clinic, but online booking is only available for
+  **Cleaning** and **Consultation**. Would you like to book one of those instead,
+  or give us a call to set up an extraction appointment?"
+"""
+
+
+# ======================================================================
 # VALIDATION DATA STRUCTURES
-# ═══════════════════════════════════════════════════════════════════════════
+# ======================================================================
 
 @dataclass
-class FieldIssue:
-    """A validation issue for a booking field (missing or invalid)."""
-    field: str            # 'clinic', 'dentist', 'date', 'time', 'service'
-    kind: str             # 'invalid' or 'missing'
-    message: str          # Human-readable description
+class FieldValidation:
+    """Validation result for a single booking field."""
+    status: str          # 'valid', 'invalid', 'missing', 'blocked'
+    value: Any = None
+    display_name: str = ""
+    error: str = ""
     options: List[str] = dc_field(default_factory=list)
-    tag: str = ''         # UI step tag like '[BOOK_STEP_1]'
+    recommendation: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+@dataclass
+class BookingValidation:
+    """Complete validation result for all booking fields."""
+    all_valid: bool = False
+    clinic: FieldValidation = dc_field(default_factory=lambda: FieldValidation("missing"))
+    dentist: FieldValidation = dc_field(default_factory=lambda: FieldValidation("missing"))
+    date: FieldValidation = dc_field(default_factory=lambda: FieldValidation("missing"))
+    time: FieldValidation = dc_field(default_factory=lambda: FieldValidation("missing"))
+    service: FieldValidation = dc_field(default_factory=lambda: FieldValidation("missing"))
+    weekly_rule: FieldValidation = dc_field(default_factory=lambda: FieldValidation("valid"))
+
+
+# ======================================================================
 # PUBLIC ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════
+# ======================================================================
 
 def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
     """
-    Run the booking flow for an authenticated user.
-    Returns a response dict: {'response', 'quick_replies', 'error'}.
+    Entry point for the booking flow.
+    Returns a response dict: {"response", "quick_replies", "error"}.
 
-    Architecture: context-aware, non-linear.
-    ┌─ Extract ALL entities ─┐
-    │  Validate ALL fields   │ → collect issues[]
-    │  Build ONE response    │
-    └────────────────────────┘
+    Every message:
+    1. Passes through entity extraction
+    2. Passes through full validation
+    3. Gets an AI-generated conversational reply (or deterministic confirmation)
     """
     if not user:
-        return build_reply(lang.login_required('booking', detected_lang))
+        return build_reply(lang.login_required("booking", detected_lang))
 
     pending_msg = bsvc.check_pending_requests(user, detected_lang)
     if pending_msg:
-        return build_reply(pending_msg, tag='[PENDING_BLOCK]')
+        return build_reply(pending_msg, tag="[PENDING_BLOCK]")
 
+    session = bmem.get_session(user.id)
     low = msg.lower()
-    today = datetime.now().date()
+    # Use Philippines local time so "today" matches the clinic's operating timezone
+    today = tz.localtime(tz.now()).date()
 
+    # -- Confirmation gate (session-state based, no step tags) --
+    if session.state == bmem.ConversationState.BOOKING_CONFIRMING:
+        # If the user is neither confirming nor cancelling, check whether
+        # they are trying to correct a specific field (e.g. "actually, make
+        # it Cleaning" or "i said nail polish for the service"). If so,
+        # reset to COLLECTING so the normal validation loop re-runs with
+        # the corrected value instead of blindly re-showing the old draft.
+        if not isvc.is_confirm_yes(low) and not isvc.is_confirm_no(low):
+            has_correction = any([
+                bsvc.find_service(msg) is not None,
+                bsvc.find_service(msg, patient_only=False) is not None,
+                bsvc._has_unmatched_service_mention(msg) is not None,
+                bsvc.find_clinic(msg) is not None,
+                bsvc.find_dentist(msg) is not None,
+                bsvc.parse_time(msg) is not None,
+                bsvc.parse_date(msg) is not None,
+            ])
+            if has_correction:
+                session.state = bmem.ConversationState.COLLECTING
+                # Fall through to normal booking flow below
+            else:
+                return _handle_confirmation(user, low, session, detected_lang)
+        else:
+            return _handle_confirmation(user, low, session, detected_lang)
+
+    # -- Extract ALL entities from message + history --
     explicit_new = isvc.classify_intent(msg).intent == isvc.INTENT_SCHEDULE
-    is_fresh = explicit_new or not _in_booking_flow(hist)
-
-    # ── PHASE 1: Extract ALL entities ─────────────────────────────────
+    is_fresh = explicit_new or session.state == bmem.ConversationState.IDLE
     ctx = bsvc.gather_booking_context(msg, hist, is_fresh=is_fresh)
-    clinic    = ctx['clinic']
-    dentist   = ctx['dentist']
-    date_val  = ctx['date']
-    time_val  = ctx['time']
-    service   = ctx['service']
-    invalid_date_msg = ctx.get('invalid_date_msg')
 
-    # ── PHASE 2: Confirmation gate (if already shown) ─────────────────
-    if isvc.step_tag_exists(hist, '[BOOK_STEP_5]'):
-        return _handle_confirmation(
-            user, low, clinic, dentist, date_val, time_val, service,
-            detected_lang,
+    clinic                = ctx["clinic"]
+    dentist               = ctx["dentist"]
+    date_val              = ctx["date"]
+    time_val              = ctx["time"]
+    service               = ctx["service"]
+    invalid_date          = ctx.get("invalid_date_msg")
+    invalid_service_name  = ctx.get("invalid_service_name")
+
+    # -- Bare weekday disambiguation --
+    # If the user said a bare day name (e.g. "monday") and the dentist's
+    # available dates contain multiple occurrences of that weekday, we must
+    # ask which specific date they mean instead of silently picking the
+    # nearest one and confusing them.
+    weekday_num = bsvc.parse_weekday_name(msg)
+    if weekday_num is not None and clinic and dentist:
+        end_wk = today + timedelta(days=30)
+        avails_wk = DentistAvailability.objects.filter(
+            dentist=dentist, date__gte=today, date__lte=end_wk, is_available=True,
+        ).filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True)).order_by("date")
+        matching_dates = []
+        for av in avails_wk:
+            if av.date.weekday() == weekday_num and bsvc.get_available_slots(dentist, av.date, clinic):
+                matching_dates.append(av.date)
+        if len(matching_dates) > 1:
+            day_name = msg.strip().capitalize()
+            options = [bsvc.fmt_date(d) for d in matching_dates[:6]]
+            is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
+            date_list = "\n".join(f"- **{bsvc.fmt_date(d)}**" for d in matching_dates[:6])
+            if is_tl:
+                text = f"May ilang {day_name} na available — alin po ang ibig ninyong sabihin?\n\n{date_list}"
+            else:
+                text = f"Just to clarify — there are a few {day_name}s coming up. Which one did you have in mind?\n\n{date_list}"
+            return build_reply(text, options)
+
+    # -- Validate ALL fields against DB --
+    validation = _validate_booking(
+        user=user, msg=msg,
+        clinic=clinic, dentist=dentist,
+        invalid_service_name=invalid_service_name,
+        date_val=date_val, time_val=time_val,
+        service=service, invalid_date_msg=invalid_date,
+        today=today,
+    )
+
+    # -- All valid -> deterministic confirmation (safety-critical) --
+    if validation.all_valid:
+        session.state = bmem.ConversationState.BOOKING_CONFIRMING
+        return _show_confirmation(
+            user, clinic, dentist, date_val, time_val, service, detected_lang,
         )
 
-    # ── PHASE 3: Special follow-up interactions ───────────────────────
-    more = _handle_more_slots(msg, low, hist, clinic, dentist, date_val,
-                              detected_lang)
-    if more:
-        return more
-
-    wk = _handle_weekday_disambiguation(
-        msg, clinic, dentist, date_val, time_val, today, detected_lang,
-    )
-    if wk:
-        return wk
-
-    # ── PHASE 4: Validate ALL fields → collect issues ─────────────────
-    issues = _validate_all(
-        user=user, msg=msg,
-        clinic=clinic, dentist=dentist, date_val=date_val,
-        time_val=time_val, service=service,
-        invalid_date_msg=invalid_date_msg,
-        today=today, detected_lang=detected_lang,
-    )
-
-    if issues:
-        return _build_issues_response(issues, detected_lang)
-
-    # ── PHASE 5: All valid → confirmation ─────────────────────────────
-    return _show_confirmation(
-        user, clinic, dentist, date_val, time_val, service, detected_lang,
+    # -- Not all valid -> AI conversational response --
+    session.state = bmem.ConversationState.BOOKING_COLLECTING
+    return _generate_ai_booking_response(
+        msg, hist, validation, detected_lang,
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# FIELD VALIDATION — ALL FIELDS IN ONE PASS
-# ═══════════════════════════════════════════════════════════════════════════
+# ======================================================================
+# FIELD VALIDATION - ALL FIELDS IN ONE PASS
+# ======================================================================
 
-def _validate_all(
+def _validate_booking(
     *, user, msg, clinic, dentist, date_val, time_val, service,
-    invalid_date_msg, today, detected_lang,
-) -> List[FieldIssue]:
+    invalid_date_msg, today, invalid_service_name=None,
+) -> BookingValidation:
     """
-    Validate every booking field.  Returns [] when all are good.
+    Validate every booking field against the database.
+    Returns structured validation data (NO formatted messages).
 
-    Dependency chain: clinic → dentist → date → time  (service independent)
-    If a prerequisite is missing/invalid, downstream fields are noted as
-    "also needed" — options can't be generated without prerequisites.
+    Dependency chain: clinic -> dentist -> date -> time (service independent)
     """
-    issues: List[FieldIssue] = []
+    result = BookingValidation()
 
-    clinic_ok  = _check_clinic(user, clinic, msg, today, detected_lang, issues)
-    dentist_ok = _check_dentist(user, clinic, clinic_ok, dentist, today,
-                                detected_lang, issues)
-    date_ok    = _check_date(user, clinic, clinic_ok, dentist, dentist_ok,
-                             date_val, invalid_date_msg, today,
-                             detected_lang, issues)
-    _check_time(clinic, clinic_ok, dentist, dentist_ok, date_val, date_ok,
-                time_val, detected_lang, issues)
-    _check_service(service, detected_lang, issues)
+    result.clinic = _check_clinic_field(user, clinic, msg, today)
+    clinic_ok = result.clinic.status == "valid"
 
-    return issues
+    result.dentist = _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg=msg)
+    dentist_ok = result.dentist.status == "valid"
+
+    result.date = _check_date_field(
+        user, clinic, clinic_ok, dentist, dentist_ok,
+        date_val, invalid_date_msg, today,
+    )
+    date_ok = result.date.status == "valid"
+
+    result.time = _check_time_field(
+        clinic, clinic_ok, dentist, dentist_ok,
+        date_val, date_ok, time_val,
+    )
+
+    result.service = _check_service_field(service, unmatched_name=invalid_service_name)
+
+    # -- Weekly rule: one confirmed appointment per calendar week --
+    result.weekly_rule = _check_weekly_rule(user, date_val, date_ok)
+
+    result.all_valid = all(
+        f.status == "valid"
+        for f in [result.clinic, result.dentist, result.date,
+                  result.time, result.service, result.weekly_rule]
+    )
+    return result
 
 
-# ── Clinic ────────────────────────────────────────────────────────────────
+# -- Clinic --
 
-def _check_clinic(user, clinic, msg, today, detected_lang, issues) -> bool:
-    """Validate or prompt for clinic.  Returns True when clinic is OK."""
+def _check_clinic_field(user, clinic, msg, today) -> FieldValidation:
+    """Validate clinic. Returns structured FieldValidation."""
     if clinic:
-        return True
-
-    if bsvc._has_unmatched_location_hint(msg):
-        clinics = ClinicLocation.objects.all()
-        qr = [c.name for c in clinics]
-        lines = ["⚠️ Sorry, I couldn't find a clinic matching that location.\n"]
-        for c in clinics:
-            lines.append(f"- **{c.name}**")
-        lines.append("\nPlease choose one of our available branches:")
-        issues.append(FieldIssue('clinic', 'invalid', '\n'.join(lines), qr,
-                                 '[BOOK_STEP_1]'))
-        return False
+        return FieldValidation("valid", value=clinic, display_name=clinic.name)
 
     clinics = ClinicLocation.objects.all()
     if not clinics.exists():
-        issues.append(FieldIssue(
-            'clinic', 'invalid',
-            "No clinic locations are set up yet. Please contact the clinic "
-            "directly.",
-        ))
-        return False
+        return FieldValidation("blocked", error="It looks like our clinic locations aren't set up at the moment. Please try again later.")
 
-    # Smart recommendation: patient's last-visited clinic
-    rec_clinic = None
-    last_appt = Appointment.objects.filter(
-        patient=user, status__in=['confirmed', 'completed'],
-        clinic__isnull=False,
-    ).order_by('-date', '-time').first()
-    if last_appt:
-        rec_clinic = last_appt.clinic
-        logger.info("Smart rec: user %s last visited %s",
-                     user.id, rec_clinic.name)
-
-    lines = [lang.step_label(1, 'clinic', detected_lang) + "\n"]
-    if rec_clinic:
-        lines.append(lang.smart_rec_clinic(rec_clinic.name, detected_lang)
-                      + "\n")
-    qr: List[str] = []
+    options = []
     for c in clinics:
         open_d = bsvc.get_dentists_with_openings(c, today)
-        tag_text = (
-            f" ({len(open_d)} dentist"
-            f"{'s' if len(open_d) != 1 else ''} available)"
-            if open_d else " (no openings this period)"
+        avail = f"({len(open_d)} dentist{'s' if len(open_d) != 1 else ''} available)" if open_d else "(no openings)"
+        options.append(f"{c.name} {avail}")
+
+    # Smart recommendation
+    rec = ""
+    last_appt = Appointment.objects.filter(
+        patient=user, status__in=["confirmed", "completed"], clinic__isnull=False,
+    ).order_by("-date", "-time").first()
+    if last_appt:
+        rec = f"Previously visited: {last_appt.clinic.name}"
+
+    if bsvc._has_unmatched_location_hint(msg):
+        return FieldValidation(
+            "invalid", error="I couldn't find that clinic location in our system.",
+            options=options, recommendation=rec,
         )
-        rec_tag = " ⭐" if rec_clinic and c.id == rec_clinic.id else ""
-        lines.append(f"- **{c.name}**{tag_text}{rec_tag}")
-        qr.append(c.name)
-    lines.append("\n" + lang.select_prompt('clinic', detected_lang))
-    issues.append(FieldIssue('clinic', 'missing', '\n'.join(lines), qr,
-                             '[BOOK_STEP_1]'))
-    return False
+    return FieldValidation("missing", options=options, recommendation=rec)
 
 
-# ── Dentist ───────────────────────────────────────────────────────────────
+# -- Dentist --
 
-def _check_dentist(user, clinic, clinic_ok, dentist, today, detected_lang,
-                   issues) -> bool:
-    """Validate or prompt for dentist.  Returns True when dentist is OK."""
+def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="") -> FieldValidation:
+    """
+    Validate dentist. Returns structured FieldValidation.
+
+    When dentist is None but the message contains a doctor keyword (dr/doc/doctor)
+    followed by a name not found in the DB, returns 'invalid' with a clear error
+    instead of silently showing the 'missing' option list.
+    """
+    if dentist is None:
+        # Check if user explicitly named a non-existent doctor
+        if msg:
+            unmatched = bsvc._has_unmatched_doctor_hint(msg)
+            if unmatched:
+                if clinic_ok:
+                    alt = bsvc.get_dentists_with_openings(clinic, today)
+                    options = [f"Dr. {d.get_full_name()}" for d in alt]
+                else:
+                    options = [f"Dr. {d.get_full_name()}"
+                               for d in bsvc.get_dentists_qs()[:6]]
+                return FieldValidation(
+                    "invalid",
+                    error=f"We don't have a Dr. {unmatched.title()} in our system.",
+                    options=options,
+                )
+
+        if not clinic_ok:
+            return FieldValidation("missing")
+
     if not clinic_ok:
-        if not dentist:
-            issues.append(FieldIssue('dentist', 'missing', 'dentist'))
-        return False
+        if dentist:
+            return FieldValidation("missing", value=dentist,
+                                   display_name=f"Dr. {dentist.get_full_name()}")
+        return FieldValidation("missing")
 
     end_date = today + timedelta(days=30)
 
     if dentist:
-        # Cross-validate: dentist practices at this clinic?
         has_avail = DentistAvailability.objects.filter(
-            dentist=dentist, date__gte=today, date__lte=end_date,
-            is_available=True,
+            dentist=dentist, date__gte=today, date__lte=end_date, is_available=True,
         ).filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True)).exists()
-
         if has_avail:
-            return True
+            return FieldValidation("valid", value=dentist,
+                                   display_name=f"Dr. {dentist.get_full_name()}")
 
-        # Mismatch
+        # Dentist doesn't practice at this clinic
         alt = bsvc.get_dentists_with_openings(clinic, today)
-        lines = [
-            f"⚠️ **Dr. {dentist.get_full_name()}** does not practice at "
-            f"**{clinic.name}** (or has no availability there).\n"
-        ]
-        if alt:
-            lines.append("Here are the available dentists at this clinic:\n")
-            qr: List[str] = []
-            for d in alt:
-                name = f"Dr. {d.get_full_name()}"
-                lines.append(f"- **{name}**")
-                qr.append(name)
-            lines.append("\n" + lang.select_prompt('dentist', detected_lang))
-            issues.append(FieldIssue('dentist', 'invalid', '\n'.join(lines),
-                                     qr, '[BOOK_STEP_2]'))
-        else:
-            lines.append(
-                f"No other dentists are currently available at "
-                f"**{clinic.name}**. Please choose a different clinic."
-            )
-            issues.append(FieldIssue('dentist', 'invalid', '\n'.join(lines),
-                                     tag='[BOOK_STEP_1]'))
-        return False
+        options = [f"Dr. {d.get_full_name()}" for d in alt]
+        return FieldValidation(
+            "invalid", value=dentist,
+            display_name=f"Dr. {dentist.get_full_name()}",
+            error=f"Unfortunately, Dr. {dentist.get_full_name()} doesn't have any availability at {clinic.name} right now.",
+            options=options,
+        )
 
-    # Dentist missing — build options
+    # Missing - build options
     dentist_ids = DentistAvailability.objects.filter(
         Q(clinic=clinic) | Q(apply_to_all_clinics=True),
         date__gte=today, date__lte=end_date, is_available=True,
-    ).values_list('dentist_id', flat=True).distinct()
+    ).values_list("dentist_id", flat=True).distinct()
 
     if not dentist_ids:
         alt_clinic = bsvc.recommend_alt_clinic(clinic, today)
         if alt_clinic:
-            issues.append(FieldIssue(
-                'dentist', 'missing',
-                f"Unfortunately **{clinic.name}** has no dentists with "
-                f"openings right now.\n\nHowever, **{alt_clinic.name}** has "
-                "availability! Would you like to book there instead?",
-                [alt_clinic.name, "No thanks"], '[BOOK_STEP_1]',
-            ))
-        else:
-            issues.append(FieldIssue(
-                'dentist', 'missing',
-                f"No dentists have open slots at {clinic.name} in the next "
-                "month. Please contact the clinic directly.",
-            ))
-        return False
+            return FieldValidation(
+                "blocked",
+                error=f"There aren't any dentists with openings at {clinic.name} right now.",
+                options=[alt_clinic.name],
+                recommendation=f"{alt_clinic.name} has availability though!",
+            )
+        return FieldValidation("blocked",
+                               error=f"None of our dentists have openings at {clinic.name} right now.")
 
     available_dentists = bsvc.get_dentists_qs().filter(id__in=dentist_ids)
+    options = [f"Dr. {d.get_full_name()}" for d in available_dentists]
 
-    # Smart recommendation: patient's last dentist at this clinic
-    rec_dentist = None
+    # Smart recommendation
+    rec = ""
     last_at = Appointment.objects.filter(
         patient=user, clinic=clinic,
-        status__in=['confirmed', 'completed'], dentist__isnull=False,
-    ).order_by('-date', '-time').first()
+        status__in=["confirmed", "completed"], dentist__isnull=False,
+    ).order_by("-date", "-time").first()
     if last_at and last_at.dentist in available_dentists:
-        rec_dentist = last_at.dentist
-        logger.info("Smart rec: user %s last saw Dr. %s at %s",
-                     user.id, rec_dentist.get_full_name(), clinic.name)
+        rec = f"Previously saw: Dr. {last_at.dentist.get_full_name()}"
 
-    lines = [lang.step_label(2, 'dentist', detected_lang)
-             + f" (at **{clinic.name}**)\n"]
-    if rec_dentist:
-        lines.append(lang.smart_rec_dentist(
-            rec_dentist.get_full_name(), detected_lang) + "\n")
-    qr: List[str] = []
-    for d in available_dentists:
-        name = f"Dr. {d.get_full_name()}"
-        rec_tag = " ⭐" if rec_dentist and d.id == rec_dentist.id else ""
-        lines.append(f"- **{name}**{rec_tag}")
-        qr.append(name)
-    lines.append("\n" + lang.select_prompt('dentist', detected_lang))
-    issues.append(FieldIssue('dentist', 'missing', '\n'.join(lines), qr,
-                             '[BOOK_STEP_2]'))
-    return False
+    return FieldValidation("missing", options=options, recommendation=rec)
 
 
-# ── Date ──────────────────────────────────────────────────────────────────
+# -- Date --
 
-def _check_date(user, clinic, clinic_ok, dentist, dentist_ok,
-                date_val, invalid_date_msg, today, detected_lang,
-                issues) -> bool:
-    """Validate or prompt for date.  Returns True when date is OK."""
-    # Invalid date sentinel (independent of prerequisites)
+def _check_date_field(user, clinic, clinic_ok, dentist, dentist_ok,
+                      date_val, invalid_date_msg, today) -> FieldValidation:
+    """Validate date. Returns structured FieldValidation."""
     if invalid_date_msg:
-        issues.append(FieldIssue(
-            'date', 'invalid', f"⚠️ {invalid_date_msg}",
-            tag='[BOOK_STEP_3_DATE_ERROR]',
-        ))
-        return False
+        return FieldValidation("invalid", error=invalid_date_msg)
 
     if not (clinic_ok and dentist_ok):
-        if not date_val:
-            issues.append(FieldIssue('date', 'missing', 'date'))
-        return False
+        if date_val:
+            return FieldValidation("missing", value=date_val,
+                                   display_name=bsvc.fmt_date(date_val))
+        return FieldValidation("missing")
 
     if date_val:
         # Same-date conflict
         same = Appointment.objects.filter(
-            patient=user, date=date_val,
-            status__in=['confirmed', 'pending'],
+            patient=user, date=date_val, status__in=["confirmed", "pending"],
         ).first()
         if same:
-            d_name = (same.dentist.get_full_name()
-                      if same.dentist else 'another dentist')
-            s_name = same.service.name if same.service else 'appointment'
-            issues.append(FieldIssue(
-                'date', 'invalid',
-                f"⚠️ You already have a **{s_name}** appointment on "
-                f"**{bsvc.fmt_date_full(date_val)}** at "
-                f"**{bsvc.fmt_time(same.time)}** "
-                f"with **Dr. {d_name}**. "
-                "Patients may only have one appointment per day. "
-                "Please choose a different date.",
-                tag='[BOOK_STEP_3]',
-            ))
-            return False
+            d_name = same.dentist.get_full_name() if same.dentist else "another dentist"
+            s_name = same.service.name if same.service else "appointment"
+            return FieldValidation(
+                "invalid", value=date_val,
+                error=(f"You've already got a {s_name} on "
+                       f"{bsvc.fmt_date_full(date_val)} with Dr. {d_name} "
+                       "— we only allow one appointment per day."),
+            )
 
-        # Slots available on this date?
         slots = bsvc.get_available_slots(dentist, date_val, clinic)
         if slots:
-            return True
+            return FieldValidation("valid", value=date_val,
+                                   display_name=bsvc.fmt_date_full(date_val))
 
-        # No slots — suggest alternatives
-        is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
-        alt = bsvc.get_alt_dentists_on_date(clinic, date_val,
-                                            exclude_dentist=dentist)
-        if alt:
-            alt_names = [f"Dr. {d.get_full_name()}" for d in alt]
-            if is_tl:
-                msg_text = (
-                    f"Puno na po ang schedule ni "
-                    f"**Dr. {dentist.get_full_name()}** "
-                    f"sa {bsvc.fmt_date(date_val)}.\n\n"
-                    "Ngunit may available na ibang dentist sa parehong "
-                    "araw:\n"
-                    + '\n'.join(f'- **{n}**' for n in alt_names)
-                    + "\n\nGusto mo bang pumili ng isa sa kanila, o "
-                    "pumili ng ibang petsa?"
-                )
-            else:
-                msg_text = (
-                    f"**Dr. {dentist.get_full_name()}** is fully booked on "
-                    f"{bsvc.fmt_date(date_val)}.\n\n"
-                    "However, the following dentists are available on "
-                    "that same day:\n"
-                    + '\n'.join(f'- **{n}**' for n in alt_names)
-                    + "\n\nWould you like to book with one of them, or "
-                    "pick a different date?"
-                )
-            qr = alt_names + (["Pumili ng ibang petsa"] if is_tl
-                              else ["Pick different date"])
-            issues.append(FieldIssue('date', 'invalid', msg_text, qr,
-                                     '[BOOK_STEP_2]'))
-        else:
-            no_msg = (
-                f"Puno na po ang lahat ng dentist sa "
-                f"{bsvc.fmt_date(date_val)} sa {clinic.name}. "
-                "Pumili po ng ibang petsa."
-                if is_tl else
-                f"All dentists at {clinic.name} are fully booked on "
-                f"{bsvc.fmt_date(date_val)}. "
-                "Please pick a different date."
-            )
-            issues.append(FieldIssue('date', 'invalid', no_msg,
-                                     tag='[BOOK_STEP_3]'))
-        return False
+        # No slots on this date
+        alt = bsvc.get_alt_dentists_on_date(clinic, date_val, exclude_dentist=dentist)
+        alt_names = [f"Dr. {d.get_full_name()}" for d in alt] if alt else []
+        return FieldValidation(
+            "invalid", value=date_val,
+            error=f"Dr. {dentist.get_full_name()} is fully booked on {bsvc.fmt_date(date_val)}.",
+            options=alt_names,
+            recommendation="Other dentists are available on that date though!" if alt_names else "How about trying a different date?",
+        )
 
-    # Date missing — show available dates
+    # Missing - show available dates
     end = today + timedelta(days=30)
     avails = DentistAvailability.objects.filter(
         dentist=dentist, date__gte=today, date__lte=end, is_available=True,
-    ).filter(
-        Q(clinic=clinic) | Q(apply_to_all_clinics=True)
-    ).order_by('date')
+    ).filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True)).order_by("date")
 
-    dates_with_slots: List = []
+    dates_with_slots = []
     for av in avails:
         if bsvc.get_available_slots(dentist, av.date, clinic):
             dates_with_slots.append(av.date)
@@ -424,321 +466,414 @@ def _check_date(user, clinic, clinic_ok, dentist, dentist_ok,
             break
 
     if not dates_with_slots:
-        alt_dentists = [d for d in bsvc.get_dentists_with_openings(
-            clinic, today) if d.id != dentist.id]
+        alt_dentists = [
+            d for d in bsvc.get_dentists_with_openings(clinic, today)
+            if d.id != dentist.id
+        ]
         if alt_dentists:
-            a = alt_dentists[0]
-            issues.append(FieldIssue(
-                'date', 'missing',
-                f"Dr. {dentist.get_full_name()} is currently fully "
-                f"booked, but **Dr. {a.get_full_name()}** is available "
-                "at the same clinic. Would you like to see them instead?",
-                [f"Dr. {a.get_full_name()}", "No thanks"],
-                '[BOOK_STEP_2]',
-            ))
-        else:
-            issues.append(FieldIssue(
-                'date', 'missing',
-                f"Dr. {dentist.get_full_name()} has no openings in the "
-                "next 30 days. Please try a different dentist or clinic.",
-            ))
-        return False
+            return FieldValidation(
+                "blocked",
+                error=f"Dr. {dentist.get_full_name()} is fully booked for the next 30 days.",
+                options=[f"Dr. {d.get_full_name()}" for d in alt_dentists[:3]],
+                recommendation="Other dentists at this clinic do have openings though!",
+            )
+        return FieldValidation(
+            "blocked",
+            error=f"Dr. {dentist.get_full_name()} doesn't have any openings in the next 30 days.",
+        )
 
-    lines = [
-        lang.step_label(3, 'date', detected_lang)
-        + f"\n\n**Dr. {dentist.get_full_name()}** at "
-        f"**{clinic.name}**:\n"
-    ]
-    qr: List[str] = []
-    for d in dates_with_slots:
-        label = bsvc.fmt_date(d)
-        lines.append(f"- **{label}**")
-        qr.append(d.strftime('%B %d'))
-    lines.append("\n" + lang.select_prompt('date', detected_lang))
-    issues.append(FieldIssue('date', 'missing', '\n'.join(lines), qr,
-                             '[BOOK_STEP_3]'))
-    return False
+    options = [bsvc.fmt_date(d) for d in dates_with_slots]
+    return FieldValidation("missing", options=options)
 
 
-# ── Time ──────────────────────────────────────────────────────────────────
+# -- Time --
 
-def _check_time(clinic, clinic_ok, dentist, dentist_ok, date_val, date_ok,
-                time_val, detected_lang, issues) -> bool:
-    """Validate or prompt for time.  Returns True when time is OK."""
+def _check_time_field(clinic, clinic_ok, dentist, dentist_ok,
+                      date_val, date_ok, time_val) -> FieldValidation:
+    """Validate time. Returns structured FieldValidation."""
     if not (clinic_ok and dentist_ok and date_ok):
-        if not time_val:
-            issues.append(FieldIssue('time', 'missing', 'time'))
-        return False
+        if time_val:
+            return FieldValidation("missing", value=time_val,
+                                   display_name=bsvc.fmt_time(time_val))
+        return FieldValidation("missing")
 
     if time_val:
+        # Defense-in-depth: explicitly reject past times using Philippines local time
+        now_local = tz.localtime(tz.now())
+        if date_val == now_local.date() and time_val <= now_local.time():
+            available_slots = bsvc.get_available_slots(dentist, date_val, clinic)
+            options = [bsvc.fmt_time(s) for s in available_slots]
+            return FieldValidation(
+                "invalid", value=time_val,
+                display_name=bsvc.fmt_time(time_val),
+                error=f"{bsvc.fmt_time(time_val)} has already passed for today.",
+                options=options,
+            )
+
         available_slots = bsvc.get_available_slots(dentist, date_val, clinic)
         if time_val in available_slots:
-            return True
+            return FieldValidation("valid", value=time_val,
+                                   display_name=bsvc.fmt_time(time_val))
 
-        is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
-        time_str = bsvc.fmt_time(time_val)
-        if available_slots:
-            lines = [
-                f"⚠️ **{time_str}** ay hindi available."
-                if is_tl else
-                f"⚠️ **{time_str}** is not available."
-            ]
-            lines.append(
-                "\nNarito po ang mga available na oras:"
-                if is_tl else
-                "\nHere are the available time slots:"
-            )
-            qr: List[str] = []
-            for s in available_slots:
-                label = bsvc.fmt_time(s)
-                lines.append(f"- **{label}**")
-                qr.append(label)
-            lines.append("\n" + lang.select_prompt('time', detected_lang))
-            issues.append(FieldIssue('time', 'invalid', '\n'.join(lines),
-                                     qr, '[BOOK_STEP_3T]'))
-        else:
-            issues.append(FieldIssue(
-                'time', 'invalid',
-                f"⚠️ **{time_str}** is not available, and there are no "
-                f"remaining time slots for Dr. {dentist.get_full_name()} "
-                f"on {bsvc.fmt_date(date_val)}. "
-                "Please choose a different date.",
-                tag='[BOOK_STEP_3]',
-            ))
-        return False
+        options = [bsvc.fmt_time(s) for s in available_slots]
+        return FieldValidation(
+            "invalid", value=time_val,
+            display_name=bsvc.fmt_time(time_val),
+            error=f"{bsvc.fmt_time(time_val)} isn't available on that day.",
+            options=options,
+        )
 
-    # Time missing — show available slots
+    # Missing
     slots = bsvc.get_available_slots(dentist, date_val, clinic)
     if not slots:
-        # Edge case: slots disappeared between date check and now
-        issues.append(FieldIssue(
-            'time', 'missing',
-            f"All slots for Dr. {dentist.get_full_name()} on "
-            f"{bsvc.fmt_date(date_val)} were just booked. "
-            "Please pick a different date.",
-            tag='[BOOK_STEP_3]',
-        ))
-        return False
+        return FieldValidation(
+            "blocked",
+            error="Looks like all the time slots just got booked for that date — how about trying a different day?",
+        )
 
-    lines = [lang.step_label(3, 'time', detected_lang)
-             + f" (**{bsvc.fmt_date(date_val)}**)\n"]
-    qr: List[str] = []
-    for s in slots:
-        label = bsvc.fmt_time(s)
-        lines.append(f"- **{label}**")
-        qr.append(label)
-    lines.append("\n" + lang.select_prompt('time', detected_lang))
-    issues.append(FieldIssue('time', 'missing', '\n'.join(lines), qr,
-                             '[BOOK_STEP_3T]'))
-    return False
+    options = [bsvc.fmt_time(s) for s in slots]
+    return FieldValidation("missing", options=options)
 
 
-# ── Service ───────────────────────────────────────────────────────────────
+# -- Service --
 
-def _check_service(service, detected_lang, issues) -> bool:
-    """Validate or prompt for service.  Returns True when service is OK."""
-    if service:
-        return True
-
+def _check_service_field(service, unmatched_name: str = None) -> FieldValidation:
+    """Validate service. Returns structured FieldValidation."""
     allowed = Service.objects.filter(patient_bookable=True)
     if not allowed.exists():
-        allowed = Service.objects.filter(name__iregex=r'(clean|consult)')
+        allowed = Service.objects.filter(name__iregex=r"(clean|consult)")
 
-    lines = [lang.step_label(4, 'service', detected_lang) + "\n"]
-    qr: List[str] = []
-    for s in allowed:
-        lines.append(f"- **{s.name}**")
-        qr.append(s.name)
-    lines.append("\n" + lang.select_prompt('service', detected_lang))
-    issues.append(FieldIssue('service', 'missing', '\n'.join(lines), qr,
-                             '[BOOK_STEP_4]'))
-    return False
+    bookable_names = [s.name for s in allowed]
+
+    # The user explicitly named a service we don't recognise at all (e.g. "nail
+    # polish"). Show a clear, friendly error instead of silently asking what
+    # service they want (which would look as if we ignored their request).
+    if unmatched_name:
+        return FieldValidation(
+            "invalid",
+            error=(
+                f"We don't offer **{unmatched_name}** as an online booking service. "
+                "Online booking is only available for **Cleaning** and **Consultation**. "
+                "For other services, please call or visit the clinic directly."
+            ),
+            options=bookable_names,
+        )
+
+    if service:
+        if service.patient_bookable:
+            return FieldValidation("valid", value=service, display_name=service.name)
+        # Service exists but is not available for online booking (owner restriction)
+        return FieldValidation(
+            "invalid",
+            value=service,
+            display_name=service.name,
+            error=(
+                f"{service.name} is offered at our clinic but cannot be booked online. "
+                "Online booking is restricted to Cleaning and Consultation only. "
+                "Please call or visit the clinic to schedule this service."
+            ),
+            options=bookable_names,
+        )
+
+    return FieldValidation("missing", options=bookable_names)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# RESPONSE BUILDER
-# ═══════════════════════════════════════════════════════════════════════════
+# -- Weekly Rule --
 
-def _build_issues_response(
-    issues: List[FieldIssue], detected_lang: str,
+def _check_weekly_rule(user, date_val, date_ok) -> FieldValidation:
+    """
+    Check the one-booking-per-week rule EARLY so the patient gets
+    feedback before reaching the confirmation/finalize step.
+    Only checked when the date is already valid.
+    """
+    if not date_ok or not date_val:
+        # Can't check without a valid date — passes by default.
+        return FieldValidation("valid")
+
+    is_valid, error_msg = validate_one_booking_per_week(user, date_val)
+    if is_valid:
+        return FieldValidation("valid")
+
+    # Build a conversational message instead of the raw validation error.
+    week_start = date_val - timedelta(days=date_val.weekday())
+    next_week = week_start + timedelta(days=7)
+    return FieldValidation(
+        "invalid",
+        value=date_val,
+        error=(
+            "You already have an appointment scheduled this week. "
+            "We only allow one appointment per week. "
+            f"Your next available window starts **{bsvc.fmt_date(next_week)}**."
+        ),
+        options=[bsvc.fmt_date(next_week)],
+        recommendation="Would you like to pick a date that week instead?",
+    )
+
+
+# ======================================================================
+# AI RESPONSE GENERATION
+# ======================================================================
+
+def _generate_ai_booking_response(
+    msg: str, hist: list,
+    validation: BookingValidation,
+    detected_lang: str,
 ) -> dict:
     """
-    Build ONE response covering all validation issues.
-
-    Strategy:
-    • Invalid fields: shown with full detail (all of them)
-    • Missing fields: first one with options is the "primary" prompt
-    • Other missing fields: noted briefly as "I'll also need …"
-    • Quick-replies come from the first issue that has options
+    Generate a conversational AI response based on validation results.
+    Falls back to simple text if LLM is unavailable.
     """
-    invalid = [i for i in issues if i.kind == 'invalid']
-    missing = [i for i in issues if i.kind == 'missing']
+    context = _build_ai_context(validation)
+    llm = get_llm_service()
 
-    lines: List[str] = []
-    qr: List[str] = []
-    tag = ''
+    prompt = (
+        BOOKING_AI_PROMPT + "\n\n"
+        + lang.gemini_language_instruction(detected_lang) + "\n\n"
+        + context + "\n\n"
+        + f"Patient's message: {msg}\n\n"
+        + "Respond naturally. Help them with the next thing they need."
+    )
 
-    # ── All invalid fields (full messages) ────────────────────────────
-    for issue in invalid:
-        if issue.message:
-            lines.append(issue.message)
-        if not qr and issue.options:
-            qr = issue.options
-        if not tag and issue.tag:
-            tag = issue.tag
+    # Add recent conversation history
+    if hist:
+        prompt += "\nRecent conversation:\n"
+        for m in hist[-4:]:
+            role = "Patient" if m["role"] == "user" else "Sage"
+            content = re.sub(r"<!--.*?-->", "", m.get("content", "")).strip()
+            if content:
+                prompt += f"{role}: {content}\n"
 
-    # ── Partition missing: actionable (has options or long msg) vs stubs
-    actionable = [i for i in missing if i.options or len(i.message) > 20]
-    stubs      = [i for i in missing
-                  if not i.options and len(i.message) <= 20]
+    text = llm.generate(prompt)
+    if text:
+        text = _sanitize_booking_response(text)
+        qr = _get_quick_replies(validation)
+        return build_reply(text, qr)
 
-    # Show first actionable missing field fully
-    if actionable:
-        primary = actionable[0]
-        if lines:
-            lines.append("")  # visual separator after errors
-        lines.append(primary.message)
-        if not qr and primary.options:
-            qr = primary.options
-        if not tag and primary.tag:
-            tag = primary.tag
+    # Fallback: simple text response (no LLM)
+    return _build_fallback_response(validation, detected_lang)
 
-    # Combine remaining actionable + stubs as "also needed" note
-    also = ([i.field for i in actionable[1:]]
-            + [i.field for i in stubs])
-    if also:
-        is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
-        labels = ', '.join(f"**{f}**" for f in also)
-        if is_tl:
-            lines.append(f"\n_Kakailanganin ko rin ang: {labels}_")
+
+def _build_ai_context(validation: BookingValidation) -> str:
+    """Build the context string for the LLM prompt from validation data."""
+    lines = ["BOOKING CONTEXT:"]
+
+    lines.append("\nCurrent selections:")
+    for name, field in [
+        ("Clinic", validation.clinic),
+        ("Dentist", validation.dentist),
+        ("Date", validation.date),
+        ("Time", validation.time),
+        ("Service", validation.service),
+        ("Weekly Rule", validation.weekly_rule),
+    ]:
+        if field.status == "valid":
+            lines.append(f"  OK {name}: {field.display_name}")
+        elif field.status == "invalid":
+            lines.append(f"  INVALID {name}: {field.error}")
+        elif field.status == "blocked":
+            lines.append(f"  BLOCKED {name}: {field.error}")
         else:
-            lines.append(f"\n_I'll also need: {labels}_")
+            lines.append(f"  NEEDED {name}: not yet selected")
 
-    if not tag and issues:
-        tag = issues[0].tag
+    lines.append("\nAvailable options (use ONLY these):")
+    for name, field in [
+        ("Clinics", validation.clinic),
+        ("Dentists", validation.dentist),
+        ("Dates", validation.date),
+        ("Time slots", validation.time),
+        ("Services", validation.service),
+        ("Weekly", validation.weekly_rule),
+    ]:
+        if field.options:
+            lines.append(f"  {name}: {', '.join(field.options[:8])}")
+            if field.recommendation:
+                lines.append(f"    Tip: {field.recommendation}")
 
-    return build_reply('\n'.join(lines), qr, tag=tag)
+    return "\n".join(lines)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SPECIAL INTERACTIONS
-# ═══════════════════════════════════════════════════════════════════════════
+def _get_quick_replies(validation: BookingValidation) -> List[str]:
+    """Get quick_replies from the highest-priority field needing input."""
+    for field in [validation.clinic, validation.dentist, validation.date,
+                  validation.time, validation.service, validation.weekly_rule]:
+        if field.status in ("missing", "invalid") and field.options:
+            # Return clean option names (strip availability annotations)
+            clean = []
+            for opt in field.options[:6]:
+                # Remove things like " (2 dentists available)" annotations
+                cleaned = re.sub(r"\s*\(.*?\)\s*$", "", opt).strip()
+                if cleaned:
+                    clean.append(cleaned)
+            return clean
+    return []
 
-def _handle_more_slots(msg, low, hist, clinic, dentist, date_val,
-                       detected_lang) -> Optional[dict]:
-    """Handle "more slots" navigation when time picker was shown."""
-    if not (clinic and dentist and date_val):
-        return None
-    if not isvc.step_tag_exists(hist, '[BOOK_STEP_3T]'):
-        return None
 
-    _more_patterns = [
-        'more slot', 'mor slot', 'other time', 'next slot', 'show more',
-        'iba pa', 'dagdag', 'more option', 'other slot', 'other option',
-        'ano pa', 'pang slot', 'ibang slot', 'ibang oras',
-    ]
-    _low = low.strip()
-    if not (any(p in _low for p in _more_patterns)
-            or _low in ('more', 'mor')):
-        return None
+def _build_fallback_response(
+    validation: BookingValidation, detected_lang: str,
+) -> dict:
+    """
+    Deterministic conversational fallback when the LLM is unavailable.
 
-    slots = bsvc.get_available_slots(dentist, date_val, clinic)
-    if not slots:
-        return None
-
+    Design principles (per FALLBACK SYSTEM ARCHITECTURE spec):
+    - NO wizard logic.  No "Please select…".  No field-by-field early return.
+    - Acknowledge what the patient already provided (valid fields).
+    - Report ALL invalid/blocked issues at once, conversationally.
+    - Then ask for the FIRST missing field naturally.
+    - Match English / Tagalog.
+    """
     is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
-    hdr = (
-        f"### Hakbang 3: Pumili ng Oras (**{bsvc.fmt_date(date_val)}**)"
-        if is_tl else
-        f"### Step 3: Choose a Time (**{bsvc.fmt_date(date_val)}**)"
-    )
 
-    if len(slots) > 6:
-        intro = (
-            "\nNarito po ang lahat ng available na oras:"
-            if is_tl else
-            "\nHere are all the available time slots:"
-        )
-        footer = "\nPumili po ng oras:" if is_tl else "\nSelect a time:"
-    else:
-        intro = ""
-        footer = (
-            "\nIto na po ang lahat ng available na slot. "
-            "Pumili po ng oras:"
-            if is_tl else
-            "\nThese are all the available slots. Select a time:"
-        )
-
-    lines = [hdr]
-    if intro:
-        lines.append(intro)
-    qr: List[str] = []
-    for s in slots:
-        label = bsvc.fmt_time(s)
-        lines.append(f"- **{label}**")
-        qr.append(label)
-    lines.append(footer)
-    return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3T]')
-
-
-def _handle_weekday_disambiguation(msg, clinic, dentist, date_val,
-                                   time_val, today,
-                                   detected_lang) -> Optional[dict]:
-    """If user typed a bare weekday and multiple dates match, disambiguate."""
-    if not (clinic and dentist):
-        return None
-    if time_val:
-        return None  # already have a time, no need to disambiguate
-
-    _weekday_num = bsvc.parse_weekday_name(msg)
-    if _weekday_num is None:
-        return None
-
-    end = today + timedelta(days=30)
-    avails = DentistAvailability.objects.filter(
-        dentist=dentist, date__gte=today, date__lte=end, is_available=True,
-    ).filter(
-        Q(clinic=clinic) | Q(apply_to_all_clinics=True)
-    ).order_by('date')
-
-    matching = [
-        av.date for av in avails
-        if av.date.weekday() == _weekday_num
-        and bsvc.get_available_slots(dentist, av.date, clinic)
+    fields_ordered = [
+        ("clinic",       validation.clinic),
+        ("dentist",      validation.dentist),
+        ("date",         validation.date),
+        ("time",         validation.time),
+        ("service",      validation.service),
+        ("weekly limit", validation.weekly_rule),
     ]
-    if len(matching) <= 1:
-        return None  # single match → normal validation handles it
 
-    is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
-    day_name = msg.strip().title()
-    hdr = (
-        f"#### Hakbang 3: Pumili ng Petsa\n\n"
-        f"May ilang **{day_name}** na available. Alin po ang gusto mo?\n"
-        if is_tl else
-        f"#### Step 3: Choose a Date\n\n"
-        f"Multiple **{day_name}s** are available. "
-        "Which one would you like?\n"
-    )
-    lines = [hdr]
-    qr: List[str] = []
-    for d in matching:
-        label = bsvc.fmt_date(d)
-        lines.append(f"- **{label}**")
-        qr.append(d.strftime('%B %d'))
-    lines.append("\n" + lang.select_prompt('date', detected_lang))
-    return build_reply('\n'.join(lines), qr, tag='[BOOK_STEP_3]')
+    # ── Natural "ask" phrases ─────────────────────────────────────────────
+    _ask_en = {
+        "clinic":       "Which clinic works best for you?",
+        "dentist":      "Which dentist would you like to see?",
+        "date":         "When would you like to come in?",
+        "time":         "What time works best for you?",
+        "service":      "Is this for a cleaning or a consultation?",
+        "weekly limit": "When else would you like to schedule?",
+    }
+    _ask_tl = {
+        "clinic":       "Saang clinic po kayo nais pumunta?",
+        "dentist":      "Sinong dentist po ang gusto ninyo?",
+        "date":         "Kailan po kayo nais pumunta?",
+        "time":         "Anong oras po ang maginhawa para sa inyo?",
+        "service":      "Ito po ba ay para sa cleaning o consultation?",
+        "weekly limit": "Kailan pa po kayo nais mag-schedule?",
+    }
+
+    # ── Friendly option-list intros (so options don't feel like raw lists) ─
+    _option_intro_en = {
+        "clinic":   "Here are our locations:",
+        "dentist":  "Here are the available dentists:",
+        "date":     "Here are some open dates:",
+        "time":     "Here are the available time slots:",
+        "service":  "We offer these for online booking:",
+    }
+    _option_intro_tl = {
+        "clinic":   "Narito po ang aming mga lokasyon:",
+        "dentist":  "Narito po ang mga available na dentist:",
+        "date":     "Narito po ang mga bukas na petsa:",
+        "time":     "Narito po ang mga bukas na oras:",
+        "service":  "Ito po ang maaaring i-book online:",
+    }
+
+    # ── Step 1: classify every field ──────────────────────────────────────
+    valid_fields: List[tuple] = []     # (name, FieldValidation)
+    error_fields: List[tuple] = []     # (name, FieldValidation)
+    first_missing_name: Optional[str] = None
+    first_missing_field: Optional[FieldValidation] = None
+
+    for name, field in fields_ordered:
+        if field.status == "valid":
+            valid_fields.append((name, field))
+        elif field.status in ("invalid", "blocked"):
+            error_fields.append((name, field))
+        elif field.status == "missing" and first_missing_name is None:
+            first_missing_name = name
+            first_missing_field = field
+
+    # ── Step 2: build the response parts ──────────────────────────────────
+    parts: List[str] = []
+
+    # -- Acknowledgment: briefly echo what's already good --
+    if valid_fields and (error_fields or first_missing_name):
+        ack = _build_acknowledgment(valid_fields, is_tl)
+        if ack:
+            parts.append(ack)
+
+    # -- Report ALL errors at once --
+    if error_fields:
+        for _name, field in error_fields:
+            parts.append(field.error)
+            # Show alternatives inline when they exist
+            if field.options:
+                intro = (_option_intro_tl if is_tl else _option_intro_en).get(_name, "")
+                if intro:
+                    parts.append(intro)
+                parts.append("\n".join(f"- **{o}**" for o in field.options[:6]))
+            if field.recommendation:
+                parts.append(f"_{field.recommendation}_")
+
+    # -- Ask for first missing field --
+    if first_missing_name and first_missing_field:
+        ask = (_ask_tl if is_tl else _ask_en)[first_missing_name]
+        parts.append(ask)
+        if first_missing_field.options:
+            intro = (_option_intro_tl if is_tl else _option_intro_en).get(first_missing_name, "")
+            if intro and not error_fields:
+                # Only add intro if we didn't already show a list above
+                parts.append(intro)
+            parts.append("\n".join(f"- **{o}**" for o in first_missing_field.options[:6]))
+        if first_missing_field.recommendation:
+            parts.append(f"_{first_missing_field.recommendation}_")
+
+    if not parts:
+        fallback = ("Paano ko po kayo matutulungan sa booking?"
+                    if is_tl else "How can I help you with your booking?")
+        return build_reply(fallback)
+
+    return build_reply("\n\n".join(parts), _get_quick_replies(validation))
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CONFIRMATION & FINALIZATION
-# ═══════════════════════════════════════════════════════════════════════════
+def _build_acknowledgment(valid_fields: List[tuple], is_tl: bool) -> str:
+    """
+    Return a short, natural opener that echoes what the patient already provided.
+    Examples:
+      - "Great, Bacoor with Dr. Cruz!"
+      - "Got it — Bacoor!"
+      - "Sige, Bacoor po!"
+    """
+    snippets = []
+    for name, field in valid_fields:
+        if name == "clinic":
+            snippets.append(field.display_name)
+        elif name == "dentist":
+            snippets.append(field.display_name)
+        elif name == "date":
+            snippets.append(f"on {field.display_name}")
+        elif name == "time":
+            snippets.append(f"at {field.display_name}")
+        elif name == "service":
+            snippets.append(f"for a {field.display_name}")
+
+    if not snippets:
+        return ""
+
+    joined = ", ".join(snippets[:3])
+    if is_tl:
+        return f"Sige po, {joined}!"
+    return f"Got it — {joined}!"
+
+
+def _sanitize_booking_response(text: str) -> str:
+    """Remove leaked sensitive data or step tags from LLM response."""
+    text = re.sub(r"<!--.*?-->", "", text).strip()
+    leak_patterns = ["password:", "token:", "api_key", "database:", "postgres://",
+                     "secret:", "credential:", "supabase", "gemini"]
+    for pat in leak_patterns:
+        if pat in text.lower():
+            return "I'd love to help you book an appointment! Which clinic works best for you?"
+    return text
+
+
+# ======================================================================
+# CONFIRMATION & FINALIZATION (DETERMINISTIC - NO LLM)
+# ======================================================================
 
 def _show_confirmation(user, clinic, dentist, date_val, time_val, service,
                        detected_lang) -> dict:
-    """Show confirmation summary when all fields are valid."""
+    """Show confirmation summary when all fields are valid. Deterministic."""
     logger.info(
-        "Booking confirmation: user=%s clinic=%s dentist=%s "
-        "date=%s time=%s service=%s",
+        "Booking confirmation: user=%s clinic=%s dentist=%s date=%s time=%s service=%s",
         user.id, clinic.name, dentist.get_full_name(),
         date_val, time_val, service.name,
     )
@@ -746,55 +881,77 @@ def _show_confirmation(user, clinic, dentist, date_val, time_val, service,
     bmem.update_draft(session, clinic=clinic, dentist=dentist,
                       date=date_val, time=time_val, service=service)
     session.flags.confirmation_shown = True
+    session.state = bmem.ConversationState.BOOKING_CONFIRMING
 
     return build_reply(
         f"{lang.confirmation_header(detected_lang)}\n\n"
-        f"📍 **Clinic:** {clinic.name}\n"
-        f"👨\u200d⚕️ **Dentist:** Dr. {dentist.get_full_name()}\n"
-        f"📅 **Date:** {bsvc.fmt_date_full(date_val)}\n"
-        f"🕐 **Time:** {bsvc.fmt_time(time_val)}\n"
-        f"🦷 **Service:** {service.name}\n\n"
+        f"\U0001f4cd **Clinic:** {clinic.name}\n"
+        f"\U0001f468\u200d\u2695\ufe0f **Dentist:** Dr. {dentist.get_full_name()}\n"
+        f"\U0001f4c5 **Date:** {bsvc.fmt_date_full(date_val)}\n"
+        f"\U0001f550 **Time:** {bsvc.fmt_time(time_val)}\n"
+        f"\U0001f9b7 **Service:** {service.name}\n\n"
         f"{lang.confirmation_yes_no(detected_lang)}",
         lang.confirmation_buttons(detected_lang),
-        tag='[BOOK_STEP_5]',
     )
 
 
-def _handle_confirmation(user, low, clinic, dentist, date_val, time_val,
-                         service, detected_lang) -> dict:
-    """Handle yes/no response during the confirmation gate."""
+def _handle_confirmation(user, low, session, detected_lang) -> dict:
+    """Handle yes/no response during the confirmation gate. Deterministic."""
+    draft = session.draft
+
+    # Read booking details from the session draft
+    clinic = draft.clinic
+    dentist = draft.dentist
+    date_val = draft.date
+    time_val = draft.time
+    service = draft.service
+
+    if not all([clinic, dentist, date_val, time_val, service]):
+        # Draft incomplete (shouldn't happen) - reset
+        logger.warning("Confirmation with incomplete draft for user=%s", user.id)
+        session.state = bmem.ConversationState.IDLE
+        bmem.clear_session(user.id)
+        is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
+        if is_tl:
+            return build_reply(
+                "Pasensya po, may problema. Pakisabi ulit ng 'book' para magsimula.",
+                tag="[FLOW_COMPLETE]",
+            )
+        return build_reply(
+            "Sorry, something went wrong. Please say 'book' to start again.",
+            tag="[FLOW_COMPLETE]",
+        )
+
     if isvc.is_confirm_yes(low):
         return _finalize_booking(
-            user, clinic, dentist, date_val, time_val, service,
-            detected_lang,
+            user, clinic, dentist, date_val, time_val, service, detected_lang,
         )
 
     if isvc.is_confirm_no(low):
-        logger.info("Booking cancelled by user at confirmation: user=%s",
-                     user.id)
+        logger.info("Booking cancelled by user at confirmation: user=%s", user.id)
+        session.state = bmem.ConversationState.IDLE
         bmem.clear_session(user.id)
         return build_reply(
             lang.booking_cancelled(detected_lang),
-            tag='[FLOW_COMPLETE]',
+            tag="[FLOW_COMPLETE]",
         )
 
-    # Neither yes nor no — re-prompt
+    # Neither yes nor no - re-prompt
     return build_reply(
         f"{lang.reprompt_confirmation(detected_lang)}\n\n"
-        f"📍 **Clinic:** {clinic.name}\n"
-        f"👨\u200d⚕️ **Dentist:** Dr. {dentist.get_full_name()}\n"
-        f"📅 **Date:** {bsvc.fmt_date_full(date_val)}\n"
-        f"🕐 **Time:** {bsvc.fmt_time(time_val)}\n"
-        f"🦷 **Service:** {service.name}",
+        f"\U0001f4cd **Clinic:** {clinic.name}\n"
+        f"\U0001f468\u200d\u2695\ufe0f **Dentist:** Dr. {dentist.get_full_name()}\n"
+        f"\U0001f4c5 **Date:** {bsvc.fmt_date_full(date_val)}\n"
+        f"\U0001f550 **Time:** {bsvc.fmt_time(time_val)}\n"
+        f"\U0001f9b7 **Service:** {service.name}",
         lang.confirmation_buttons(detected_lang),
-        tag='[BOOK_STEP_5]',
     )
 
 
 def _finalize_booking(user, clinic, dentist, date_val, time_val, service,
                       detected_lang) -> dict:
-    """Validate with booking_validation_service and create the appointment."""
-    logger.info("Booking confirmed by user, validating: user=%s", user.id)
+    """Validate and create the appointment. Deterministic."""
+    logger.info("Booking confirmed by user, finalizing: user=%s", user.id)
 
     appt, error_msg = bsvc.create_appointment(
         patient=user,
@@ -806,32 +963,33 @@ def _finalize_booking(user, clinic, dentist, date_val, time_val, service,
     )
 
     if error_msg:
-        if 'per week' in error_msg:
-            next_week = date_val + timedelta(
-                days=(7 - date_val.weekday()))
+        if "per week" in error_msg:
+            next_week = date_val + timedelta(days=(7 - date_val.weekday()))
+            session = bmem.get_session(user.id)
+            session.state = bmem.ConversationState.BOOKING_COLLECTING
             return build_reply(
-                "⚠️ **You can only book one appointment per week.**\n\n"
-                f"Your next available booking window starts "
-                f"**{bsvc.fmt_date(next_week)}**. "
-                "Would you like to pick a date in that week instead?",
-                [next_week.strftime('%B %d')],
-                tag='[BOOK_STEP_3]',
+                f"You already have an appointment this week — we only allow one per week. "
+                f"Your next available window starts **{bsvc.fmt_date(next_week)}**. "
+                f"Would you like to pick a date that week instead?",
+                [next_week.strftime("%B %d")],
             )
-        if 'slot was just booked' in error_msg.lower():
-            return build_reply(error_msg, tag='[BOOK_STEP_3T]')
-        if ('overlapping' in error_msg.lower()
-                or 'already have' in error_msg.lower()):
-            return build_reply(
-                f"⚠️ {error_msg} Please pick a different time.",
-                tag='[BOOK_STEP_3T]',
-            )
+        if "slot was just booked" in error_msg.lower():
+            session = bmem.get_session(user.id)
+            session.state = bmem.ConversationState.BOOKING_COLLECTING
+            return build_reply(error_msg)
+        if "overlapping" in error_msg.lower() or "already have" in error_msg.lower():
+            session = bmem.get_session(user.id)
+            session.state = bmem.ConversationState.BOOKING_COLLECTING
+            return build_reply(f"{error_msg} How about a different time?")
         return build_reply(error_msg)
 
-    # Notifications
-    create_appointment_notification(appt, 'new_appointment')
-    create_patient_notification(appt, 'appointment_confirmed')
+    # Success - notifications
+    create_appointment_notification(appt, "new_appointment")
+    create_patient_notification(appt, "appointment_confirmed")
 
-    # Clear session memory
+    # Clear session
+    session = bmem.get_session(user.id)
+    session.state = bmem.ConversationState.IDLE
     bmem.clear_session(user.id)
 
     return build_reply(
@@ -843,16 +1001,5 @@ def _finalize_booking(user, clinic, dentist, date_val, time_val, service,
         f"**Service:** {service.name}\n"
         f"**Status:** Confirmed\n\n"
         f"{lang.booking_success_footer(detected_lang)}",
-        tag='[FLOW_COMPLETE]',
+        tag="[FLOW_COMPLETE]",
     )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# INTERNAL HELPERS
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _in_booking_flow(hist: list) -> bool:
-    """True if currently in an active booking flow."""
-    if isvc.flow_is_terminated(hist):
-        return False
-    return isvc.step_tag_exists(hist, '[BOOK_STEP_')

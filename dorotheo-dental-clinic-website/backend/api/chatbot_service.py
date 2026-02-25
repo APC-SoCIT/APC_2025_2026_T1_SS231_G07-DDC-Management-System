@@ -98,40 +98,37 @@ def _handle_greeting(msg: str, detected_lang: str) -> dict:
     if any(w in low for w in ['bye', 'goodbye', 'good bye', 'paalam', 'see you', 'take care', 'ingat']):
         if detected_lang in ('tl', 'tl-mix'):
             return build_reply(
-                "Salamat po at nandito kayo! Ingat po kayo. "
-                "Kung may katanungan pa po kayo, huwag mag-atubiling bumalik. 🦷"
+                "Salamat po at nandito kayo! Ingat po kayo, at huwag mag-atubiling bumalik kung may kailangan."
             )
         return build_reply(
-            "Thank you for visiting! Take care, and don't hesitate to come back if you need anything. 🦷"
+            "Thank you for visiting! Take care, and feel free to come back anytime you need us."
         )
 
     # ── Thanks ──
     if any(w in low for w in ['thank you', 'thanks', 'salamat', 'maraming salamat']):
         if detected_lang in ('tl', 'tl-mix'):
             return build_reply(
-                "Walang anuman po! Lagi kaming nandito para tumulong. 😊 "
+                "Walang anuman po! Lagi kaming nandito para tumulong. "
                 "May iba pa po ba akong maitutulong sa inyo?"
             )
         return build_reply(
-            "You're welcome! 😊 Is there anything else I can help you with?"
+            "You're welcome! Is there anything else I can help you with?"
         )
 
     # ── General greetings ──
     if detected_lang in ('tl', 'tl-mix'):
         return build_reply(
-            "Kamusta po! Ako si **Sage**, ang inyong AI dental concierge ng Dorotheo Dental Clinic. "
-            "Maaari ko po kayong tulungan sa:\n\n"
-            "• **Mag-book, mag-reschedule, o mag-cancel** ng appointment\n"
-            "• Impormasyon tungkol sa aming mga serbisyo at dentista\n"
-            "• Clinic hours at location\n\n"
-            "Paano kita matutulungan ngayon? 😊",
+            "Kamusta po! Ako si **Sage**, ang AI dental concierge ng Dorotheo Dental Clinic. "
+            "Maaari ko po kayong tulungan sa pag-book, pag-reschedule, o pag-cancel ng appointment, "
+            "pati na rin sa impormasyon tungkol sa aming mga serbisyo at dentista. "
+            "Paano kita matutulungan ngayon?",
             ['Book Appointment', 'Our Services', 'Clinic Hours', 'Our Dentists']
         )
     return build_reply(
-        "Hello! 😊 I'm **Sage**, your AI dental concierge at Dorotheo Dental Clinic. "
-        "How can I assist you today?\n\n"
-        "• **Book, reschedule, or cancel** an appointment\n"
-        "• Information about our services, dentists, or clinic hours",
+        "Hello! I'm **Sage**, your AI dental concierge at Dorotheo Dental Clinic. "
+        "I can help you book, reschedule, or cancel appointments, "
+        "and answer questions about our services, dentists, and clinic hours. "
+        "How can I help you today?",
         ['Book Appointment', 'Our Services', 'Clinic Hours', 'Our Dentists']
     )
 
@@ -158,7 +155,8 @@ def _sanitize(text: str) -> str:
 
 SYSTEM_PROMPT = """You are "Sage", the AI concierge for Dorotheo Dental Clinic.
 
-PERSONALITY: Professional, calming, efficient. Proactive — don't just say "No availability,"
+PERSONALITY: Professional, warm, and efficient. Speak like a friendly receptionist —
+natural, conversational, and helpful. Proactive — don't just say "No availability,"
 suggest alternatives.
 
 LANGUAGE MATCHING (CRITICAL - MOST IMPORTANT RULE):
@@ -168,71 +166,29 @@ LANGUAGE MATCHING (CRITICAL - MOST IMPORTANT RULE):
 - Taglish examples: "Magbook ako tomorrow sa Bacoor", "Cancel ko yung Feb 5", "Sino available ngayon?"
 - DO NOT mix languages - if they speak Tagalog, DON'T respond in English
 
-MOBILE-FIRST FORMATTING (MANDATORY — MUST FOLLOW):
-Your responses are displayed on mobile devices. Follow these rules strictly:
-1. Keep total response under 18–22 lines.
-2. Maximum 4–6 lines per section.
-3. Maximum 2–3 lines per paragraph.
-4. Use `### ` for ALL section headers with ONE emoji each (e.g., `### 📅 Available Dates`).
-5. Use ONLY markdown `-` bullets for ALL lists — one item per line, vertically stacked.
-   ABSOLUTELY NEVER use `•`, `·`, or `|` characters for bullets — ONLY `-`.
-   Each list item MUST be on its own separate line. NEVER put multiple items on one line.
-6. Use **Bold** for ALL key data points: names, times, dates, locations
-   (e.g., **Dr. Carlo Salvador**, **9:00 AM**, **Alabang Clinic**).
-7. Add a single blank line between a section header and its list.
-8. NEVER output dense text blocks.
-9. NEVER list more than 6–8 items in one section.
-10. Do NOT overuse emojis — only for section headers.
-11. Do NOT repeat the same information.
+RESPONSE STYLE (MANDATORY):
+- Write like a human, not a template. Vary your phrasing every time.
+- NEVER use rigid section headers like "### 📍 Clinic Locations" or "### 👨‍⚕️ Our Dentists".
+- Do NOT use emojis in section headers. Minimal emoji use overall (0-1 per response max).
+- Present information naturally woven into sentences and short paragraphs.
+- You may use **bold** for key names, dates, and times.
+- You may use simple markdown bullets (- ) when listing 3+ items, but keep it conversational.
+- Keep responses concise: 2-6 sentences for simple answers, longer only if truly needed.
+- NEVER end with repetitive closers like "Would you like to know more or book an appointment?"
+  Instead, vary your follow-ups naturally or simply end after answering.
+- NEVER repeat the same information the user already knows or that you just said.
+- When listing dentists, weave availability into natural sentences. Example:
+  "We have several dentists on our team. Dr. Carlo Salvador and Dr. George Ocampo
+  are available today at our Bacoor clinic. Dr. Marvin Dorotheo is not available today
+  but has openings later this week."
+- When asked about services, summarize conversationally rather than dumping a list.
+- When asked about clinic hours, mention them naturally in a sentence.
 
-TIME SLOT FORMATTING (CRITICAL):
+TIME SLOT FORMATTING:
 - NEVER list 20+ individual time slots.
-- Group continuous time slots into ranges using `-` bullets.
-  Correct: "- **9:00 AM – 12:00 PM**"
-  Wrong: "9:00 AM, 9:30 AM, 10:00 AM, 10:30 AM..."
-- If exact slot selection is needed, show only the first 5–6 slots,
-  then add: "More time slots available upon booking."
+- Group continuous time slots into ranges (e.g., "9:00 AM to 12:00 PM").
+- If exact slot selection is needed, show only the first 5–6 slots.
 - NEVER display comma-separated time values.
-- NEVER use `•` — use `-` only.
-
-DENTIST AVAILABILITY FORMAT:
-Use this structure:
-### 👨‍⚕️ Dr. [Full Name]
-
-### 📅 Next Available
-
-- **Monday** – 9:00 AM to 12:00 PM
-- **Tuesday** – 1:00 PM to 4:30 PM
-
-📍 Available at:
-
-- **Alabang**
-
-Would you like me to book a slot for you?
-
-CLINIC LOCATION FORMAT:
-### 📍 [Clinic Name]
-
-Short address line
-📞 Phone number
-
-OPERATING HOURS FORMAT:
-### ⏰ Operating Hours
-
-- **Monday – Friday:** 8:00 AM – 6:00 PM
-- **Saturday:** 9:00 AM – 3:00 PM
-- **Sunday:** Closed
-
-ANTI-PATTERNS (STRICTLY FORBIDDEN):
-- NEVER output: "Dr. X - Available on Monday @ All Clinics: 9:00 AM, 9:30 AM, 10:00 AM..."
-- NEVER output long comma-separated lists.
-- NEVER output large unformatted paragraphs.
-- NEVER output raw database-style text.
-
-SMART LENGTH CONTROL:
-Keep responses concise and well-structured, but NEVER cut off mid-sentence.
-Always finish your thought completely. If a longer response is needed to fully
-answer the patient's question, that is acceptable. Prioritize completeness over brevity.
 
 WHAT YOU CAN HELP WITH:
 - Dental services and procedures information
@@ -302,26 +258,23 @@ Your role is to:
 5. ALWAYS close your response with a warm recommendation to book a consultation at
    Dorotheo Dental and Diagnostic Center so a dentist can properly evaluate them
 
-MOBILE-FIRST FORMATTING (MANDATORY):
-- Keep responses well-structured but NEVER cut off mid-sentence. Always complete your thoughts.
-- Maximum 2–3 lines per paragraph.
-- Use `### ` for ALL section headers with ONE emoji each (e.g., `### 🦷 What You Can Do`).
-- Use markdown `-` bullets for ALL lists — one item per line, vertically stacked. NEVER use `•`.
-- Use **Bold** for key terms in each bullet (e.g., **Warm salt water rinse**).
-- Add a single blank line between a section header and its list.
-- NEVER output dense text blocks.
+RESPONSE STYLE:
+- Write naturally and conversationally, like a caring professional.
+- Keep responses concise but complete — 3-4 short paragraphs at most.
+- Use **bold** for key terms when helpful.
+- Use simple markdown bullets (- ) only if listing 3+ home care tips.
+- Do NOT use section headers with emojis (no "### 🦷 ...").
+- Vary your phrasing — avoid sounding scripted.
 
 CRITICAL RULES:
 - NEVER diagnose. Use hedging language: "this may be", "this could indicate",
   "it's possible that", "many people experience this when"
 - Be warm, caring, and reassuring — the patient may be anxious or in pain
-- Keep the response focused: 3–4 short paragraphs at most
 - NEVER mention specific prices, dentist names, or availability
 - If symptoms suggest an emergency (extreme pain, facial/neck swelling, difficulty breathing
   or swallowing, high fever with dental pain, severe bleeding): clearly emphasize urgency
   and advise the patient to seek immediate dental or medical care
 - Match the language the patient is using (English or Filipino/Tagalog/Taglish)
-- End with a 'Book Appointment' prompt
 """
 
 
@@ -398,21 +351,21 @@ class DentalChatbotService:
                 # Classify the user's current intent to see if they want to
                 # proceed directly with a transactional action
                 unblock_intent = isvc.classify_intent(user_message)
+                session = bmem.get_session(self.user.id)
                 if unblock_intent.intent == isvc.INTENT_RESCHEDULE and unblock_intent.confidence >= 0.7:
+                    session.state = bmem.ConversationState.RESCHEDULE_PENDING
                     return handle_reschedule(self.user, user_message, [], self._lang)
                 if unblock_intent.intent == isvc.INTENT_SCHEDULE and unblock_intent.confidence >= 0.7:
+                    session.state = bmem.ConversationState.BOOKING_COLLECTING
                     return handle_booking(self.user, user_message, [], self._lang)
                 if unblock_intent.intent == isvc.INTENT_CANCEL and unblock_intent.confidence >= 0.7:
+                    session.state = bmem.ConversationState.CANCEL_PENDING
                     return handle_cancel(self.user, user_message, [], self._lang)
 
                 # No explicit transactional intent — show the approval menu
                 return build_reply(
-                    "\u2705 **Your request has been approved!** You can now book, reschedule, "
-                    "or cancel appointments.\n\n"
-                    "What would you like to do?\n\n"
-                    "\u2022 **Book Appointment**\n"
-                    "\u2022 **Reschedule Appointment**\n"
-                    "\u2022 **Cancel Appointment**",
+                    "**Your request has been approved!** You can now book, reschedule, "
+                    "or cancel appointments. What would you like to do?",
                     ['Book Appointment', 'Reschedule Appointment', 'Cancel Appointment'],
                     tag='[APPROVAL_WELCOME]',
                 )
@@ -428,11 +381,11 @@ class DentalChatbotService:
                 if detected_lang in ('tl', 'tl-mix', 'tl_en'):
                     return build_reply(
                         "Nandito po ako para tumulong sa mga serbisyo at appointment "
-                        "ng Dorotheo Dental Clinic. Paano kita matutulungan? 😊"
+                        "ng Dorotheo Dental Clinic. Paano kita matutulungan?"
                     )
                 return build_reply(
                     "I'm here to assist with Dorotheo Dental Clinic services and appointments. "
-                    "How can I help you today? 😊"
+                    "How can I help you?"
                 )
 
             # ── Greeting / farewell shortcut (no LLM needed) ──
@@ -440,17 +393,97 @@ class DentalChatbotService:
                 logger.debug("Intent: GREETING – quick reply")
                 return _handle_greeting(user_message, detected_lang)
 
+            # ── Detect active flow from conversation history ──
+            active = isvc.detect_active_flow(hist)
+
+            # Cancel/reschedule flows no longer emit numbered step tags —
+            # they use the conversational [CANCEL_FLOW]/[RESCHED_FLOW] tags.
+            # Booking also uses session state. Fall back to session state
+            # so that if the history hasn't been updated yet we still route
+            # correctly (e.g., very first reply in a fresh session).
+            if not active and self.is_authenticated:
+                _session = bmem.get_session(self.user.id)
+                if _session.state in (
+                    bmem.ConversationState.BOOKING_COLLECTING,
+                    bmem.ConversationState.BOOKING_CONFIRMING,
+                ):
+                    active = 'booking'
+                elif _session.state == bmem.ConversationState.CANCEL_PENDING:
+                    active = 'cancel'
+                elif _session.state == bmem.ConversationState.RESCHEDULE_PENDING:
+                    active = 'reschedule'
+
+            # ── GLOBAL EXIT INTENT CHECK ─────────────────────────────
+            # If user is in ANY active flow and signals they want to stop
+            # (e.g., "stop", "nevermind", "wag na", "forget it"), exit
+            # the flow immediately. This prevents users from getting
+            # "stuck" in a flow they can't escape.
+            # Must run BEFORE transactional intent routing because some
+            # exit phrases (e.g., "wag na") overlap with CANCEL_KEYWORDS.
+            if active and isvc.is_exit_intent(user_message):
+                logger.info("EXIT intent detected — abandoning %s flow (user=%s)",
+                            active, self.user.id if self.user else 'anon')
+                if self.user:
+                    session = bmem.get_session(self.user.id)
+                    session.state = bmem.ConversationState.IDLE
+                    bmem.clear_session(self.user.id)
+                is_tl = detected_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
+                if is_tl:
+                    exit_msg = (
+                        "Okay po, walang problema! "
+                        "May iba pa po ba akong maitutulong?"
+                    )
+                else:
+                    exit_msg = (
+                        "No problem! "
+                        "Is there anything else I can help with?"
+                    )
+                return build_reply(exit_msg, tag='[FLOW_COMPLETE]')
+
+            # ── GLOBAL PENDING LOCK CHECK ─────────────────────────────
+            # Before starting ANY new transactional flow OR continuing
+            # an active one, check if the user has a pending
+            # reschedule/cancel request that blocks new actions.
+            # Individual flow handlers also check as defense-in-depth.
+            if self.is_authenticated and intent_result.is_transactional:
+                pending_msg = bsvc.check_pending_requests(self.user, self._lang)
+                if pending_msg:
+                    logger.info("Global pending lock — blocking %s (user=%s)",
+                                intent_result.intent, self.user.id)
+                    return build_reply(pending_msg, tag='[PENDING_BLOCK]')
+
+            if self.is_authenticated and active:
+                pending_msg = bsvc.check_pending_requests(self.user, self._lang)
+                if pending_msg:
+                    logger.info("Global pending lock — blocking active %s flow (user=%s)",
+                                active, self.user.id)
+                    # Clear the now-stale session so they aren't stuck
+                    bmem.clear_session(self.user.id)
+                    return build_reply(pending_msg, tag='[PENDING_BLOCK]')
+
             # ── Detect NEW explicit intent — always start fresh ──
+            # When user expresses a clear new transactional intent
+            # (even if mid-flow), honor it. This allows natural flow
+            # switching: "actually, I want to cancel instead."
             if intent_result.intent == isvc.INTENT_CANCEL and intent_result.confidence >= 0.7:
                 logger.info("Intent: CANCEL (user=%s)", self.user.id if self.user else 'anon')
+                if self.user:
+                    session = bmem.get_session(self.user.id)
+                    session.state = bmem.ConversationState.CANCEL_PENDING
                 return handle_cancel(self.user, user_message, [], self._lang)
 
             if intent_result.intent == isvc.INTENT_RESCHEDULE and intent_result.confidence >= 0.7:
                 logger.info("Intent: RESCHEDULE (user=%s)", self.user.id if self.user else 'anon')
+                if self.user:
+                    session = bmem.get_session(self.user.id)
+                    session.state = bmem.ConversationState.RESCHEDULE_PENDING
                 return handle_reschedule(self.user, user_message, [], self._lang)
 
             if intent_result.intent == isvc.INTENT_SCHEDULE and intent_result.confidence >= 0.7:
                 logger.info("Intent: BOOKING (user=%s)", self.user.id if self.user else 'anon')
+                if self.user:
+                    session = bmem.get_session(self.user.id)
+                    session.state = bmem.ConversationState.BOOKING_COLLECTING
                 return handle_booking(self.user, user_message, [], self._lang)
 
             # ── Continue ongoing flow (if no new explicit intent) ──
@@ -460,7 +493,6 @@ class DentalChatbotService:
             # Exception: if the message is an actual question (contains '?'
             # or starts with a question word) we let Q&A handle it so the
             # user can ask about the clinic while mid-flow.
-            active = isvc.detect_active_flow(hist)
             if active:
                 _low_msg = user_message.lower().strip()
                 _question_words = (
@@ -553,14 +585,14 @@ class DentalChatbotService:
         # LLM unavailable — safe caring fallback
         if is_tagalog:
             return build_reply(
-                "Salamat po sa pagbabahagi ng inyong alalahanin. 🦷 "
+                "Salamat po sa pagbabahagi ng inyong alalahanin. "
                 "Para mapatnubayan kayo nang maayos, lubos naming inirerekomenda na "
                 "mag-book kayo ng konsultasyon sa Dorotheo Dental and Diagnostic Center. "
                 "Ang aming mga dentista ay handang tumulong sa inyo.",
                 ['Book Appointment']
             )
         return build_reply(
-            "Thank you for sharing your concern. 🦷 "
+            "Thank you for sharing your concern. "
             "For proper evaluation and care, we highly recommend booking a consultation "
             "at Dorotheo Dental and Diagnostic Center. "
             "Our dentists are here to help you.",

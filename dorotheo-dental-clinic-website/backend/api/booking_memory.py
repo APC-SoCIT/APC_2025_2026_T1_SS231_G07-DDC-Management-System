@@ -13,12 +13,33 @@ from __future__ import annotations
 import time
 import logging
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional, Dict, Any
 from datetime import date, time as time_obj
 
 from .language_detection import LanguageContext, detect_language
 
 logger = logging.getLogger('chatbot.booking_memory')
+
+
+# ── Conversation State Machine ─────────────────────────────────────────────
+
+class ConversationState(Enum):
+    """
+    Proper state machine for the booking conversation.
+
+    States:
+        IDLE                — No active flow. Ready for any intent.
+        BOOKING_COLLECTING  — Collecting booking fields (clinic, dentist, date, time, service).
+        BOOKING_CONFIRMING  — All fields collected, awaiting yes/no confirmation.
+        RESCHEDULE_PENDING  — User is in the reschedule flow.
+        CANCEL_PENDING      — User is in the cancel flow.
+    """
+    IDLE = 'idle'
+    BOOKING_COLLECTING = 'booking_collecting'
+    BOOKING_CONFIRMING = 'booking_confirming'
+    RESCHEDULE_PENDING = 'reschedule_pending'
+    CANCEL_PENDING = 'cancel_pending'
 
 # ── In-memory store (keyed by user_id) ─────────────────────────────────────
 
@@ -87,6 +108,7 @@ class BookingSessionMemory:
         conversation_flags → ConversationFlags
         last_updated_timestamp → last_updated
     """
+    state: ConversationState = ConversationState.IDLE
     draft: BookingDraft = field(default_factory=BookingDraft)
     confidence: ConfidenceScores = field(default_factory=ConfidenceScores)
     flags: ConversationFlags = field(default_factory=ConversationFlags)
@@ -120,6 +142,7 @@ class BookingSessionMemory:
 
     def reset(self):
         """Reset memory for a new booking attempt."""
+        self.state = ConversationState.IDLE
         self.draft = BookingDraft()
         self.confidence = ConfidenceScores()
         self.flags = ConversationFlags()
@@ -130,6 +153,7 @@ class BookingSessionMemory:
     def get_summary(self) -> dict:
         """Return human-readable summary of draft state (for logging)."""
         return {
+            'state': self.state.value,
             'clinic': self.draft.clinic_name or None,
             'dentist': self.draft.dentist_name or None,
             'date': str(self.draft.date) if self.draft.date else None,

@@ -33,6 +33,7 @@ INTENT_GREETING = 'greeting'
 INTENT_OUT_OF_SCOPE = 'out_of_scope'
 INTENT_DENTAL_ADVICE = 'dental_advice'  # General dental health / symptom questions
 INTENT_FALLBACK = 'fallback'
+INTENT_EXIT = 'exit_flow'  # User wants to abandon the current flow
 
 # All transactional intents (booking engine, no RAG needed)
 TRANSACTIONAL_INTENTS = {INTENT_SCHEDULE, INTENT_RESCHEDULE, INTENT_CANCEL}
@@ -111,6 +112,38 @@ RESCHEDULE_KEYWORDS = [
     'resched ko', 'resched na', 'change ko', 'palitan ko',
     'resched ko yung', 'lipat ko', 'change ko yung', 'i-reschedule',
     'mag-resched', 'pag-reschedule',
+]
+
+EXIT_FLOW_KEYWORDS = [
+    # English — clear flow-abandonment signals
+    'stop', 'stop it', 'stop this', 'stop booking', 'stop the booking',
+    'nevermind', 'never mind', 'nvm', 'nm',
+    'forget it', 'forget about it', 'forget this',
+    "i don't want to book", "don't want to book", 'i dont want to book',
+    "i don't want to anymore", "don't want to anymore",
+    "i don't want to continue", "don't want to continue",
+    "i changed my mind", 'changed my mind', 'change of mind',
+    'exit', 'quit', 'abort', 'back out',
+    'not anymore', 'maybe later', 'not now',
+    'cancel the booking', 'cancel this booking',
+    'cancel booking', 'cancel this',
+    "i'll do it later", 'do it later',
+    # Tagalog — strong exit signals
+    'tigil', 'tigil na', 'tigil na po', 'tama na', 'tama na po',
+    'ayoko na mag-book', 'ayoko na magbook', 'ayoko na po mag-book',
+    'hindi ko na gusto', 'di ko na gusto',
+    'mamaya na lang', 'mamaya na lang po',
+    'bukas na lang', 'bukas na lang po',
+    'later na lang', 'later na lang po',
+    'bawi na lang', 'bawi na lang po',
+    'wag na lang', 'wag na lang po',
+    'huwag na lang', 'huwag na lang po',
+    'hindi na', 'hindi na po',
+    'di na', 'di na po',
+    'ayoko na', 'ayoko na po',
+    'wag na', 'wag na po',
+    'huwag na', 'huwag na po',
+    'wag muna', 'huwag muna',
 ]
 
 CLINIC_INFO_KEYWORDS = [
@@ -767,6 +800,18 @@ def is_confirm_no(message: str) -> bool:
     return _matches_keywords(normalized, CONFIRM_NO_KEYWORDS)
 
 
+def is_exit_intent(message: str) -> bool:
+    """
+    Detect flow-abandonment signals (stop, nevermind, forget it, etc.).
+
+    This is NOT part of classify_intent(). It is checked separately by the
+    orchestrator when an active flow is detected, BEFORE routing to the flow
+    handler. This prevents users from getting "stuck" in a flow.
+    """
+    low = message.lower().strip()
+    return _matches_keywords(low, EXIT_FLOW_KEYWORDS)
+
+
 # ── Flow State Detection ──────────────────────────────────────────────────
 
 def detect_active_flow(history: list) -> Optional[str]:
@@ -784,6 +829,12 @@ def detect_active_flow(history: list) -> Optional[str]:
         if m.get('role') != 'assistant':
             continue
         content = m.get('content', '')
+        # New AI-conversational tags (no step numbers)
+        if '[CANCEL_FLOW]' in content or '[CANCEL_CONFIRM]' in content:
+            return 'cancel'
+        if '[RESCHED_FLOW]' in content or '[RESCHED_CONFIRM]' in content:
+            return 'reschedule'
+        # Legacy step-based tags (backward compatibility with old sessions)
         if '[CANCEL_STEP_' in content:
             return 'cancel'
         if '[RESCHED_STEP_' in content:

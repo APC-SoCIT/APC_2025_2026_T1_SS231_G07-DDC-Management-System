@@ -175,13 +175,14 @@ def get_available_slots(
     booked = get_booked_times(dentist, date)
     blocked = get_blocked_ranges(date, clinic)
 
-    # Filter out past time slots when the date is today (timezone-safe)
-    now = tz.now()
-    now_time = now.time() if date == now.date() else None
+    # Filter out past time slots when the date is today (Philippines local time)
+    # Use localtime() so the comparison is against Asia/Manila time, not UTC.
+    now_local = tz.localtime(tz.now())
+    now_time = now_local.time() if date == now_local.date() else None
 
     # Enforce MAX_FUTURE_DAYS limit
     from .booking_validation_service import MAX_FUTURE_DAYS
-    max_date = now.date() + timedelta(days=MAX_FUTURE_DAYS)
+    max_date = now_local.date() + timedelta(days=MAX_FUTURE_DAYS)
     if date > max_date:
         return []
 
@@ -513,6 +514,84 @@ def _has_unmatched_location_hint(msg: str) -> bool:
     return True
 
 
+def _has_unmatched_service_mention(msg: str) -> Optional[str]:
+    """
+    Return the candidate service name (title-cased) if the message explicitly
+    names something as a service but it doesn't match any known service alias.
+
+    Examples:
+        "i said nail polish for service"  → "Nail Polish"
+        "for tooth whitening"             → None (whitening IS in aliases)
+        "book a cleaning"                 → None (matched)
+
+    Used to block stale-history service bleeding and show a clear error:
+    "Nail Polish isn't something we book online — we only offer Cleaning and
+    Consultation for online booking."
+    """
+    low = msg.lower()
+
+    # Patterns that unambiguously name a service
+    patterns = [
+        r'\bi said\s+(.{2,30}?)\s+(?:for service|as service|is the service|for the service)\b',
+        r'\bservice\s+(?:is|should be|was|:)\s*([a-zA-Z][a-zA-Z\s]{1,28})',
+        r'\bchange\s+(?:the\s+)?service\s+to\s+([a-zA-Z][a-zA-Z\s]{1,28})',
+        r'\bfor\s+([a-zA-Z][a-zA-Z\s]{2,28}?)\s+service\b',
+        r'\bwant\s+([a-zA-Z][a-zA-Z\s]{2,28}?)\s+(?:service|appointment)\b',
+        r'\bbook.*?for\s+([a-zA-Z][a-zA-Z\s]{2,20}?)\s+(?:at|po|please|with|\Z)',
+    ]
+
+    candidate = None
+    for pattern in patterns:
+        m = re.search(pattern, low, re.IGNORECASE)
+        if m:
+            candidate = m.group(1).strip()
+            break
+
+    if not candidate or len(candidate) < 3:
+        return None
+
+    # Strip trailing noise words
+    noise = ('at', 'po', 'please', 'the', 'a', 'an', 'my', 'your')
+    for w in noise:
+        if candidate.endswith(f' {w}'):
+            candidate = candidate[: -(len(w) + 1)].strip()
+
+    if len(candidate) < 3:
+        return None
+
+    # If it matches any known alias, it's recognised — let normal flow handle it
+    for svc_name, aliases in SERVICE_ALIASES.items():
+        if any(alias in candidate or candidate in alias for alias in aliases):
+            return None
+
+    return candidate.title()
+
+
+def _has_unmatched_doctor_hint(msg: str) -> Optional[str]:
+    """
+    Return the raw candidate name (original case) if the message mentions a
+    doctor keyword (dr / doc / doctor) followed by a name that does NOT match
+    any dentist in the database.
+
+    Examples:
+        "book with doc gabriel"   → "gabriel"  (if no Gabriel in DB)
+        "see dr. santos"          → None        (Santos found in DB)
+        "i need a dentist"        → None        (no doctor keyword + name)
+
+    Used to produce an "invalid" FieldValidation instead of a silent
+    "missing" when the user clearly named a non-existent dentist.
+    """
+    m = re.search(r'\b(?:dr\.?|doc\.?|doctor)\s+([a-zA-ZÑñ]+)', msg, re.IGNORECASE)
+    if not m:
+        return None
+    candidate = m.group(1).lower()
+    for d in get_dentists_qs():
+        if (candidate in d.last_name.lower() or
+                candidate in d.first_name.lower()):
+            return None  # matched a real dentist — not unmatched
+    return m.group(1)  # return original-case candidate
+
+
 def find_service(msg: str, patient_only: bool = True) -> Optional[Service]:
     """
     Match service from message using aliases and DB lookup.
@@ -566,12 +645,19 @@ def gather_booking_context(
     """
     invalid_date_msg: Optional[str] = None
 
+    invalid_service_name: Optional[str] = None
+
     if is_fresh:
         clinic = find_clinic(msg)
         dentist = find_dentist(msg)
         _raw_date = parse_date(msg)
         time_val = parse_time(msg)
-        service = find_service(msg)
+        _unmatched_svc_name_fresh = _has_unmatched_service_mention(msg)
+        if _unmatched_svc_name_fresh:
+            service = None
+            invalid_service_name = _unmatched_svc_name_fresh
+        else:
+            service = find_service(msg) or find_service(msg, patient_only=False)
     else:
         # Filter out stale data from before flow resets
         filtered_hist = _filter_stale_history(hist)
@@ -591,34 +677,56 @@ def gather_booking_context(
         else:
             clinic = find_clinic(combined_user)
 
-        dentist = find_dentist(msg)
-        if not dentist and _has_step_tag(filtered_hist, '[BOOK_STEP_3'):
-            dentist = find_dentist(combined_user)
+        # Always fall back to history for dentist — the booking flow no longer
+        # emits [BOOK_STEP_3] tags, so don't gate on them. _filter_stale_history
+        # already scrubs anything before a FLOW_COMPLETE reset.
+        dentist = find_dentist(msg) or find_dentist(combined_user)
 
         _raw_date = parse_date(msg)
         if _raw_date is None:
             _raw_date = parse_date(combined_user)
         time_val = parse_time(msg) or parse_time(combined_user)
-        service = find_service(msg) or find_service(combined_user)
+
+        # --- Service extraction (history-bleed guard) ---
+        # First check the current message for an UNRECOGNISED service mention
+        # (e.g. "nail polish"). If found, block history from supplying a
+        # different service so the user gets a clear "not bookable online" error
+        # instead of silently inheriting "Cleaning" from an earlier message.
+        _unmatched_svc_name = _has_unmatched_service_mention(msg)
+        if _unmatched_svc_name:
+            # Current msg names an unrecognized service — don't bleed history
+            service = None
+            invalid_service_name = _unmatched_svc_name
+        else:
+            service = find_service(msg) or find_service(combined_user)
+            # If no patient-bookable service was found, check whether a
+            # NON-bookable service was mentioned. Passing it through lets
+            # _check_service_field produce the "cannot be booked online"
+            # error instead of silently asking "which service?".
+            if service is None:
+                service = (
+                    find_service(msg, patient_only=False)
+                    or find_service(combined_user, patient_only=False)
+                )
+            invalid_service_name = None
 
     # Resolve date sentinels (INVALID_DATE, PAST_DATE, FAR_FUTURE_DATE)
     if _raw_date is INVALID_DATE:
         invalid_date_msg = (
-            "That date doesn't exist in the calendar. "
-            "Please choose a valid date (e.g. February only has 28 or 29 days)."
+            "Hmm, that date doesn't seem to exist on the calendar "
+            "— for example, February only has 28 or 29 days. Could you double-check?"
         )
         date = None
     elif _raw_date is PAST_DATE:
         invalid_date_msg = (
-            "You cannot book an appointment in the past. "
-            "Please select a future date."
+            "That date has already passed — we can only book future appointments."
         )
         date = None
     elif _raw_date is FAR_FUTURE_DATE:
         from .booking_validation_service import MAX_FUTURE_DAYS
         invalid_date_msg = (
-            f"Booking beyond our allowed scheduling window is not permitted. "
-            f"Appointments can only be booked up to {MAX_FUTURE_DAYS} days in advance."
+            f"That's a bit too far out — we can only schedule up to "
+            f"{MAX_FUTURE_DAYS} days ahead. How about something sooner?"
         )
         date = None
     else:
@@ -635,6 +743,7 @@ def gather_booking_context(
         'time': time_val,
         'service': service,
         'invalid_date_msg': invalid_date_msg,
+        'invalid_service_name': invalid_service_name,
     }
 
 
@@ -643,12 +752,29 @@ def match_appointment(msg: str, qs) -> Optional[Appointment]:
     Try to match user's message to an appointment in queryset.
 
     Matching logic:
+    - Relative date keywords (today/tomorrow/ngayon/bukas) → match by resolved date
     - If BOTH service name AND date are mentioned → require BOTH to match the same appointment
     - If only service OR only date is mentioned → match on whichever is found
     - If only one appointment exists → return it
     - If no match → return None (caller should provide helpful mismatch feedback)
     """
+    from datetime import date as _date
     low = msg.lower()
+
+    # -- Relative date resolution (today / tomorrow / ngayon / bukas) --
+    # Must run before the main match loop because "today" never appears in
+    # month-name date_variants like "february 25".
+    _today = _date.today()
+    _rel_date = None
+    if re.search(r'\btoday\b|\bngayon\b', low):
+        _rel_date = _today
+    elif re.search(r'\btomorrow\b|\bbukas\b', low):
+        _rel_date = _today + timedelta(days=1)
+    if _rel_date is not None:
+        rel_matches = [a for a in qs if a.date == _rel_date]
+        if len(rel_matches) == 1:
+            return rel_matches[0]
+        # Multiple on same relative day → fall through to service/date disambiguation
 
     # Build match data for each appointment
     match_data = []
@@ -658,12 +784,8 @@ def match_appointment(msg: str, qs) -> Optional[Appointment]:
             a.date.strftime('%B %d').lower(),               # "february 23"
             a.date.strftime('%b %d').lower(),                # "feb 23" (zero-padded)
             (a.date.strftime('%b ') + str(a.date.day)).lower(),  # "feb 2" (no zero-pad)
-            a.date.strftime('%B %-d').lower() if hasattr(a.date, 'strftime') else '',  # "february 2" (no zero-pad)
+            (a.date.strftime('%B ') + str(a.date.day)).lower(),  # "february 2" (cross-platform)
         ]
-        # Also handle "month day" without zero padding for full month name
-        date_variants.append(
-            (a.date.strftime('%B ') + str(a.date.day)).lower()  # "february 2"
-        )
         # Remove duplicates
         date_variants = list(set(v for v in date_variants if v))
 
@@ -992,7 +1114,7 @@ def submit_cancel_request(appointment: Appointment) -> bool:
 def check_pending_requests(user: User, detected_lang: str = 'en') -> Optional[str]:
     """
     Check if patient has any pending reschedule or cancellation requests.
-    Returns a message string if blocked, or None if clear to proceed.
+    Returns a conversational message string if blocked, or None if clear.
     """
     is_tl = detected_lang in ('tl', 'tl-mix')
 
@@ -1001,15 +1123,12 @@ def check_pending_requests(user: User, detected_lang: str = 'en') -> Optional[st
     ).exists():
         if is_tl:
             return (
-                "🚫 Hindi po kayo maaaring mag-book, mag-reschedule, o mag-cancel habang mayroon pang "
-                "nakabinbing kahilingang mag-reschedule.\n\n"
-                "Mangyaring hintayin po ang pagsusuri at pagkumpirma ng staff sa inyong "
-                "kahilingan bago gumawa ng bagong aksyon."
+                "Mukhang mayroon ka pang nakabinbing kahilingang mag-reschedule. "
+                "Tapusin muna natin iyon bago gumawa ng bagong pagbabago."
             )
         return (
-            "🚫 You cannot book, reschedule, or cancel while a reschedule request is pending.\n\n"
-            "Please wait for staff to review and confirm your pending reschedule request "
-            "before taking any new action."
+            "It looks like you already have a pending reschedule request. "
+            "Let's complete that first before making any new changes."
         )
 
     if Appointment.objects.filter(
@@ -1017,15 +1136,12 @@ def check_pending_requests(user: User, detected_lang: str = 'en') -> Optional[st
     ).exists():
         if is_tl:
             return (
-                "🚫 Hindi po kayo maaaring mag-book, mag-reschedule, o mag-cancel habang mayroon pang "
-                "nakabinbing kahilingang mag-cancel.\n\n"
-                "Mangyaring hintayin po ang pagsusuri at pagkumpirma ng staff sa inyong "
-                "kahilingan bago gumawa ng bagong aksyon."
+                "Mukhang mayroon ka pang nakabinbing kahilingang mag-cancel. "
+                "Tapusin muna natin iyon bago gumawa ng bagong pagbabago."
             )
         return (
-            "🚫 You cannot book, reschedule, or cancel while a cancellation request is pending.\n\n"
-            "Please wait for staff to review and confirm your pending cancellation request "
-            "before taking any new action."
+            "It looks like you already have a pending cancellation request. "
+            "Let's complete that first before making any new changes."
         )
 
     return None

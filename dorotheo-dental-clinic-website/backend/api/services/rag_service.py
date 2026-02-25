@@ -317,14 +317,17 @@ def build_db_context(msg: str, user=None) -> str:
             parts.append('\n'.join(lines))
 
     # Clinic hours (Tagalog day-names + 'bukas' = open ALSO trigger this section)
-    # Also trigger for closing time, lunchbreak, and "what time" queries
-    if asking_about_clinic or any(w in low for w in [
+    # Also trigger for closing time, lunchbreak, and "what time" queries.
+    # EXCEPTION: do NOT add clinic hours when asking about a specific dentist's
+    # availability — "what time is Dr. X available?" should only show that dentist,
+    # not the whole clinic address+hours block.
+    if (asking_about_clinic or any(w in low for w in [
         'saturday', 'sunday', 'sabado', 'linggo', 'bukas ba', 'bukas kayo',
         'open saturday', 'open sunday', 'weekend', 'weekdays',
         'what time', 'what time do', 'close', 'closing', 'closing time',
         'lunch', 'lunch break', 'lunchbreak', 'kelan bukas', 'kelan kayo',
         'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
-    ]):
+    ])) and not asking_about_availability:
         clinics = ClinicLocation.objects.all().order_by('name')
         if clinics.exists():
             col_lines = ["=== CLINIC LOCATIONS & HOURS ==="]
@@ -502,20 +505,20 @@ def build_db_context(msg: str, user=None) -> str:
                                         date_entries.append(fmt_date(dt))
 
                         if date_entries:
-                            # Mobile-first: limit to 6 date entries max
+                            # Limit to 6 date entries max
                             shown = date_entries[:6]
-                            lines.append(f"\u2022 Dr. {full_name} \u2013 Available on:")
+                            lines.append(f"  Dr. {full_name} - Available on:")
                             for entry in shown:
-                                lines.append(f"  \u2022 {entry}")
+                                lines.append(f"    {entry}")
                             if len(date_entries) > 6:
-                                lines.append(f"  _...and {len(date_entries) - 6} more dates._")
+                                lines.append(f"    ...and {len(date_entries) - 6} more dates.")
                             # Show clinic once at bottom (only if a specific branch)
                             if single_clinic and single_clinic != 'All Clinics':
-                                lines.append(f"  \ud83d\udccd {single_clinic}")
+                                lines.append(f"    Clinic: {single_clinic}")
                         else:
-                            lines.append(f"\u2022 Dr. {full_name} - No available slots in {date_context}")
+                            lines.append(f"  Dr. {full_name} - No available slots in {date_context}")
                     else:
-                        lines.append(f"\u2022 Dr. {full_name} - No available dates in {date_context}")
+                        lines.append(f"  Dr. {full_name} - No available dates in {date_context}")
                 else:
                     single_date_q = DentistAvailability.objects.filter(
                         dentist=d, date__gte=start_date, date__lte=end_date,
@@ -623,99 +626,34 @@ def build_db_context(msg: str, user=None) -> str:
 
 def get_direct_answer(msg: str) -> Optional[dict]:
     """
-    Handle quick reply button questions with structured answers.
-    Returns a response dict or None if not a direct question.
+    Handle quick reply button questions by returning None so the AI
+    generates natural conversational responses from DB context.
+
+    Previously returned hardcoded templates — now only returns direct
+    answers for cases where the DB has absolutely no data.
     """
     stripped = msg.strip()
-    low = msg.lower().strip()
 
     if stripped == "What dental services do you offer?":
         svcs = Service.objects.all().order_by('name')
         if not svcs.exists():
             return {'text': "We currently don't have services listed. Please contact the clinic directly."}
-        lines = ["### 🦷 Our Dental Services\n"]
-        for s in svcs:
-            lines.append(f"- **{s.name}**")
-        lines.append("\n💙 Would you like to book an appointment?")
-        return {'text': '\n'.join(lines), 'quick_replies': ['Book Appointment', 'Our Dentists', 'Clinic Hours']}
+        # Let AI handle formatting — return None to fall through to LLM pipeline
+        return None
 
     if stripped == "Who are the dentists?":
         dents = get_dentists_qs().order_by('last_name')
         if not dents.exists():
             return {'text': "We currently don't have dentist information available."}
-        lines = ["### 👨\u200d⚕️ Our Dental Team\n"]
-        today = datetime.now().date()
-        for d in dents:
-            full_name = d.get_full_name().strip()
-            if not full_name:
-                continue
-            is_available = DentistAvailability.objects.filter(
-                dentist=d, date=today, is_available=True
-            ).exists()
-            if is_available:
-                lines.append(f"- ✅ **Dr. {full_name}** – Available today")
-            else:
-                lines.append(f"- **Dr. {full_name}**")
-        lines.append("\n💙 Ready to book? Say 'Book Appointment' to schedule your visit!")
-        return {'text': '\n'.join(lines), 'quick_replies': ['Book Appointment', 'Our Services', 'Clinic Hours']}
+        return None
 
     if stripped == "What are your clinic hours?":
         clinics = ClinicLocation.objects.all().order_by('name')
         if not clinics.exists():
             return {'text': "We currently don't have clinic location information available."}
-        lines = ["### 📍 Clinic Locations\n"]
-        clinic_list = list(clinics)
-        for c in clinic_list:
-            lines.append(f"\n**{c.name}**")
-            lines.append(f"📍 {c.address}")
-            lines.append(f"📞 {c.phone}")
-        lines.append("\n### ⏰ Operating Hours\n")
-        lines.append("- **Monday – Friday:** 8:00 AM – 6:00 PM")
-        lines.append("- **Saturday:** 9:00 AM – 3:00 PM")
-        lines.append("- **Sunday:** Closed")
-        lines.append("\n💙 Need to schedule an appointment? Just say 'Book Appointment'!")
-        return {'text': '\n'.join(lines), 'quick_replies': ['Book Appointment', 'Our Dentists', 'Our Services']}
+        return None
 
-    # Contact / Social Media — flexible pattern-based match
-    _social_kw = ['facebook', 'instagram', ' fb', ' ig ', 'fb page', 'ig page', 'social media']
-    _contact_kw = [
-        'contact us', 'contact info', 'how to contact', 'how do i contact',
-        'cellphone', 'phone number', 'numero', 'telepono', 'tawag',
-        'how to reach', 'makipag-ugnayan', 'number nyo', 'number namin',
-        'how can i call', 'how do i call', 'saan ko maabot', 'saan ko kayo',
-        'ma contact', 'macontact', 'ma-contact', 'contact ang', 'contact ng',
-        'contact nyo', 'contact kayo', 'contact ninyo', 'i-contact',
-        'saan ko makita', 'paano kayo', 'paano ka', 'paano makipag',
-    ]
-    _is_social = any(w in low for w in _social_kw)
-    _is_contact = any(w in low for w in _contact_kw)
-    if _is_social or _is_contact:
-        _is_tl = any(w in low for w in [
-            'saan', 'paano', 'numero', 'tawag', 'makipag', 'nyo', 'namin',
-            'natin', 'po ', ' po', 'kayo', 'makontak', 'maabot',
-        ])
-        if _is_tl:
-            return {
-                'text': (
-                    "### 📞 Makipag-ugnayan sa Amin\n\n"
-                    "- 📞 **Telepono:** +63 912 345 6789\n"
-                    "- 📘 **Facebook:** Dorotheo Dental FB\n"
-                    "- 📸 **Instagram:** Dorotheo Dental IG\n\n"
-                    "💙 Maaari ka ring mag-book ng appointment dito sa chat!"
-                ),
-                'quick_replies': ['Book Appointment', 'Clinic Hours', 'Our Location'],
-            }
-        return {
-            'text': (
-                "### 📞 Contact Us\n\n"
-                "- 📞 **Phone:** +63 912 345 6789\n"
-                "- 📘 **Facebook:** Dorotheo Dental FB\n"
-                "- 📸 **Instagram:** Dorotheo Dental IG\n\n"
-                "💙 You can also book an appointment directly through this chat!"
-            ),
-            'quick_replies': ['Book Appointment', 'Clinic Hours', 'Our Location'],
-        }
-
+    # Contact / Social Media — let AI handle too
     return None
 
 
@@ -726,7 +664,7 @@ def format_context_fallback(context: str, is_tagalog: bool) -> str:
     lines = []
 
     if "=== AVAILABLE DENTAL SERVICES ===" in context:
-        lines.append("🦷 **Mga Dental Services Namin:**\n" if is_tagalog else "🦷 **Our Dental Services:**\n")
+        lines.append("**Mga Dental Services Namin:**\n" if is_tagalog else "**Our Dental Services:**\n")
         services_section = context.split("=== AVAILABLE DENTAL SERVICES ===")[1]
         if "===" in services_section:
             services_section = services_section.split("===")[0]
@@ -738,27 +676,24 @@ def format_context_fallback(context: str, is_tagalog: bool) -> str:
         lines.append("")
 
     if "=== OUR DENTISTS ===" in context:
-        lines.append("👨‍⚕️ **Mga Dentista Namin:**\n" if is_tagalog else "👨‍⚕️ **Our Dentists:**\n")
+        lines.append("**Mga Dentista Namin:**\n" if is_tagalog else "**Our Dentists:**\n")
         dentists_section = context.split("=== OUR DENTISTS ===")[1]
         if "===" in dentists_section:
             dentists_section = dentists_section.split("===")[0]
         for line in dentists_section.strip().split('\n'):
             stripped = line.strip()
             if stripped.startswith('•'):
-                # Convert • to - for proper markdown bullet formatting
                 lines.append('- ' + stripped[1:].lstrip())
             elif stripped.startswith('- '):
                 lines.append(stripped)
-            elif stripped.startswith('📍'):
-                # Clinic location line — indent under the doctor above
+            elif stripped.startswith('Clinic:'):
                 lines.append(f"  {stripped}")
             elif stripped.startswith('_') and stripped.endswith('_'):
-                # Italic notes e.g. _...and X more dates._
                 lines.append(f"  {stripped}")
         lines.append("")
 
     if "=== CLINIC LOCATIONS & HOURS ===" in context:
-        lines.append("📍 **Mga Branch:**\n" if is_tagalog else "📍 **Clinic Locations:**\n")
+        lines.append("**Mga Branch:**\n" if is_tagalog else "**Clinic Locations:**\n")
         clinic_section = context.split("=== CLINIC LOCATIONS & HOURS ===")[1]
         if "===" in clinic_section:
             clinic_section = clinic_section.split("===")[0]
@@ -766,46 +701,36 @@ def format_context_fallback(context: str, is_tagalog: bool) -> str:
             stripped = cline.strip()
             if not stripped:
                 continue
-            if stripped.startswith('📍'):
-                # Clinic name header
-                lines.append(f"\n**{stripped}**")
-            elif stripped.startswith('Address:'):
-                # Split long address — show first segment + city/area only
+            if stripped.startswith('Address:'):
                 addr = stripped.replace('Address:', '').strip()
-                parts = [p.strip() for p in addr.split(',')]
-                lines.append(parts[0])
-                if len(parts) > 1:
-                    lines.append(', '.join(parts[1:3]).strip())
+                parts_addr = [p.strip() for p in addr.split(',')]
+                lines.append(parts_addr[0])
+                if len(parts_addr) > 1:
+                    lines.append(', '.join(parts_addr[1:3]).strip())
             elif stripped.startswith('Phone:'):
-                lines.append(f"📞 {stripped.replace('Phone:', '').strip()}")
-            elif stripped.startswith('⏰'):
-                lines.append(stripped)
+                lines.append(f"Phone: {stripped.replace('Phone:', '').strip()}")
             elif stripped.startswith('•'):
-                # Convert • to - for proper markdown bullet formatting
                 lines.append('- ' + stripped[1:].lstrip())
             elif stripped.startswith('- '):
+                lines.append(stripped)
+            else:
                 lines.append(stripped)
         lines.append("")
 
     if "=== CLINIC CONTACT & SOCIAL MEDIA ===" in context:
-        lines.append("### \ud83d\udcde Makipag-ugnayan\n" if is_tagalog else "### \ud83d\udcde Contact Us\n")
+        lines.append("**Makipag-ugnayan:**\n" if is_tagalog else "**Contact Us:**\n")
         social_section = context.split("=== CLINIC CONTACT & SOCIAL MEDIA ===")[1]
         if "===" in social_section:
             social_section = social_section.split("===")[0]
         for sline in social_section.strip().split('\n'):
             s = sline.strip()
             if s.startswith('Phone:'):
-                lines.append(f"- \ud83d\udcde **{'Telepono' if is_tagalog else 'Phone'}:** {s.replace('Phone:', '').strip()}")
+                lines.append(f"- **{'Telepono' if is_tagalog else 'Phone'}:** {s.replace('Phone:', '').strip()}")
             elif s.startswith('Facebook Page Name:'):
-                lines.append(f"- \ud83d\udcd8 **Facebook:** {s.replace('Facebook Page Name:', '').strip()}")
+                lines.append(f"- **Facebook:** {s.replace('Facebook Page Name:', '').strip()}")
             elif s.startswith('Instagram Name:'):
-                lines.append(f"- \ud83d\udcf8 **Instagram:** {s.replace('Instagram Name:', '').strip()}")
+                lines.append(f"- **Instagram:** {s.replace('Instagram Name:', '').strip()}")
         lines.append("")
-
-    if is_tagalog:
-        lines.append("💙 May gusto ka pa bang malaman o mag-book ng appointment?")
-    else:
-        lines.append("💙 Would you like to know more or book an appointment?")
 
     _log_source('db_formatted', 0, 'context_fallback')
     return '\n'.join(lines)

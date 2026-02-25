@@ -42,51 +42,56 @@ MAX_FUTURE_DAYS = 90  # Cannot book more than 90 days in advance
 
 
 # ── Response Messages ──────────────────────────────────────────────────────
+# These are the defense-in-depth messages shown when the flow-level
+# validation is bypassed somehow.  Keep them conversational.
 
 MSG_ALREADY_BOOKED_THIS_WEEK = (
-    "You already have a booking this week. "
-    "Please reschedule or cancel your existing appointment if needed."
+    "You already have a booking this week — we only allow one per week. "
+    "You'd need to reschedule or cancel the existing one first."
 )
 
 MSG_PENDING_REQUEST = (
-    "Your previous request is still pending approval. "
-    "Please wait for confirmation before making a new booking."
+    "It looks like you still have a pending request waiting for approval. "
+    "Let's wait for that to be confirmed before making any new changes."
 )
 
 MSG_NOT_ELIGIBLE_FOR_MODIFICATION = (
-    "This appointment is not eligible for modification at this time."
+    "This appointment can't be modified right now."
 )
 
-MSG_INVALID_DATE = "Please provide a valid future date."
-MSG_INVALID_TIME = "Please provide a time within clinic working hours (8:00 AM - 6:00 PM, Mon-Fri; 9:00 AM - 3:00 PM, Sat)."
-MSG_DENTIST_NOT_FOUND = "The specified dentist does not exist in our system."
-MSG_DENTIST_INACTIVE = "The specified dentist is not active or not a valid dentist."
-MSG_SERVICE_NOT_FOUND = "The specified service does not exist in our system."
-MSG_SERVICE_NOT_PATIENT_BOOKABLE = (
-    "This service is not available for online booking by patients. "
-    "Only Cleaning and Consultation can be booked online. "
-    "For other services, please contact the clinic directly."
+MSG_INVALID_DATE = "That doesn't look like a valid date — could you try again with a future date?"
+MSG_INVALID_TIME = (
+    "That time falls outside our clinic hours. "
+    "We're open 8 AM – 6 PM on weekdays and 9 AM – 3 PM on Saturdays."
 )
-MSG_CLINIC_NOT_FOUND = "The specified clinic location does not exist in our system."
-MSG_SLOT_TAKEN_DENTIST = "That time slot has already been booked for this dentist. Please pick a different time."
-MSG_SLOT_TAKEN_PATIENT = "You already have an appointment at this date and time."
-MSG_SUNDAY_CLOSED = "The clinic is closed on Sundays. Please choose another day."
-MSG_PAST_DATE = "You cannot book an appointment in the past. Please select a future date."
-MSG_PAST_TIME = "That time has already passed today. Please select a later time."
+MSG_DENTIST_NOT_FOUND = "We couldn't find that dentist in our system."
+MSG_DENTIST_INACTIVE = "That dentist isn't currently active in our system."
+MSG_SERVICE_NOT_FOUND = "We don't seem to have that service on file."
+MSG_SERVICE_NOT_PATIENT_BOOKABLE = (
+    "That service is offered at our clinic, but it can't be booked online. "
+    "Online booking is only available for Cleaning and Consultation. "
+    "For anything else, give us a call or drop by the clinic."
+)
+MSG_CLINIC_NOT_FOUND = "We don't have that clinic location in our system."
+MSG_SLOT_TAKEN_DENTIST = "That time slot was just taken — would you like to pick a different time?"
+MSG_SLOT_TAKEN_PATIENT = "You already have an appointment at that date and time."
+MSG_SUNDAY_CLOSED = "We're closed on Sundays — how about another day?"
+MSG_PAST_DATE = "That date is in the past — we can only book future appointments."
+MSG_PAST_TIME = "That time has already passed for today. How about a later slot?"
 MSG_SLOT_NOT_FOUND = (
-    "No matching availability slot found. The requested time slot does not exist "
-    "in the dentist's schedule. Please select from the available slots shown."
+    "That time slot doesn't seem to exist in the dentist's schedule. "
+    "Could you pick one of the available slots instead?"
 )
 MSG_SLOT_ALREADY_BOOKED = (
-    "This time slot was just booked by someone else. Please select a different time."
+    "Oops — someone just grabbed that slot! Could you pick a different time?"
 )
 MSG_FUTURE_LIMIT = (
-    f"Appointments cannot be booked more than {MAX_FUTURE_DAYS} days in advance. "
-    "Please select a closer date."
+    f"That's a bit too far out — we can only schedule up to "
+    f"{MAX_FUTURE_DAYS} days ahead. How about something sooner?"
 )
 MSG_CLINIC_MISMATCH = (
-    "The selected time slot does not belong to the chosen clinic. "
-    "Please select a slot from the correct clinic."
+    "That time slot belongs to a different clinic. "
+    "Let's pick a slot from the right one."
 )
 
 
@@ -423,12 +428,14 @@ def validate_not_past_time(
     target_time: time_obj,
 ) -> Tuple[bool, Optional[str]]:
     """
-    Verify that the slot is in the future using server time.
-    Timezone-safe: uses django.utils.timezone.now().
+    Verify that the slot is in the future using Philippines local time.
+    Uses timezone.localtime() so the comparison is always against local
+    clinic time (Asia/Manila), not UTC. This prevents past-time slots
+    from being booked when the server's UTC offset differs from PHP+8.
     """
-    now = timezone.now()
-    current_date = now.date()
-    current_time = now.time()
+    now_local = timezone.localtime(timezone.now())
+    current_date = now_local.date()
+    current_time = now_local.time()
 
     if target_date < current_date:
         return False, MSG_PAST_DATE
