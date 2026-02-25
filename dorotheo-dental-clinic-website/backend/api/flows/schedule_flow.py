@@ -81,13 +81,19 @@ FORMATTING:
 
 SERVICES (IMPORTANT):
 - Online self-booking is restricted by the clinic owner to **Cleaning** and **Consultation** only.
-- The clinic DOES perform other services (Tooth Extraction, Whitening, Braces, Filling, Veneers, etc.),
+- The clinic DOES perform other DENTAL services (Tooth Extraction, Whitening, Braces, Filling, Veneers,
+  Crowns, Fluoride Treatment, Dental Implants, Adjustment Visits, etc.),
   but those CANNOT be booked online by patients.
-- If a patient requests a service not in the bookable list, explain this owner restriction clearly:
+- If a patient requests a dental service not in the bookable list, explain this owner restriction clearly:
   say something like "That service is available at our clinic, but it can't be booked online —
   you'd need to call or visit us in person to schedule it. For online booking I can only
   set you up for a **Cleaning** or **Consultation**."
-- NEVER say 'we don't offer that service' — the clinic offers it, just not via online booking.
+- If a patient requests a NON-DENTAL service (e.g., physical exam, nail polish, massage, haircut,
+  eye exam, vaccination, blood test), say clearly that this is a dental clinic and we do NOT offer
+  that service. Be friendly: "We're a dental clinic, so we don't offer physical exams — but I can
+  help you book a **Cleaning** or **Consultation** for your dental needs!"
+- ONLY use 'we don't offer that service' for genuinely non-dental services.
+  For dental services that exist but aren't bookable online, say it's available at the clinic.
 
 EXAMPLE GOOD RESPONSES:
 - "Great choice! Dr. Cruz is available at Bacoor. When would you like to come in?"
@@ -259,7 +265,7 @@ def _validate_booking(
     result.clinic = _check_clinic_field(user, clinic, msg, today)
     clinic_ok = result.clinic.status == "valid"
 
-    result.dentist = _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg=msg)
+    result.dentist = _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg=msg, requested_date=date_val)
     dentist_ok = result.dentist.status == "valid"
 
     result.date = _check_date_field(
@@ -321,13 +327,17 @@ def _check_clinic_field(user, clinic, msg, today) -> FieldValidation:
 
 # -- Dentist --
 
-def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="") -> FieldValidation:
+def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="", requested_date=None) -> FieldValidation:
     """
     Validate dentist. Returns structured FieldValidation.
 
     When dentist is None but the message contains a doctor keyword (dr/doc/doctor)
     followed by a name not found in the DB, returns 'invalid' with a clear error
     instead of silently showing the 'missing' option list.
+
+    If requested_date is provided and no dentist was specified, filters the
+    suggested dentist list to those who actually have availability on that
+    specific date, making the suggestions more relevant.
     """
     if dentist is None:
         # Check if user explicitly named a non-existent doctor
@@ -376,6 +386,24 @@ def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="") -> Fie
         )
 
     # Missing - build options
+    # If the patient already mentioned a specific date, narrow suggestions
+    # to dentists who actually have openings on THAT date.
+    if requested_date is not None:
+        date_dentists = bsvc.get_alt_dentists_on_date(clinic, requested_date)
+        if date_dentists:
+            options = [f"Dr. {d.get_full_name()}" for d in date_dentists]
+            # Smart recommendation
+            rec = ""
+            last_at = Appointment.objects.filter(
+                patient=user, clinic=clinic,
+                status__in=["confirmed", "completed"], dentist__isnull=False,
+            ).order_by("-date", "-time").first()
+            if last_at and last_at.dentist in date_dentists:
+                rec = f"Previously saw: Dr. {last_at.dentist.get_full_name()}"
+            elif date_dentists:
+                rec = f"Dr. {date_dentists[0].get_full_name()} has availability on that date!"
+            return FieldValidation("missing", options=options, recommendation=rec)
+
     dentist_ids = DentistAvailability.objects.filter(
         Q(clinic=clinic) | Q(apply_to_all_clinics=True),
         date__gte=today, date__lte=end_date, is_available=True,
@@ -404,6 +432,8 @@ def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="") -> Fie
     ).order_by("-date", "-time").first()
     if last_at and last_at.dentist in available_dentists:
         rec = f"Previously saw: Dr. {last_at.dentist.get_full_name()}"
+    elif available_dentists:
+        rec = f"Dr. {available_dentists[0].get_full_name()} has the most availability!"
 
     return FieldValidation("missing", options=options, recommendation=rec)
 
@@ -442,12 +472,20 @@ def _check_date_field(user, clinic, clinic_ok, dentist, dentist_ok,
             return FieldValidation("valid", value=date_val,
                                    display_name=bsvc.fmt_date_full(date_val))
 
-        # No slots on this date
+        # No slots on this date — distinguish "no availability set" from "fully booked"
+        has_record = bsvc.has_availability_record(dentist, date_val, clinic)
         alt = bsvc.get_alt_dentists_on_date(clinic, date_val, exclude_dentist=dentist)
         alt_names = [f"Dr. {d.get_full_name()}" for d in alt] if alt else []
+        if has_record:
+            error_msg = f"Dr. {dentist.get_full_name()} is fully booked on {bsvc.fmt_date(date_val)}."
+        else:
+            error_msg = (
+                f"Dr. {dentist.get_full_name()} doesn't have availability set for "
+                f"{bsvc.fmt_date(date_val)}. They haven't opened their schedule for that date yet."
+            )
         return FieldValidation(
             "invalid", value=date_val,
-            error=f"Dr. {dentist.get_full_name()} is fully booked on {bsvc.fmt_date(date_val)}.",
+            error=error_msg,
             options=alt_names,
             recommendation="Other dentists are available on that date though!" if alt_names else "How about trying a different date?",
         )
@@ -546,9 +584,31 @@ def _check_service_field(service, unmatched_name: str = None) -> FieldValidation
     bookable_names = [s.name for s in allowed]
 
     # The user explicitly named a service we don't recognise at all (e.g. "nail
-    # polish"). Show a clear, friendly error instead of silently asking what
-    # service they want (which would look as if we ignored their request).
+    # polish", "physical exam"). Show a clear, friendly error instead of
+    # silently asking what service they want.
+    #
+    # Distinguish between:
+    #  (a) Non-dental services (physical exam, nail polish) → "we don't offer that"
+    #  (b) Unknown but possibly dental → generic "not available for online booking"
     if unmatched_name:
+        _NON_DENTAL_KEYWORDS = (
+            'physical exam', 'physical', 'nail polish', 'nail', 'manicure',
+            'pedicure', 'haircut', 'hair', 'massage', 'spa', 'facial',
+            'eye exam', 'eye', 'skin care', 'derma', 'blood test', 'lab test',
+            'x-ray', 'xray', 'vaccine', 'vaccination', 'immunization',
+            'body check', 'medical exam', 'general checkup',
+        )
+        is_non_dental = any(kw in unmatched_name.lower() for kw in _NON_DENTAL_KEYWORDS)
+        if is_non_dental:
+            return FieldValidation(
+                "invalid",
+                error=(
+                    f"We're a dental clinic, so we don't offer **{unmatched_name}**. "
+                    "I can help you with dental services though! For online booking, "
+                    "I can set you up for a **Cleaning** or **Consultation**."
+                ),
+                options=bookable_names,
+            )
         return FieldValidation(
             "invalid",
             error=(

@@ -196,6 +196,25 @@ def get_available_slots(
     return slots
 
 
+def has_availability_record(
+    dentist: User,
+    date: date_obj,
+    clinic: Optional[ClinicLocation] = None,
+) -> bool:
+    """
+    Check if a DentistAvailability record exists for the given dentist on the
+    given date at the given clinic.  This is a lighter check than
+    get_available_slots() — it answers "did the dentist set their schedule?"
+    without computing individual slot availability.
+    """
+    qs = DentistAvailability.objects.filter(
+        dentist=dentist, date=date, is_available=True,
+    )
+    if clinic:
+        qs = qs.filter(Q(clinic=clinic) | Q(apply_to_all_clinics=True))
+    return qs.exists()
+
+
 def get_alt_dentists_on_date(
     clinic: ClinicLocation,
     date: date_obj,
@@ -530,6 +549,32 @@ def _has_unmatched_service_mention(msg: str) -> Optional[str]:
     """
     low = msg.lower()
 
+    # ── Non-dental service keywords ────────────────────────────────────
+    # If the candidate matches one of these, it's clearly not a dental
+    # service and we should immediately flag it as unmatched so the
+    # chatbot says "we don't offer that" rather than hallucinating.
+    _NON_DENTAL = (
+        'physical exam', 'physical examination', 'checkup physical',
+        'general checkup', 'body check', 'medical exam',
+        'nail polish', 'nail', 'manicure', 'pedicure',
+        'haircut', 'hair', 'massage', 'spa', 'facial',
+        'eye exam', 'eye check', 'skin care', 'derma',
+        'blood test', 'lab test', 'x-ray', 'xray',
+        'vaccine', 'vaccination', 'immunization',
+    )
+
+    # Quick check: does the message contain a known non-dental phrase?
+    for nd in _NON_DENTAL:
+        if nd in low:
+            # Make sure it's not part of a dental service alias
+            is_dental = False
+            for aliases in SERVICE_ALIASES.values():
+                if any(nd in alias or alias in nd for alias in aliases):
+                    is_dental = True
+                    break
+            if not is_dental:
+                return nd.title()
+
     # Patterns that unambiguously name a service
     patterns = [
         r'\bi said\s+(.{2,30}?)\s+(?:for service|as service|is the service|for the service)\b',
@@ -538,6 +583,8 @@ def _has_unmatched_service_mention(msg: str) -> Optional[str]:
         r'\bfor\s+([a-zA-Z][a-zA-Z\s]{2,28}?)\s+service\b',
         r'\bwant\s+([a-zA-Z][a-zA-Z\s]{2,28}?)\s+(?:service|appointment)\b',
         r'\bbook.*?for\s+([a-zA-Z][a-zA-Z\s]{2,20}?)\s+(?:at|po|please|with|\Z)',
+        # "book appointment <service> <date/time/clinic>" pattern
+        r'\bbook\s+(?:an?\s+)?(?:appointment\s+)?(?:for\s+)?([a-zA-Z][a-zA-Z\s]{2,25}?)\s+(?:on|at|in|sa|with|for|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|\d)',
     ]
 
     candidate = None
