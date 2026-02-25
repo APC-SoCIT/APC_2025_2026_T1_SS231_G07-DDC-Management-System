@@ -453,14 +453,6 @@ export default function Documents() {
         </div>
       )}
 
-      <ConfirmDeleteModal
-        isOpen={deleteDocId !== null}
-        title="Delete Document"
-        message="Are you sure you want to delete this document? This action cannot be undone."
-        onConfirm={confirmDeleteDocument}
-        onCancel={() => setDeleteDocId(null)}
-        isLoading={isDeleting}
-      />
     </div>
   )
 }
