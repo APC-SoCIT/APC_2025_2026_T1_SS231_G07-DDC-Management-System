@@ -20,6 +20,10 @@ python manage.py update_patient_status || echo "update_patient_status failed (no
 echo "Setting up initial data..."
 python manage.py create_clinics --skip-services || echo "Clinics already exist"
 
+# Index pages for RAG chatbot (idempotent — deletes and re-creates per page)
+echo "Indexing pages for RAG..."
+python manage.py index_pages || echo "index_pages failed (non-fatal)"
+
 # Skip collectstatic - already done during build
 # Static files are collected in the GitHub Action workflow
 
