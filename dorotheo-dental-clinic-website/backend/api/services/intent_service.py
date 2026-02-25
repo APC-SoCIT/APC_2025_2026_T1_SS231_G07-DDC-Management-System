@@ -169,6 +169,14 @@ CLINIC_INFO_KEYWORDS = [
     'kailan available', 'anong araw available', 'kelan available',
     'sino available', 'sino ang available',
     'is dr', 'is doc', 'any available',
+    # Availability check / re-check patterns
+    'check availability', 'check again', 'check it again',
+    'can you check again', 'please check again', 'try again',
+    'check availability again', 'what about',
+    'how about that date', 'how about that clinic',
+    'what about that date', 'what about that clinic',
+    'on that date', 'for that date', 'same date',
+    'that date', 'that day', 'same day',
     # Dentists / staff
     'who are the dentists', 'who are your dentists', 'list of dentists',
     'your dentists', 'available dentists', 'sino ang dentist',
@@ -515,6 +523,14 @@ def _is_dentist_availability_query(text: str) -> bool:
         # "Pwede ba makita si Doc X" / "Pwede pa makita si Dr. X"
         r'(pwede|puwede|can i|can we).{0,30}(makita|konsulta|magpa|visit|see).{0,20}(si\s)?(dr\.?|doc)',
         r'(makita|makonsulta|magpa-consult).{0,30}(si\s)?(dr\.?|doc)',
+        # Availability check at a specific clinic (without mentioning dentist)
+        # e.g. "what about alabang clinic on that date?", "check availability in bacoor"
+        r'(check|checking).{0,20}(availability|available)',
+        r'(what about|how about).{0,30}(clinic|bacoor|alabang|poblacion)',
+        r'(availability|available).{0,30}(at|in|sa|ng).{0,20}(clinic|bacoor|alabang|poblacion)',
+        # "check again" / "try again" availability patterns
+        r'(check|try|look).{0,10}again',
+        r'(that|same|the same).{0,10}(date|day|clinic)',
     ]
     for pattern in dr_avail_patterns:
         if re.search(pattern, text, re.IGNORECASE):

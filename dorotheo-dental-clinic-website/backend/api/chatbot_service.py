@@ -606,7 +606,7 @@ class DentalChatbotService:
         """
         Handle general Q&A questions using:
         1. Direct answers (quick-reply buttons)
-        2. Semantic cache (FAQ patterns)
+        2. Semantic cache (FAQ patterns) — SKIPPED for availability queries
         3. RAG + LLM (full pipeline)
         4. DB context fallback (when LLM is unavailable)
         """
@@ -615,11 +615,16 @@ class DentalChatbotService:
         if direct:
             return build_reply(direct['text'], direct.get('quick_replies'))
 
-        # 2. Check semantic cache
-        cached = self._cache.get(msg)
-        if cached:
-            logger.info("Cache hit for query: %s", msg[:50])
-            return build_reply(cached)
+        # Detect if this is an availability query — these must ALWAYS
+        # hit the database live (never serve stale cached responses)
+        _is_availability_query = rag_service._is_availability_related(msg)
+
+        # 2. Check semantic cache — SKIP for availability queries
+        if not _is_availability_query:
+            cached = self._cache.get(msg)
+            if cached:
+                logger.info("Cache hit for query: %s", msg[:50])
+                return build_reply(cached)
 
         current_lang = self._lang
         is_tagalog = current_lang in (lang.LANG_TAGALOG, lang.LANG_TAGLISH)
@@ -630,8 +635,9 @@ class DentalChatbotService:
         if not skip_rag:
             rag_context, rag_sources = rag_service.get_rag_context(msg)
 
-        # Build DB context for LLM grounding
-        db_context = rag_service.build_db_context(msg, user=self.user)
+        # Build DB context for LLM grounding — pass conversation history
+        # so date references like "that date" can be resolved from context
+        db_context = rag_service.build_db_context(msg, user=self.user, conversation_history=hist)
 
         # Build prompt and call LLM
         prompt = self._build_qa_prompt(msg, hist, current_lang, db_context, rag_context)
@@ -640,8 +646,10 @@ class DentalChatbotService:
         if text:
             text = _sanitize(text)
 
-            # Cache the response for FAQ patterns
-            self._cache.put(msg, text)
+            # Cache the response for FAQ patterns — SKIP caching for
+            # availability queries since availability changes frequently
+            if not _is_availability_query:
+                self._cache.put(msg, text)
 
             result = build_reply(text)
             if rag_sources:

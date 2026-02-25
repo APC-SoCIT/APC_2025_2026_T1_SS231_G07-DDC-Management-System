@@ -907,6 +907,48 @@ def patient_intake_form_post_delete(sender, instance, **kwargs):
         logger.error(f"Error in patient_intake_form_post_delete: {e}")
 
 
+# ==================== AVAILABILITY CACHE INVALIDATION ====================
+
+@receiver(post_save, sender='api.DentistAvailability')
+def availability_changed_on_save(sender, instance, **kwargs):
+    """
+    Clear chatbot semantic cache when DentistAvailability is created or updated.
+    This ensures the chatbot always sees the latest availability data
+    instead of serving stale cached responses.
+    """
+    try:
+        from api.services.cache_service import get_cache
+        cache = get_cache()
+        cache.clear()
+        logger.info(
+            "Chatbot cache cleared: DentistAvailability saved (id=%s, dentist=%s, date=%s)",
+            instance.id,
+            instance.dentist_id,
+            instance.date,
+        )
+    except Exception as e:
+        logger.error("Error clearing chatbot cache on availability save: %s", e)
+
+
+@receiver(post_delete, sender='api.DentistAvailability')
+def availability_changed_on_delete(sender, instance, **kwargs):
+    """
+    Clear chatbot semantic cache when DentistAvailability is deleted.
+    """
+    try:
+        from api.services.cache_service import get_cache
+        cache = get_cache()
+        cache.clear()
+        logger.info(
+            "Chatbot cache cleared: DentistAvailability deleted (id=%s, dentist=%s, date=%s)",
+            instance.id,
+            instance.dentist_id,
+            instance.date,
+        )
+    except Exception as e:
+        logger.error("Error clearing chatbot cache on availability delete: %s", e)
+
+
 # ==================== SIGNAL REGISTRATION ====================
 
 def register_audit_signals():

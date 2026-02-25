@@ -93,6 +93,44 @@ def _parse_month_only(msg: str):
     return None
 
 
+# ── Availability Query Detection ──────────────────────────────────────────
+
+def _is_availability_related(msg: str) -> bool:
+    """
+    Detect if a message is asking about dentist/clinic availability.
+    Used to skip caching and force fresh DB lookups for availability queries.
+    """
+    low = msg.lower()
+    avail_kw = [
+        'available', 'availability', 'check availability', 'check again',
+        'open slot', 'available slot', 'time slot', 'booking slot',
+    ]
+    if any(kw in low for kw in avail_kw):
+        return True
+    if _has_context_date_reference(msg):
+        return True
+    # Check if any clinic name is mentioned alongside time/date keywords
+    date_kw = [
+        'tomorrow', 'today', 'next week', 'this week', 'next month',
+        'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+        'january', 'jan', 'february', 'feb', 'march', 'mar', 'april', 'apr',
+        'may', 'june', 'jun', 'july', 'jul', 'august', 'aug',
+        'september', 'sep', 'october', 'oct', 'november', 'nov', 'december', 'dec',
+    ]
+    has_date = any(kw in low for kw in date_kw)
+    has_clinic = False
+    try:
+        for cl in ClinicLocation.objects.all():
+            if cl.name.lower() in low:
+                has_clinic = True
+                break
+    except Exception:
+        pass
+    if has_date and has_clinic:
+        return True
+    return False
+
+
 # ── Configuration ──────────────────────────────────────────────────────────
 
 RAG_TOP_K = 5
@@ -259,13 +297,67 @@ def _get_time_slots_text(dentist, check_date, clinic=None) -> str:
     return f"Available on {fmt_date(check_date)}: {range_text}"
 
 
+# ── Conversation History Date Extraction ───────────────────────────────────
+
+def _extract_date_from_history(conversation_history: list) -> Optional[datetime]:
+    """
+    Extract the most recent date mentioned in conversation history.
+    Useful when the user says 'that date', 'same date', 'on that date', etc.
+    Scans both user and assistant messages (most recent first).
+    Returns a date object or None.
+    """
+    if not conversation_history:
+        return None
+    for m in reversed(conversation_history):
+        content = m.get('content', '')
+        # Try to parse a date from each history message
+        d = parse_date(content)
+        if d and d not in (object(),):  # skip sentinels
+            # Extra guard: must be a real date object
+            try:
+                _ = d.year
+                return d
+            except AttributeError:
+                continue
+    return None
+
+
+def _has_context_date_reference(msg: str) -> bool:
+    """
+    Detect if the user is referring to a date from previous conversation context.
+    E.g. 'that date', 'same date', 'on that date', 'the same day', 'that day',
+         'same time', 'for that date', 'check again'.
+    """
+    low = msg.lower()
+    context_date_patterns = [
+        r'\b(that|the same|same)\s+(date|day|time|schedule)\b',
+        r'\b(on that date|for that date|sa date na (yun|yon|iyon))\b',
+        r'\bcheck\s*(it\s*)?again\b',
+        r'\btry\s*again\b',
+        r'\bcheck\s*availability\s*again\b',
+        r'\bcan you check again\b',
+        r'\bplease check again\b',
+        r'\bhow about\b',
+        r'\bwhat about\b',
+    ]
+    for pat in context_date_patterns:
+        if re.search(pat, low):
+            return True
+    return False
+
+
 # ── Database Context Builder ───────────────────────────────────────────────
 
-def build_db_context(msg: str, user=None) -> str:
+def build_db_context(msg: str, user=None, conversation_history=None) -> str:
     """
     Build comprehensive context from database for the LLM to answer.
     ALL data comes from Django ORM queries — never hardcoded.
     This is the fallback when RAG is unavailable.
+
+    Args:
+        msg: The user's current message.
+        user: The authenticated user (if any).
+        conversation_history: List of conversation history dicts for date context.
     """
     low = msg.lower()
     parts = []
@@ -275,7 +367,17 @@ def build_db_context(msg: str, user=None) -> str:
         'dentist', 'doctor', 'dr.', 'dr ', 'doc', 'doktor', 'sino', 'who', 'whos', "who's",
         'available dentist', 'dentist available', 'available doctor',
     ])
-    asking_about_availability = any(w in low for w in [
+
+    # Check if user mentions a specific clinic name from the DB
+    _mentions_clinic_name = False
+    for cl in ClinicLocation.objects.all():
+        if cl.name.lower() in low:
+            _mentions_clinic_name = True
+            break
+
+    # Availability detection — trigger when user asks about availability
+    # even WITHOUT mentioning "dentist" explicitly (e.g. "check availability at alabang")
+    _has_availability_keywords = any(w in low for w in [
         'available', 'availability', 'next week', 'next month', 'tomorrow', 'ngayon', 'ngayong',
         'today', 'this month', 'this week', 'anong araw', 'kelan', 'kailan',
         'next year', 'susunod', 'upcoming',
@@ -285,7 +387,19 @@ def build_db_context(msg: str, user=None) -> str:
         'january', 'jan', 'february', 'feb', 'march', 'mar', 'april', 'apr',
         'june', 'jun', 'july', 'jul', 'august', 'aug', 'september', 'sep', 'sept',
         'october', 'oct', 'november', 'nov', 'december', 'dec',
-    ]) and asking_about_dentist  # only trigger dentist section when ALSO asking about a dentist
+    ])
+
+    # Also trigger availability lookup when user references a date from history
+    # (e.g. "that date", "same date", "check again") or mentions a clinic name
+    _references_context_date = _has_context_date_reference(msg)
+
+    asking_about_availability = (
+        (_has_availability_keywords and asking_about_dentist)  # original: dentist + availability kw
+        or (_has_availability_keywords and _mentions_clinic_name)  # NEW: availability kw + clinic name
+        or (_references_context_date and _mentions_clinic_name)  # NEW: context date ref + clinic name
+        or (_references_context_date and _has_availability_keywords)  # NEW: context date ref + availability kw
+        or bool(re.search(r'\b(check|checking)\s+(availability|available)\b', low))  # NEW: explicit "check availability"
+    )
     asking_about_service = any(w in low for w in [
         'service', 'treatment', 'procedure', 'serbisyo', 'gawin', 'ginagawa',
         'have', 'offer', 'do you', 'meron', 'may', 'cleaning', 'extraction',
@@ -344,7 +458,8 @@ def build_db_context(msg: str, user=None) -> str:
 
     # Dentists with availability
     # Also enter if there's a month-range query (e.g. "anong araw available next month") even without dentist keyword
-    if asking_about_dentist or asking_about_availability or _pre_month_range or any(w in low for w in [
+    # Also enter when user references a context date + clinic (e.g. "what about alabang on that date?")
+    if asking_about_dentist or asking_about_availability or _pre_month_range or _references_context_date or any(w in low for w in [
         'sino ang dentist', 'sino ang mga dentist', 'mga dentista', 'lista ng dentist',
         'dentist saturday', 'dentist sabado', 'dentist available',
     ]):
@@ -377,6 +492,14 @@ def build_db_context(msg: str, user=None) -> str:
         if dents.exists():
             lines = ["=== OUR DENTISTS ==="]
             check_date = parse_date(msg)
+
+            # If user references a date from conversation history (e.g. "that date",
+            # "same date", "check again"), try to extract it from history.
+            if not check_date and _references_context_date and conversation_history:
+                check_date = _extract_date_from_history(conversation_history)
+                if check_date:
+                    logger.info("Resolved context date reference to: %s", check_date)
+
             month_range = _parse_month_only(msg) if not check_date else None
 
             # Detect open-ended "when/kelan" — user wants upcoming dates, not just today
