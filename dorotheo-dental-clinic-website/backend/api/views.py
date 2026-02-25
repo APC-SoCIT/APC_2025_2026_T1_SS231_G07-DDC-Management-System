@@ -918,7 +918,11 @@ class UserViewSet(AuditContextMixin, viewsets.ModelViewSet):
                 'name': user.get_full_name(),
                 'email': user.email,
                 'phone': user.phone,
-                'address': user.address,
+                'address_street': user.address_street,
+                'address_barangay': user.address_barangay,
+                'address_city': user.address_city,
+                'address_province': user.address_province,
+                'address_zip': user.address_zip,
                 'birthday': str(user.birthday) if user.birthday else None,
                 'age': user.age,
             },
@@ -1259,7 +1263,7 @@ class AppointmentViewSet(AuditContextMixin, viewsets.ModelViewSet):
         # Staff/owners can book any service; patients can only book
         # patient_bookable services (Cleaning, Consultation).
         # ═══════════════════════════════════════════════════════════════
-        booked_by_staff = getattr(request.user, 'role', 'patient') in ('staff', 'owner')
+        booked_by_staff = getattr(request.user, 'user_type', 'patient') in ('staff', 'owner')
         is_valid, error_msg = validate_new_booking(
             patient=patient,
             dentist=dentist,

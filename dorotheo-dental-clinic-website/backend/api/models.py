@@ -18,7 +18,11 @@ class User(AbstractUser):
     user_type = models.CharField(max_length=20, choices=USER_TYPES, default='patient', db_index=True)
     role = models.CharField(max_length=20, choices=STAFF_ROLES, blank=True, default='')
     phone = models.CharField(max_length=20, blank=True)
-    address = models.TextField(blank=True)
+    address_street = models.CharField(max_length=255, blank=True, null=True)
+    address_barangay = models.CharField(max_length=100, blank=True, null=True)
+    address_city = models.CharField(max_length=100, blank=True, null=True)
+    address_province = models.CharField(max_length=100, blank=True, null=True)
+    address_zip = models.CharField(max_length=10, blank=True, null=True)
     birthday = models.DateField(null=True, blank=True)
     age = models.IntegerField(null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profiles/', null=True, blank=True)
@@ -29,6 +33,11 @@ class User(AbstractUser):
 
     # Override email to make it unique and required
     email = models.EmailField(unique=True, blank=False)
+
+    # DPA / consent tracking
+    accepted_terms_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when the user accepted the Terms & Conditions")
+    accepted_privacy_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when the user accepted the Privacy Policy")
+    policy_version = models.CharField(max_length=50, default='1.0', help_text="Version of the policy documents the user consented to")
 
     class Meta:
         indexes = [

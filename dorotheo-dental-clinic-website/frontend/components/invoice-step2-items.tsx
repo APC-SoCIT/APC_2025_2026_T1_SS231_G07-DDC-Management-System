@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Minus, Edit2, Trash2, Package } from "lucide-react"
+import { Search, Plus, Minus, Edit2, Trash2, Package, X } from "lucide-react"
 import { getInventory } from "@/lib/api"
 import { InvoiceItem, InventoryItem, InvoiceTotals } from "@/lib/types"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface InvoiceStep2ItemsProps {
   appointment: any
@@ -21,6 +19,9 @@ interface InvoiceStep2ItemsProps {
   onBack: () => void
   onNext: () => void
 }
+
+// Panel mode: null = normal list view, "add" = confirm add, "edit" = edit item, "remove" = confirm remove
+type PanelMode = null | "add" | "edit" | "remove"
 
 export function InvoiceStep2Items({
   appointment,
@@ -34,19 +35,21 @@ export function InvoiceStep2Items({
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(true)
-  
-  // Dialogs
-  const [showAddDialog, setShowAddDialog] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [showRemoveDialog, setShowRemoveDialog] = useState(false)
-  
-  // Selected item for dialogs
+
+  // Inline panel state (replaces nested Dialogs)
+  const [panelMode, setPanelMode] = useState<PanelMode>(null)
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null)
   const [selectedInvoiceItem, setSelectedInvoiceItem] = useState<InvoiceItem | null>(null)
   const [selectedInvoiceItemIndex, setSelectedInvoiceItemIndex] = useState<number>(-1)
-  
-  // Dialog form state
   const [dialogQuantity, setDialogQuantity] = useState(1)
+
+  const closePanel = () => {
+    setPanelMode(null)
+    setSelectedInventoryItem(null)
+    setSelectedInvoiceItem(null)
+    setSelectedInvoiceItemIndex(-1)
+    setDialogQuantity(1)
+  }
 
   // Fetch inventory
   useEffect(() => {
@@ -91,7 +94,7 @@ export function InvoiceStep2Items({
   const handleAddClick = (inventoryItem: InventoryItem) => {
     setSelectedInventoryItem(inventoryItem)
     setDialogQuantity(1)
-    setShowAddDialog(true)
+    setPanelMode("add")
   }
 
   const handleConfirmAdd = () => {
@@ -117,12 +120,8 @@ export function InvoiceStep2Items({
       total_price: dialogQuantity * unitPrice,
     }
 
-    // Close dialog first, then update items after a tick to avoid nested Dialog render issues
-    setShowAddDialog(false)
-    setSelectedInventoryItem(null)
-    setTimeout(() => {
-      onItemsChange([...items, newItem])
-    }, 50)
+    closePanel()
+    onItemsChange([...items, newItem])
   }
 
   // Edit item handlers
@@ -130,13 +129,12 @@ export function InvoiceStep2Items({
     setSelectedInvoiceItem(item)
     setSelectedInvoiceItemIndex(index)
     setDialogQuantity(item.quantity)
-    setShowEditDialog(true)
+    setPanelMode("edit")
   }
 
   const handleConfirmEdit = () => {
     if (selectedInvoiceItemIndex === -1 || !selectedInvoiceItem) return
 
-    // Validate against available stock
     const inventoryItem = inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)
     if (inventoryItem && dialogQuantity > inventoryItem.quantity) {
       alert(`Cannot exceed available stock (${inventoryItem.quantity} units)`)
@@ -150,34 +148,22 @@ export function InvoiceStep2Items({
       total_price: dialogQuantity * selectedInvoiceItem.unit_price,
     }
 
-    // Close dialog first, then update items after a tick
-    setShowEditDialog(false)
-    setSelectedInvoiceItem(null)
-    setSelectedInvoiceItemIndex(-1)
-    setTimeout(() => {
-      onItemsChange(updatedItems)
-    }, 50)
+    closePanel()
+    onItemsChange(updatedItems)
   }
 
   // Remove item handlers
   const handleRemoveClick = (item: InvoiceItem, index: number) => {
     setSelectedInvoiceItem(item)
     setSelectedInvoiceItemIndex(index)
-    setShowRemoveDialog(true)
+    setPanelMode("remove")
   }
 
   const handleConfirmRemove = () => {
     if (selectedInvoiceItemIndex === -1) return
-    
     const updatedItems = items.filter((_, index) => index !== selectedInvoiceItemIndex)
-    
-    // Close dialog first, then update items after a tick
-    setShowRemoveDialog(false)
-    setSelectedInvoiceItem(null)
-    setSelectedInvoiceItemIndex(-1)
-    setTimeout(() => {
-      onItemsChange(updatedItems)
-    }, 50)
+    closePanel()
+    onItemsChange(updatedItems)
   }
 
   // Quantity controls for selected items
@@ -218,81 +204,260 @@ export function InvoiceStep2Items({
         </CardContent>
       </Card>
 
-      {/* Available Items */}
+      {/* Available Inventory Items — or inline Add confirmation */}
       <Card>
         <CardHeader>
-          <CardTitle>Available Inventory Items</CardTitle>
-          <CardDescription>Search and select items to add to the invoice</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>
+                {panelMode === "add" ? "Add Item to Invoice" : "Available Inventory Items"}
+              </CardTitle>
+              <CardDescription>
+                {panelMode === "add"
+                  ? "Configure quantity and confirm"
+                  : "Search and select items to add to the invoice"}
+              </CardDescription>
+            </div>
+            {panelMode === "add" && (
+              <Button size="icon" variant="ghost" onClick={closePanel}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Search items by name or category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Items List */}
-          <ScrollArea className="h-[300px] pr-4">
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading inventory...</div>
-            ) : filteredItems.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No items found</div>
-            ) : (
-              <div className="space-y-2">
-                {filteredItems.map((item) => (
-                  <Card key={item.id} className="hover:bg-accent/50 transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">{item.name}</h4>
-                            <Badge variant="outline">{item.category}</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Stock: {item.quantity} units
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg font-bold">₱{parseFloat(item.unit_cost).toFixed(2)}</span>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddClick(item)}
-                            disabled={item.quantity === 0}
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+          {panelMode === "add" && selectedInventoryItem ? (
+            /* ── Inline Add Panel ── */
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <p className="font-semibold">{selectedInventoryItem.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedInventoryItem.category}</p>
+                </div>
+                <Badge variant="outline">Stock: {selectedInventoryItem.quantity} units</Badge>
               </div>
-            )}
-          </ScrollArea>
+
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setDialogQuantity(Math.max(1, dialogQuantity - 1))}
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={selectedInventoryItem.quantity}
+                    value={dialogQuantity}
+                    onChange={(e) => setDialogQuantity(Math.min(selectedInventoryItem.quantity, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="text-center w-24"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setDialogQuantity(Math.min(selectedInventoryItem.quantity, dialogQuantity + 1))}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    × ₱{parseFloat(selectedInventoryItem.unit_cost || "0").toFixed(2)} per unit
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-background">
+                <span className="font-medium">Total:</span>
+                <span className="text-xl font-bold">
+                  ₱{(dialogQuantity * parseFloat(selectedInventoryItem.unit_cost || "0")).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={closePanel}>
+                  Cancel
+                </Button>
+                <Button className="flex-1 bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white" onClick={handleConfirmAdd}>
+                  Confirm Add
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* ── Inventory List ── */
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search items by name or category..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              <ScrollArea className="h-[300px] pr-4">
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading inventory...</div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No items found</div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredItems.map((item) => (
+                      <Card key={item.id} className="hover:bg-accent/50 transition-colors">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold">{item.name}</h4>
+                                <Badge variant="outline">{item.category}</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Stock: {item.quantity} units
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold">₱{parseFloat(item.unit_cost).toFixed(2)}</span>
+                              <Button
+                                size="sm"
+                                onClick={() => handleAddClick(item)}
+                                disabled={item.quantity === 0}
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {/* Selected Items */}
+      {/* Selected Items — or inline Edit/Remove panel */}
       <Card>
         <CardHeader>
-          <CardTitle>Selected Items ({items.length})</CardTitle>
-          <CardDescription>
-            {items.length === 0 ? "No items selected yet" : "Review and adjust quantities"}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>
+                {panelMode === "edit"
+                  ? "Edit Item"
+                  : panelMode === "remove"
+                  ? "Remove Item?"
+                  : `Selected Items (${items.length})`}
+              </CardTitle>
+              <CardDescription>
+                {panelMode === "edit"
+                  ? "Adjust quantity"
+                  : panelMode === "remove"
+                  ? `Remove "${selectedInvoiceItem?.item_name}" from this invoice?`
+                  : items.length === 0
+                  ? "No items selected yet"
+                  : "Review and adjust quantities"}
+              </CardDescription>
+            </div>
+            {(panelMode === "edit" || panelMode === "remove") && (
+              <Button size="icon" variant="ghost" onClick={closePanel}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {panelMode === "edit" && selectedInvoiceItem ? (
+            /* ── Inline Edit Panel ── */
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-semibold">{selectedInvoiceItem.item_name}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setDialogQuantity(Math.max(1, dialogQuantity - 1))}
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)?.quantity}
+                    value={dialogQuantity}
+                    onChange={(e) => {
+                      const inv = inventoryItems.find(i => i.id === selectedInvoiceItem.inventory_item_id)
+                      const val = Math.max(1, parseInt(e.target.value) || 1)
+                      setDialogQuantity(inv ? Math.min(val, inv.quantity) : val)
+                    }}
+                    className="text-center w-24"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => {
+                      const inv = inventoryItems.find(i => i.id === selectedInvoiceItem.inventory_item_id)
+                      setDialogQuantity(inv ? Math.min(inv.quantity, dialogQuantity + 1) : dialogQuantity + 1)
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    × ₱{selectedInvoiceItem.unit_price.toFixed(2)} per unit
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Available: {inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)?.quantity ?? 0} units
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-background">
+                <span className="font-medium">Total:</span>
+                <span className="text-xl font-bold">
+                  ₱{(dialogQuantity * selectedInvoiceItem.unit_price).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={closePanel}>
+                  Cancel
+                </Button>
+                <Button className="flex-1 bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white" onClick={handleConfirmEdit}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          ) : panelMode === "remove" ? (
+            /* ── Inline Remove Panel ── */
+            <div className="space-y-4">
+              <div className="p-4 border border-destructive/30 bg-destructive/5 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  This will remove <span className="font-semibold text-foreground">{selectedInvoiceItem?.item_name}</span> from the invoice.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={closePanel}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" className="flex-1" onClick={handleConfirmRemove}>
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ) : items.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>No items added to invoice</p>
             </div>
           ) : (
+            /* ── Items List ── */
             <div className="space-y-3">
               {items.map((item, index) => (
                 <Card key={`item-${item.inventory_item_id}-${index}`} className="bg-white">
@@ -385,187 +550,6 @@ export function InvoiceStep2Items({
           </Button>
         </div>
       </div>
-
-      {/* Add Item Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Item to Invoice</DialogTitle>
-            <DialogDescription>Configure quantity and price</DialogDescription>
-          </DialogHeader>
-          
-          {selectedInventoryItem && (
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Item</Label>
-                <p className="font-semibold">{selectedInventoryItem.name}</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="add-quantity">Quantity</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => setDialogQuantity(Math.max(1, dialogQuantity - 1))}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <Input
-                    id="add-quantity"
-                    type="number"
-                    min="1"
-                    max={selectedInventoryItem.quantity}
-                    value={dialogQuantity}
-                    onChange={(e) => setDialogQuantity(parseInt(e.target.value) || 1)}
-                    className="text-center"
-                  />
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => setDialogQuantity(Math.min(selectedInventoryItem.quantity, dialogQuantity + 1))}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Available: {selectedInventoryItem.quantity} units
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Unit Price</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">₱{parseFloat(selectedInventoryItem.unit_cost || "0").toFixed(2)}</span>
-                  <span className="text-sm text-muted-foreground">per unit</span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Total:</span>
-                  <span className="text-2xl font-bold">
-                    ₱{(dialogQuantity * parseFloat(selectedInventoryItem.unit_cost || "0")).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmAdd}>
-              Confirm Add
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Item Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Item</DialogTitle>
-            <DialogDescription>Adjust quantity and price</DialogDescription>
-          </DialogHeader>
-          
-          {selectedInvoiceItem && (
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Item</Label>
-                <p className="font-semibold">{selectedInvoiceItem.item_name}</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="edit-quantity">Quantity</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => setDialogQuantity(Math.max(1, dialogQuantity - 1))}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <Input
-                    id="edit-quantity"
-                    type="number"
-                    min="1"
-                    max={inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)?.quantity}
-                    value={dialogQuantity}
-                    onChange={(e) => {
-                      const inventoryItem = inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)
-                      const val = parseInt(e.target.value) || 1
-                      setDialogQuantity(inventoryItem ? Math.min(val, inventoryItem.quantity) : val)
-                    }}
-                    className="text-center"
-                  />
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => {
-                      const inventoryItem = inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)
-                      setDialogQuantity(inventoryItem ? Math.min(inventoryItem.quantity, dialogQuantity + 1) : dialogQuantity + 1)
-                    }}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Available: {inventoryItems.find(inv => inv.id === selectedInvoiceItem.inventory_item_id)?.quantity || 0} units
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Unit Price</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">₱{selectedInvoiceItem.unit_price.toFixed(2)}</span>
-                  <span className="text-sm text-muted-foreground">(from inventory)</span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Total:</span>
-                  <span className="text-2xl font-bold">
-                    ₱{(dialogQuantity * selectedInvoiceItem.unit_price).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmEdit}>
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Remove Item Dialog */}
-      <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Item from Invoice?</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to remove "{selectedInvoiceItem?.item_name}" from this invoice?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRemoveDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmRemove}>
-              Remove
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

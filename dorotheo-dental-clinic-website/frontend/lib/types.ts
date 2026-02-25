@@ -163,7 +163,11 @@ export interface Patient {
   last_name: string
   date_of_birth?: string
   phone?: string
-  address?: string
+  address_street?: string
+  address_barangay?: string
+  address_city?: string
+  address_province?: string
+  address_zip?: string
   city?: string
   state?: string
   zipcode?: string

@@ -130,6 +130,27 @@ function LoginForm() {
             >
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
+
+            <p className="text-xs text-center text-[var(--color-text-muted)] mt-3">
+              By logging in, you agree to our{" "}
+              <Link
+                href="/terms-and-conditions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] underline"
+              >
+                Terms &amp; Conditions
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] underline"
+              >
+                Privacy Policy
+              </Link>.
+            </p>
           </form>
 
           <div className="mt-6 text-center">

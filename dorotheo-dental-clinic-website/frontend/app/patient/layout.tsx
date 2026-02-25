@@ -225,6 +225,25 @@ export default function PatientLayout({ children }: Readonly<{ children: React.R
           </nav>
 
           <div className="p-4 border-t border-[var(--color-border)]">
+            <div className="flex items-center justify-center gap-3 mb-3 text-xs text-[var(--color-text-muted)]">
+              <Link
+                href="/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--color-primary)] transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <span>|</span>
+              <Link
+                href="/terms-and-conditions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--color-primary)] transition-colors"
+              >
+                Terms
+              </Link>
+            </div>
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-red-600 hover:bg-red-50 transition-colors"

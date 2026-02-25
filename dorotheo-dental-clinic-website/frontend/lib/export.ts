@@ -85,7 +85,7 @@ export const formatPatientRecordsAsText = (data: any): string => {
   text += `Email: ${data.patient.email}\n`
   text += `Phone: ${data.patient.phone_number || "N/A"}\n`
   text += `Date of Birth: ${formatDate(data.patient.date_of_birth)}\n`
-  text += `Address: ${data.patient.address || "N/A"}\n`
+  text += `Address: ${[data.patient.address_street, data.patient.address_barangay, data.patient.address_city, data.patient.address_province, data.patient.address_zip].filter(Boolean).join(", ") || "N/A"}\n`
   text += `Date Registered: ${formatDate(data.patient.date_joined)}\n\n`
 
   // Appointments

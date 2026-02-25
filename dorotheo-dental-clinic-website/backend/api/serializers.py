@@ -23,14 +23,25 @@ class ClinicLocationSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     last_appointment_date = serializers.SerializerMethodField()
     assigned_clinic_name = serializers.CharField(source='assigned_clinic.name', read_only=True)
+    # Write-only boolean sent by the frontend registration form
+    accepted_terms = serializers.BooleanField(write_only=True, required=False, default=False)
     
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password', 'first_name', 'last_name', 'user_type', 
-                  'role', 'phone', 'address', 'birthday', 'age', 'profile_picture', 
+                  'role', 'phone', 'address_street', 'address_barangay', 'address_city',
+                  'address_province', 'address_zip',
+                  'birthday', 'age', 'profile_picture', 
                   'is_active_patient', 'is_archived', 'assigned_clinic', 'assigned_clinic_name', 
-                  'created_at', 'last_appointment_date']
-        extra_kwargs = {'password': {'write_only': True}}
+                  'created_at', 'last_appointment_date',
+                  'accepted_terms_at', 'accepted_privacy_at', 'policy_version',
+                  'accepted_terms']
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'accepted_terms_at': {'read_only': True},
+            'accepted_privacy_at': {'read_only': True},
+            'policy_version': {'read_only': True},
+        }
 
     def get_last_appointment_date(self, obj):
         """
@@ -106,10 +117,28 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Contact number is required")
         return value
     
-    def validate_address(self, value):
-        """Validate address is not empty"""
+    def validate_address_street(self, value):
+        """Validate street address is not empty"""
         if not value or not value.strip():
-            raise serializers.ValidationError("Address is required")
+            raise serializers.ValidationError("Street address is required")
+        return value
+
+    def validate_address_province(self, value):
+        """Validate province is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Province is required")
+        return value
+
+    def validate_address_city(self, value):
+        """Validate city is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("City/Municipality is required")
+        return value
+
+    def validate_address_barangay(self, value):
+        """Validate barangay is not empty"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Barangay is required")
         return value
     
     def validate_birthday(self, value):
@@ -185,6 +214,13 @@ class UserSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        # Pop the virtual boolean field before creating the user
+        accepted_terms = validated_data.pop('accepted_terms', False)
+        if accepted_terms:
+            now = timezone.now()
+            validated_data['accepted_terms_at'] = now
+            validated_data['accepted_privacy_at'] = now
+            validated_data['policy_version'] = '1.0'
         return User.objects.create_user(**validated_data)
 
 

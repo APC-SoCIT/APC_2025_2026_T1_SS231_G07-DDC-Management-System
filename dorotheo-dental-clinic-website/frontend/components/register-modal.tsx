@@ -1,9 +1,18 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { X, Eye, EyeOff } from "lucide-react"
 import { api } from "@/lib/api"
+import Link from "next/link"
+import { usePhLocations } from "@/hooks/use-ph-locations"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface RegisterModalProps {
   isOpen: boolean
@@ -17,10 +26,27 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
     birthday: "",
     email: "",
     phone: "",
-    address: "",
+    addressStreet: "",
+    addressProvince: "",
+    addressProvinceCode: "",
+    addressCity: "",
+    addressCityCode: "",
+    addressBarangay: "",
+    addressZip: "",
     password: "",
     confirmPassword: "",
   })
+
+  // Philippine location data
+  const { provinces, getCities, getBarangays } = usePhLocations()
+  const cities = useMemo(
+    () => getCities(formData.addressProvinceCode),
+    [formData.addressProvinceCode, getCities]
+  )
+  const barangays = useMemo(
+    () => getBarangays(formData.addressCityCode),
+    [formData.addressCityCode, getBarangays]
+  )
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -31,6 +57,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
   const [phoneError, setPhoneError] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   
   // State for numeric month input
   const [monthInput, setMonthInput] = useState("")
@@ -50,7 +77,13 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         birthday: "",
         email: "",
         phone: "",
-        address: "",
+        addressStreet: "",
+        addressProvince: "",
+        addressProvinceCode: "",
+        addressCity: "",
+        addressCityCode: "",
+        addressBarangay: "",
+        addressZip: "",
         password: "",
         confirmPassword: "",
       })
@@ -62,6 +95,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
       setShowSuccess(false)
       setMissingFields([])
       setInvalidFields([])
+      setAcceptedTerms(false)
       setMonthInput("")
       setYearInput("")
       if (monthInputTimer) {
@@ -110,9 +144,13 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
     if (!formData.birthday) missing.push('birthday')
     if (!formData.email) missing.push('email')
     if (!formData.phone) missing.push('phone')
-    if (!formData.address) missing.push('address')
+    if (!formData.addressStreet) missing.push('addressStreet')
+    if (!formData.addressProvince) missing.push('addressProvince')
+    if (!formData.addressCity) missing.push('addressCity')
+    if (!formData.addressBarangay) missing.push('addressBarangay')
     if (!formData.password) missing.push('password')
     if (!formData.confirmPassword) missing.push('confirmPassword')
+    if (!acceptedTerms) missing.push('acceptedTerms')
 
     // Validate filled fields
     const emailRegex = /^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
@@ -254,8 +292,13 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         password: formData.password,
         phone: formData.phone,
         birthday: formData.birthday,
-        address: formData.address,
+        address_street: formData.addressStreet,
+        address_barangay: formData.addressBarangay,
+        address_city: formData.addressCity,
+        address_province: formData.addressProvince,
+        address_zip: formData.addressZip,
         user_type: "patient",
+        accepted_terms: true,
       }
 
       const response = await api.register(registrationData)
@@ -270,7 +313,13 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
         birthday: "",
         email: "",
         phone: "",
-        address: "",
+        addressStreet: "",
+        addressProvince: "",
+        addressProvinceCode: "",
+        addressCity: "",
+        addressCityCode: "",
+        addressBarangay: "",
+        addressZip: "",
         password: "",
         confirmPassword: "",
       })
@@ -405,7 +454,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Birthday</label>
               <div
                 className={`grid gap-2 rounded-lg ${missingFields.includes('birthday') || invalidFields.includes('birthday') ? 'p-2 border-2 border-red-500 bg-red-50' : ''}`}
-                style={{ gridTemplateColumns: '2.2fr 1fr 1.6fr' }}
+                style={{ gridTemplateColumns: '2.2fr 1.3fr 1.6fr' }}
               >
                 <select
                   required
@@ -650,17 +699,129 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
             </div>
           </div>
 
+          {/* Address Fields */}
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Address</label>
-            <textarea
+            <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Street Address</label>
+            <input
+              type="text"
               required
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              rows={3}
+              value={formData.addressStreet}
+              onChange={(e) => setFormData({ ...formData, addressStreet: e.target.value })}
               className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
-                missingFields.includes('address') || invalidFields.includes('address') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
+                missingFields.includes('addressStreet') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
               }`}
+              placeholder="House/Unit No., Street, Subdivision"
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Province</label>
+              <Select
+                value={formData.addressProvinceCode}
+                onValueChange={(code) => {
+                  const prov = provinces.find((p) => p.code === code)
+                  setFormData({
+                    ...formData,
+                    addressProvinceCode: code,
+                    addressProvince: prov?.name ?? "",
+                    addressCityCode: "",
+                    addressCity: "",
+                    addressBarangay: "",
+                  })
+                }}
+              >
+                <SelectTrigger
+                  className={`w-full px-4 py-2.5 h-auto border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    missingFields.includes('addressProvince') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
+                  }`}
+                >
+                  <SelectValue placeholder="Select province" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {provinces.map((p) => (
+                    <SelectItem key={p.code} value={p.code}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">City / Municipality</label>
+              <Select
+                value={formData.addressCityCode}
+                onValueChange={(code) => {
+                  const city = cities.find((c) => c.code === code)
+                  setFormData({
+                    ...formData,
+                    addressCityCode: code,
+                    addressCity: city?.name ?? "",
+                    addressBarangay: "",
+                  })
+                }}
+                disabled={!formData.addressProvinceCode}
+              >
+                <SelectTrigger
+                  className={`w-full px-4 py-2.5 h-auto border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    missingFields.includes('addressCity') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
+                  } ${!formData.addressProvinceCode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <SelectValue placeholder="Select city / municipality" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {cities.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Barangay</label>
+              <Select
+                value={formData.addressBarangay}
+                onValueChange={(name) => {
+                  setFormData({ ...formData, addressBarangay: name })
+                }}
+                disabled={!formData.addressCityCode}
+              >
+                <SelectTrigger
+                  className={`w-full px-4 py-2.5 h-auto border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    missingFields.includes('addressBarangay') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)]'
+                  } ${!formData.addressCityCode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <SelectValue placeholder="Select barangay" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {barangays.map((b) => (
+                    <SelectItem key={b.code} value={b.name}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Zip Code</label>
+              <input
+                type="text"
+                value={formData.addressZip}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "")
+                  setFormData({ ...formData, addressZip: value })
+                }}
+                maxLength={4}
+                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] border-[var(--color-border)]`}
+                placeholder="e.g. 1234"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -711,6 +872,45 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Consent checkbox */}
+          <div className="pt-2">
+            <label className={`flex items-start gap-3 cursor-pointer select-none rounded-lg border p-3 transition-colors ${
+              missingFields.includes('acceptedTerms') ? 'border-red-500 bg-red-50' : 'border-[var(--color-border)] hover:bg-[var(--color-background)]'
+            }`}>
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => {
+                  setAcceptedTerms(e.target.checked)
+                  if (e.target.checked) {
+                    setMissingFields(prev => prev.filter(f => f !== 'acceptedTerms'))
+                  }
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] accent-[var(--color-primary)]"
+              />
+              <span className="text-sm text-[var(--color-text)] leading-snug">
+                I agree to the{" "}
+                <Link
+                  href="/terms-and-conditions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] underline font-medium"
+                >
+                  Terms &amp; Conditions
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] underline font-medium"
+                >
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
           </div>
 
           <div className="flex gap-3 pt-4">

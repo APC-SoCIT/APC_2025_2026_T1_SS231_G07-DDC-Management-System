@@ -432,14 +432,25 @@ export default function PatientAppointmentsPage() {
       if (!token || !patient) return
 
       // Fetch documents for this patient
+      const IMAGE_TYPES = ['xray', 'dental_image', 'scan']
       const docsResponse = await api.getDocuments(patient.id, token)
-      const appointmentDocs = docsResponse.filter((doc: Document) => doc.appointment === appointmentId)
+      const allAppointmentDocs = docsResponse.filter((doc: Document) => doc.appointment === appointmentId)
+      const appointmentDocs = allAppointmentDocs.filter((doc: Document) => !IMAGE_TYPES.includes(doc.document_type))
+      const imageDocs = allAppointmentDocs
+        .filter((doc: Document) => IMAGE_TYPES.includes(doc.document_type))
+        .map((doc: Document) => ({
+          id: doc.id,
+          image_url: (doc as any).file_url || doc.file,
+          uploaded_at: doc.uploaded_at,
+          notes: doc.description || doc.title || '',
+          appointment: doc.appointment,
+        }))
       setAppointmentDocuments(prev => ({ ...prev, [appointmentId]: appointmentDocs }))
 
-      // Fetch teeth images for this patient
+      // Fetch teeth images for this patient (legacy TeethImage model)
       const imagesResponse = await api.getPatientTeethImages(patient.id, token)
       const appointmentImgs = imagesResponse.filter((img: TeethImage) => img.appointment === appointmentId)
-      setAppointmentImages(prev => ({ ...prev, [appointmentId]: appointmentImgs }))
+      setAppointmentImages(prev => ({ ...prev, [appointmentId]: [...imageDocs, ...appointmentImgs] }))
     } catch (error) {
       console.error("Error loading appointment files:", error)
     } finally {
@@ -777,7 +788,7 @@ export default function PatientAppointmentsPage() {
                                                     className="w-12 h-12 object-cover rounded flex-shrink-0"
                                                   />
                                                   <div>
-                                                    <p className="text-sm font-medium">Dental Image</p>
+                                                    <p className="text-sm font-medium">{img.notes || 'Dental Image'}</p>
                                                     <p className="text-xs text-gray-500">
                                                       {new Date(img.uploaded_at).toLocaleDateString()}
                                                     </p>
@@ -1027,7 +1038,7 @@ export default function PatientAppointmentsPage() {
                                                     className="w-12 h-12 object-cover rounded flex-shrink-0"
                                                   />
                                                   <div>
-                                                    <p className="text-sm font-medium">Dental Image</p>
+                                                    <p className="text-sm font-medium">{img.notes || 'Dental Image'}</p>
                                                     <p className="text-xs text-gray-500">
                                                       {new Date(img.uploaded_at).toLocaleDateString()}
                                                     </p>

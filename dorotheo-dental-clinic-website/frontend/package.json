@@ -51,6 +51,7 @@
     "lucide-react": "^0.454.0",
     "next": "15.5.12",
     "next-themes": "^0.4.6",
+    "philippine-location-json-for-geer": "^1.1.11",
     "react": "^19.2.4",
     "react-day-picker": "9.8.0",
     "react-dom": "^19.2.4",
