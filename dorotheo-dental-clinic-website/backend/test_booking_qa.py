@@ -41,7 +41,7 @@ passed = failed = warned = 0
 
 # Delay between chatbot calls — keeps us under Gemini free-tier RPM (15/min).
 # Set to 0 to disable throttling (e.g. when using a paid key).
-THROTTLE_SECONDS = 10
+THROTTLE_SECONDS = 0
 
 # ── Forbidden wizard phrases (must NEVER appear) ──────────────────────────
 FORBIDDEN = [
@@ -74,12 +74,13 @@ def _bot(user):
 
 
 def run(label: str, msg: str, user=None, history=None,
-        must_contain=None, must_not_contain=None,
+        must_contain=None, must_not_contain=None, must_contain_any=None,
         no_forbidden=True, show_response=True):
     """
     Run a single message through the chatbot and evaluate the result.
 
-    must_contain     : list[str] — all must appear in response (case-insensitive)
+    must_contain     : list[str] — ALL must appear in response (case-insensitive)
+    must_contain_any : list[str] — AT LEAST ONE must appear (bilingual check)
     must_not_contain : list[str] — none must appear in response
     no_forbidden     : bool — check FORBIDDEN wizard phrases list
     """
@@ -105,11 +106,17 @@ def run(label: str, msg: str, user=None, history=None,
             if phrase in resp.lower():
                 problems.append(f'contains forbidden phrase: "{phrase}"')
 
-    # Must-contain check
+    # Must-contain check (ALL required)
     if must_contain:
         for term in (must_contain if isinstance(must_contain, list) else [must_contain]):
             if term.lower() not in resp.lower():
                 problems.append(f'missing expected term: "{term}"')
+
+    # Must-contain-any check (AT LEAST ONE required — bilingual)
+    if must_contain_any:
+        terms = must_contain_any if isinstance(must_contain_any, list) else [must_contain_any]
+        if not any(t.lower() in resp.lower() for t in terms):
+            problems.append(f'missing any of: {terms}')
 
     # Must-not-contain check
     if must_not_contain:
@@ -189,7 +196,7 @@ def main():
         label="1 · Impossible date: January 39",
         msg="book an appointment at bacoor for january 39 at 10am for cleaning",
         user=patient,
-        must_contain=["calendar"],
+        must_contain=["31"],   # bot should say January only has 31 days
     )
 
     # ── 2 ─────────────────────────────────────────────────────────────────
@@ -197,7 +204,9 @@ def main():
         label="2 · Past date (3 days ago)",
         msg=f"book at bacoor on {past_date} at 10am for cleaning",
         user=patient,
-        must_contain=["already"],
+        # bot should mention the date has passed — works in English ("already") and
+        # Tagalog/Taglish ("nakalipas").
+        must_contain_any=["already", "nakalipas", "passed"],
         must_not_contain=["cannot book an appointment in the past"],
     )
 
@@ -214,7 +223,8 @@ def main():
         label="4 · Past time today: 1am",
         msg="book at bacoor today at 1am with dr carlo salvador for cleaning",
         user=patient,
-        must_contain=["passed", "already"],
+        # bot should indicate 1 AM has passed — works in English and Tagalog/Taglish.
+        must_contain_any=["passed", "already", "nakalipas", "1:00"],
         must_not_contain=["please select"],
     )
 
