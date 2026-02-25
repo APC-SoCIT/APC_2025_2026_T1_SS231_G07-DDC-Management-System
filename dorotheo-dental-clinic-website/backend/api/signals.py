@@ -949,6 +949,99 @@ def availability_changed_on_delete(sender, instance, **kwargs):
         logger.error("Error clearing chatbot cache on availability delete: %s", e)
 
 
+# ==================== SERVICE CACHE INVALIDATION ====================
+
+def _clear_chatbot_cache(label: str):
+    """Shared helper — clears the chatbot semantic cache and logs the reason."""
+    try:
+        from api.services.cache_service import get_cache
+        get_cache().clear()
+        logger.info("Chatbot cache cleared: %s", label)
+    except Exception as e:
+        logger.error("Error clearing chatbot cache (%s): %s", label, e)
+
+
+@receiver(post_save, sender='api.Service')
+def service_changed_on_save(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a Service is created or updated so the
+    chatbot immediately reflects the new/changed service listing.
+    """
+    _clear_chatbot_cache(f"Service saved (id={instance.id}, name={instance.name!r})")
+
+
+@receiver(post_delete, sender='api.Service')
+def service_changed_on_delete(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a Service is deleted.
+    """
+    _clear_chatbot_cache(f"Service deleted (id={instance.id}, name={instance.name!r})")
+
+
+# ==================== CLINIC LOCATION CACHE INVALIDATION ====================
+
+@receiver(post_save, sender='api.ClinicLocation')
+def clinic_location_changed_on_save(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a ClinicLocation is created or updated (hours,
+    address, contact info, etc.) so the chatbot always returns fresh clinic data.
+    """
+    _clear_chatbot_cache(f"ClinicLocation saved (id={instance.id}, name={instance.name!r})")
+
+
+@receiver(post_delete, sender='api.ClinicLocation')
+def clinic_location_changed_on_delete(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a ClinicLocation is deleted.
+    """
+    _clear_chatbot_cache(f"ClinicLocation deleted (id={instance.id}, name={instance.name!r})")
+
+
+# ==================== RAG PAGE CHUNK CACHE INVALIDATION ====================
+
+@receiver(post_save, sender='api.PageChunk')
+def page_chunk_changed_on_save(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a PageChunk (RAG document) is created or updated
+    so the chatbot picks up new knowledge-base content immediately.
+    """
+    _clear_chatbot_cache(f"PageChunk saved (id={instance.id})")
+
+
+@receiver(post_delete, sender='api.PageChunk')
+def page_chunk_changed_on_delete(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a PageChunk is deleted.
+    """
+    _clear_chatbot_cache(f"PageChunk deleted (id={instance.id})")
+
+
+# ==================== DENTIST / STAFF USER CACHE INVALIDATION ====================
+
+@receiver(post_save, sender=User)
+def dentist_user_changed_on_save(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a staff/dentist User record is saved.
+    Patient-only changes are not relevant to chatbot answers, so we skip those
+    to avoid unnecessary cache thrashing.
+    """
+    if getattr(instance, 'user_type', None) in ('staff', 'owner'):
+        _clear_chatbot_cache(
+            f"Staff/dentist User saved (id={instance.id}, role={getattr(instance, 'role', 'n/a')!r})"
+        )
+
+
+@receiver(post_delete, sender=User)
+def dentist_user_changed_on_delete(sender, instance, **kwargs):
+    """
+    Clear chatbot cache when a staff/dentist User record is deleted.
+    """
+    if getattr(instance, 'user_type', None) in ('staff', 'owner'):
+        _clear_chatbot_cache(
+            f"Staff/dentist User deleted (id={instance.id}, role={getattr(instance, 'role', 'n/a')!r})"
+        )
+
+
 # ==================== SIGNAL REGISTRATION ====================
 
 def register_audit_signals():
