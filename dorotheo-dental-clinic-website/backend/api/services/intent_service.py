@@ -865,6 +865,8 @@ def detect_active_flow(history: list) -> Optional[str]:
             return 'cancel'
         if '[RESCHED_FLOW]' in content or '[RESCHED_CONFIRM]' in content:
             return 'reschedule'
+        if '[BOOKING_FLOW]' in content or '[BOOKING_CONFIRM]' in content:
+            return 'booking'
         # Legacy step-based tags (backward compatibility with old sessions)
         if '[CANCEL_STEP_' in content:
             return 'cancel'

@@ -238,7 +238,7 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
                 text = f"May ilang {day_name} na available — alin po ang ibig ninyong sabihin?\n\n{date_list}"
             else:
                 text = f"Just to clarify — there are a few {day_name}s coming up. Which one did you have in mind?\n\n{date_list}"
-            return build_reply(text, options)
+            return build_reply(text, options, tag="[BOOKING_FLOW]")
 
     # -- Validate ALL fields against DB --
     validation = _validate_booking(
@@ -745,7 +745,7 @@ def _generate_ai_booking_response(
     if text:
         text = _sanitize_booking_response(text)
         qr = _get_quick_replies(validation)
-        return build_reply(text, qr)
+        return build_reply(text, qr, tag="[BOOKING_FLOW]")
 
     # Fallback: simple text response (no LLM)
     return _build_fallback_response(validation, detected_lang)
@@ -943,9 +943,9 @@ def _build_fallback_response(
     if not parts:
         fallback = ("Paano ko po kayo matutulungan sa booking?"
                     if is_tl else "How can I help you with your booking?")
-        return build_reply(fallback)
+        return build_reply(fallback, tag="[BOOKING_FLOW]")
 
-    return build_reply("\n\n".join(parts), _get_quick_replies(validation))
+    return build_reply("\n\n".join(parts), _get_quick_replies(validation), tag="[BOOKING_FLOW]")
 
 
 def _build_acknowledgment(valid_fields: List[tuple], is_tl: bool) -> str:
@@ -1016,6 +1016,7 @@ def _show_confirmation(user, clinic, dentist, date_val, time_val, service,
         f"\U0001f9b7 **Service:** {service.name}\n\n"
         f"{lang.confirmation_yes_no(detected_lang)}",
         lang.confirmation_buttons(detected_lang),
+        tag="[BOOKING_CONFIRM]",
     )
 
 

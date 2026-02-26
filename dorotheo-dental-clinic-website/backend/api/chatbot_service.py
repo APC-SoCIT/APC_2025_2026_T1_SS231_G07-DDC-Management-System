@@ -426,9 +426,10 @@ class DentalChatbotService:
 
             # Cancel/reschedule flows no longer emit numbered step tags —
             # they use the conversational [CANCEL_FLOW]/[RESCHED_FLOW] tags.
-            # Booking also uses session state. Fall back to session state
-            # so that if the history hasn't been updated yet we still route
-            # correctly (e.g., very first reply in a fresh session).
+            # Booking uses [BOOKING_FLOW]/[BOOKING_CONFIRM] tags (added to all
+            # mid-flow responses). Fall back to session state so that if the
+            # history hasn't been updated yet we still route correctly
+            # (e.g., very first reply in a fresh session).
             if not active and self.is_authenticated:
                 _session = bmem.get_session(self.user.id)
                 if _session.state in (
@@ -440,6 +441,20 @@ class DentalChatbotService:
                     active = 'cancel'
                 elif _session.state == bmem.ConversationState.RESCHEDULE_PENDING:
                     active = 'reschedule'
+
+            # ── Restore booking session state from history when session is stale ──
+            # In production (multi-worker / multi-instance), the second request may
+            # hit a different process with an empty _session_store. If history
+            # shows an active booking flow but our session is IDLE, restore state
+            # so handle_booking routes correctly instead of falling through to LLM.
+            if active == 'booking' and self.is_authenticated:
+                _bsession = bmem.get_session(self.user.id)
+                if _bsession.state == bmem.ConversationState.IDLE:
+                    _bsession.state = bmem.ConversationState.BOOKING_COLLECTING
+                    logger.info(
+                        "Restored booking session state from conversation history (user=%s)",
+                        self.user.id,
+                    )
 
             # ── GLOBAL EXIT INTENT CHECK ─────────────────────────────
             # If user is in ANY active flow and signals they want to stop
