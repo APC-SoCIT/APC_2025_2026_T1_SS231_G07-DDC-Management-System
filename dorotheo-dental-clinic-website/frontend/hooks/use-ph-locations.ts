@@ -36,11 +36,51 @@ interface Barangay {
 /**
  * Formats a raw Philippine location name from ALL-CAPS to Title Case.
  * For example: "QUEZON CITY" → "Quezon City"
+ * Handles special cases: keeps "of", "and", "the" lowercase (except at start),
+ * and preserves acronyms like "NCR".
  */
 function toTitleCase(str: string): string {
+  // Words that should remain lowercase (unless at the start or after a comma)
+  const lowercaseWords = new Set(['of', 'the', 'and', 'in', 'on', 'at', 'to', 'for', 'de', 'del'])
+  
+  // Known acronyms that should remain uppercase
+  const acronyms = new Set(['ncr', 'ncrpp', 'armm', 'car', 'psgc'])
+  
   return str
     .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .split(/\s+/)
+    .map((word, index) => {
+      // Handle words with commas (e.g., "ncr,")
+      if (word.includes(',')) {
+        const parts = word.split(',')
+        return parts.map((part) => {
+          if (!part) return ''
+          if (acronyms.has(part)) {
+            return part.toUpperCase()
+          }
+          return part.charAt(0).toUpperCase() + part.slice(1)
+        }).join(',')
+      }
+      
+      // Keep acronyms uppercase
+      if (acronyms.has(word)) {
+        return word.toUpperCase()
+      }
+      
+      // First word should always be capitalized
+      if (index === 0) {
+        return word.charAt(0).toUpperCase() + word.slice(1)
+      }
+      
+      // Keep certain words lowercase
+      if (lowercaseWords.has(word)) {
+        return word
+      }
+      
+      // Capitalize other words
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
 }
 
 /**

@@ -76,14 +76,12 @@
             display: inline-block;
             padding: 12px 30px;
             background-color: #2d5a3f;
-            color: white;
+            color: #ffffff !important;
             text-decoration: none;
             border-radius: 5px;
             margin: 20px 0;
             font-weight: bold;
-        }
-        .button:hover {
-            background-color: #234a32;
+            font-size: 16px;
         }
         .button-container {
             text-align: center;
@@ -152,7 +150,7 @@
             
             {% if portal_url %}
             <div class="button-container">
-                <a href="{{ portal_url }}" class="button">View in Patient Portal</a>
+                <a href="{{ portal_url }}" class="button" style="display:inline-block;padding:14px 32px;background-color:#2d5a3f;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">View in Patient Portal</a>
             </div>
             {% endif %}
             

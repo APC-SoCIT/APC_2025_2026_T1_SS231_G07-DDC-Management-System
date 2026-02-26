@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Search, Edit2, CheckCircle, Copy, Archive, ArchiveRestore, AlertTriangle, X, UserX } from "lucide-react"
+import { Plus, Trash2, Search, Edit2, CheckCircle, Copy, Archive, ArchiveRestore, AlertTriangle, X, UserX, Eye, EyeOff } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -36,6 +36,10 @@ export default function OwnerStaff() {
   const [archivedStaff, setArchivedStaff] = useState<StaffMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [addStaffError, setAddStaffError] = useState("")
+  const [addStaffMissingFields, setAddStaffMissingFields] = useState<string[]>([])
+  const [addStaffInvalidFields, setAddStaffInvalidFields] = useState<string[]>([])
+  const [showAddPassword, setShowAddPassword] = useState(false)
+  const [showAddConfirmPassword, setShowAddConfirmPassword] = useState(false)
   const [editStaffError, setEditStaffError] = useState("")
   const [editStaffSuccess, setEditStaffSuccess] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
@@ -90,9 +94,90 @@ export default function OwnerStaff() {
     
     if (!token) return
 
-    // Check if passwords match
-    if (newStaff.password !== newStaff.confirmPassword) {
-      setAddStaffError("Passwords do not match")
+    // Reset validation state
+    setAddStaffError("")
+    setAddStaffMissingFields([])
+    setAddStaffInvalidFields([])
+
+    const missing: string[] = []
+    const invalid: string[] = []
+    const errors: string[] = []
+
+    // Required field checks
+    if (!newStaff.firstName.trim()) missing.push('firstName')
+    if (!newStaff.lastName.trim()) missing.push('lastName')
+    if (!newStaff.email.trim()) missing.push('email')
+    if (!newStaff.username.trim()) missing.push('username')
+    if (!newStaff.password) missing.push('password')
+    if (!newStaff.confirmPassword) missing.push('confirmPassword')
+    if (!newStaff.birthdate) missing.push('birthdate')
+    if (!newStaff.phone.trim()) missing.push('phone')
+    if (!newStaff.address.trim()) missing.push('address')
+    if (!newStaff.role) missing.push('role')
+
+    // Format validations
+    const nameRegex = /^[A-Za-z\s\-']+$/
+    const emailRegex = /^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+    const phoneRegex = /^09[0-9]{9}$/
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/
+
+    if (newStaff.firstName.trim() && !nameRegex.test(newStaff.firstName.trim())) {
+      if (!invalid.includes('firstName')) invalid.push('firstName')
+      errors.push('First name should only contain letters')
+    }
+    if (newStaff.lastName.trim() && !nameRegex.test(newStaff.lastName.trim())) {
+      if (!invalid.includes('lastName')) invalid.push('lastName')
+      errors.push('Last name should only contain letters')
+    }
+    if (newStaff.email.trim() && !emailRegex.test(newStaff.email.trim())) {
+      if (!invalid.includes('email')) invalid.push('email')
+      errors.push('Invalid email address format (e.g., example@email.com)')
+    }
+    if (newStaff.username.trim() && !usernameRegex.test(newStaff.username.trim())) {
+      if (!invalid.includes('username')) invalid.push('username')
+      errors.push('Username may only contain letters, numbers, dots, underscores, or hyphens')
+    }
+    if (newStaff.phone.trim() && !phoneRegex.test(newStaff.phone.trim())) {
+      if (!invalid.includes('phone')) invalid.push('phone')
+      errors.push('Contact number must be exactly 11 digits and start with 09')
+    }
+    if (newStaff.password && newStaff.password.length < 8) {
+      if (!invalid.includes('password')) invalid.push('password')
+      errors.push('Password must be at least 8 characters')
+    }
+    if (newStaff.password && newStaff.confirmPassword && newStaff.password !== newStaff.confirmPassword) {
+      if (!invalid.includes('confirmPassword')) invalid.push('confirmPassword')
+      errors.push('Passwords do not match')
+    }
+    if (newStaff.birthdate) {
+      const today = new Date()
+      const bday = new Date(newStaff.birthdate)
+      const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
+      const hundredYearsAgo = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate())
+      if (bday > today) {
+        if (!invalid.includes('birthdate')) invalid.push('birthdate')
+        errors.push('Birthdate cannot be in the future')
+      } else if (bday > eighteenYearsAgo) {
+        if (!invalid.includes('birthdate')) invalid.push('birthdate')
+        errors.push('Staff member must be at least 18 years old')
+      } else if (bday <= hundredYearsAgo) {
+        if (!invalid.includes('birthdate')) invalid.push('birthdate')
+        errors.push('Birthdate seems too far in the past')
+      }
+    }
+
+    if (missing.length > 0 || invalid.length > 0) {
+      setAddStaffMissingFields(missing)
+      setAddStaffInvalidFields(invalid)
+      if (missing.length > 0 && invalid.length > 0) {
+        setAddStaffError('Please fill in all required fields and fix invalid entries')
+      } else if (missing.length > 0) {
+        setAddStaffError('Please fill in all required fields')
+      } else if (errors.length === 1) {
+        setAddStaffError(errors[0])
+      } else {
+        setAddStaffError('Please fix the following: ' + errors.join(', '))
+      }
       return
     }
 
@@ -118,6 +203,10 @@ export default function OwnerStaff() {
       await fetchStaff()
       setShowAddModal(false)
       setAddStaffError("")
+      setAddStaffMissingFields([])
+      setAddStaffInvalidFields([])
+      setShowAddPassword(false)
+      setShowAddConfirmPassword(false)
       
       // Show success modal with login credentials
       setSuccessCredentials({ username: loginUsername, password: newStaff.password })
@@ -136,28 +225,50 @@ export default function OwnerStaff() {
         role: "",
       })
     } catch (error: any) {
-      const data = error.response?.data
+      // Parse API errors and highlight relevant fields
+      const data = error.data || error.response?.data
       if (data) {
+        const newInvalid: string[] = []
         if (data.birthday) {
           const msg = Array.isArray(data.birthday) ? data.birthday[0] : data.birthday
+          newInvalid.push('birthdate')
+          setAddStaffInvalidFields(newInvalid)
           setAddStaffError(typeof msg === 'string' ? msg : "Staff must be 18 years old and above.")
         } else if (data.username) {
           const msg = Array.isArray(data.username) ? data.username[0] : data.username
-          setAddStaffError(`Username: ${typeof msg === 'string' ? msg : 'already taken or invalid'}`)
+          newInvalid.push('username')
+          setAddStaffInvalidFields(newInvalid)
+          setAddStaffError(typeof msg === 'string' ? msg : 'Username already taken or invalid')
         } else if (data.email) {
           const msg = Array.isArray(data.email) ? data.email[0] : data.email
-          setAddStaffError(`Email: ${typeof msg === 'string' ? msg : 'invalid'}`)
+          const emailMsg = Array.isArray(data.email) ? data.email : [data.email]
+          if (emailMsg.some((m: string) => m.toLowerCase().includes('already') || m.toLowerCase().includes('exists'))) {
+            newInvalid.push('email')
+            setAddStaffInvalidFields(newInvalid)
+            setAddStaffError('Email already registered. Please use a different email.')
+          } else {
+            newInvalid.push('email')
+            setAddStaffInvalidFields(newInvalid)
+            setAddStaffError(typeof msg === 'string' ? msg : 'Invalid email')
+          }
         } else if (data.password) {
           const msg = Array.isArray(data.password) ? data.password[0] : data.password
-          setAddStaffError(`Password: ${typeof msg === 'string' ? msg : 'invalid'}`)
+          newInvalid.push('password')
+          setAddStaffInvalidFields(newInvalid)
+          setAddStaffError(typeof msg === 'string' ? msg : 'Invalid password')
+        } else if (data.phone) {
+          const msg = Array.isArray(data.phone) ? data.phone[0] : data.phone
+          newInvalid.push('phone')
+          setAddStaffInvalidFields(newInvalid)
+          setAddStaffError(typeof msg === 'string' ? msg : 'Invalid contact number')
         } else if (data.non_field_errors) {
           const msg = Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : data.non_field_errors
           setAddStaffError(typeof msg === 'string' ? msg : "Failed to add staff member.")
         } else {
           const messages: string[] = []
-          for (const [, errors] of Object.entries(data)) {
-            if (Array.isArray(errors)) messages.push(...(errors as string[]).map(String))
-            else if (typeof errors === 'string') messages.push(errors)
+          for (const [, errs] of Object.entries(data)) {
+            if (Array.isArray(errs)) messages.push(...(errs as string[]).map(String))
+            else if (typeof errs === 'string') messages.push(errs)
           }
           setAddStaffError(messages.join(' ') || "Failed to add staff member. Please try again.")
         }
@@ -512,14 +623,25 @@ export default function OwnerStaff() {
             <div className="border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between sticky top-0 bg-white">
               <h2 className="text-2xl font-display font-bold text-[var(--color-primary)]">Add Staff Member</h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false)
+                  setAddStaffError("")
+                  setAddStaffMissingFields([])
+                  setAddStaffInvalidFields([])
+                  setShowAddPassword(false)
+                  setShowAddConfirmPassword(false)
+                }}
                 className="p-2 rounded-lg hover:bg-[var(--color-background)] transition-colors"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleAddStaff} className="p-6 space-y-4">
+            <form onSubmit={handleAddStaff} noValidate className="p-6 space-y-4">
+              {addStaffError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{addStaffError}</div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
@@ -527,10 +649,17 @@ export default function OwnerStaff() {
                   </label>
                   <input
                     type="text"
-                    required
                     value={newStaff.firstName}
-                    onChange={(e) => setNewStaff({ ...newStaff, firstName: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    onChange={(e) => {
+                      setNewStaff({ ...newStaff, firstName: e.target.value })
+                      setAddStaffMissingFields(prev => prev.filter(f => f !== 'firstName'))
+                      setAddStaffInvalidFields(prev => prev.filter(f => f !== 'firstName'))
+                    }}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      addStaffMissingFields.includes('firstName') || addStaffInvalidFields.includes('firstName')
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-[var(--color-border)]'
+                    }`}
                   />
                 </div>
 
@@ -540,10 +669,17 @@ export default function OwnerStaff() {
                   </label>
                   <input
                     type="text"
-                    required
                     value={newStaff.lastName}
-                    onChange={(e) => setNewStaff({ ...newStaff, lastName: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    onChange={(e) => {
+                      setNewStaff({ ...newStaff, lastName: e.target.value })
+                      setAddStaffMissingFields(prev => prev.filter(f => f !== 'lastName'))
+                      setAddStaffInvalidFields(prev => prev.filter(f => f !== 'lastName'))
+                    }}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      addStaffMissingFields.includes('lastName') || addStaffInvalidFields.includes('lastName')
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-[var(--color-border)]'
+                    }`}
                   />
                 </div>
               </div>
@@ -554,11 +690,18 @@ export default function OwnerStaff() {
                 </label>
                 <input
                   type="email"
-                  required
                   value={newStaff.email}
-                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, email: e.target.value })
+                    setAddStaffMissingFields(prev => prev.filter(f => f !== 'email'))
+                    setAddStaffInvalidFields(prev => prev.filter(f => f !== 'email'))
+                  }}
                   placeholder="john.doe@example.com"
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    addStaffMissingFields.includes('email') || addStaffInvalidFields.includes('email')
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-[var(--color-border)]'
+                  }`}
                 />
               </div>
 
@@ -566,14 +709,25 @@ export default function OwnerStaff() {
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Username <span className="text-red-500">*</span>
                 </label>
-                <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 rounded-lg ${
+                  addStaffMissingFields.includes('username') || addStaffInvalidFields.includes('username')
+                    ? 'ring-1 ring-red-500'
+                    : ''
+                }`}>
                   <input
                     type="text"
-                    required
                     value={newStaff.username}
-                    onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
+                    onChange={(e) => {
+                      setNewStaff({ ...newStaff, username: e.target.value })
+                      setAddStaffMissingFields(prev => prev.filter(f => f !== 'username'))
+                      setAddStaffInvalidFields(prev => prev.filter(f => f !== 'username'))
+                    }}
                     placeholder="john.doe"
-                    className="flex-1 px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    className={`flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      addStaffMissingFields.includes('username') || addStaffInvalidFields.includes('username')
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-[var(--color-border)]'
+                    }`}
                   />
                   <span className="text-[var(--color-text-muted)] font-medium">@dorotheo.com</span>
                 </div>
@@ -586,39 +740,62 @@ export default function OwnerStaff() {
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Password <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newStaff.password}
-                  onChange={(e) => {
-                    setNewStaff({ ...newStaff, password: e.target.value })
-                    setAddStaffError("") // Clear error when user changes password
-                  }}
-                  placeholder="8 characters minimum"
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
+                <div className="relative">
+                  <input
+                    type={showAddPassword ? "text" : "password"}
+                    minLength={8}
+                    value={newStaff.password}
+                    onChange={(e) => {
+                      setNewStaff({ ...newStaff, password: e.target.value })
+                      setAddStaffMissingFields(prev => prev.filter(f => f !== 'password'))
+                      setAddStaffInvalidFields(prev => prev.filter(f => f !== 'password'))
+                    }}
+                    placeholder="8 characters minimum"
+                    className={`w-full px-4 py-2.5 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      addStaffMissingFields.includes('password') || addStaffInvalidFields.includes('password')
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-[var(--color-border)]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPassword(!showAddPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  >
+                    {showAddPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
                   Confirm Password <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newStaff.confirmPassword}
-                  onChange={(e) => {
-                    setNewStaff({ ...newStaff, confirmPassword: e.target.value })
-                    setAddStaffError("") // Clear error when user changes confirm password
-                  }}
-                  placeholder="Re-enter password"
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
-                {addStaffError && addStaffError.includes("match") && (
-                  <p className="text-red-500 text-sm mt-1 font-medium">{addStaffError}</p>
-                )}
+                <div className="relative">
+                  <input
+                    type={showAddConfirmPassword ? "text" : "password"}
+                    minLength={8}
+                    value={newStaff.confirmPassword}
+                    onChange={(e) => {
+                      setNewStaff({ ...newStaff, confirmPassword: e.target.value })
+                      setAddStaffMissingFields(prev => prev.filter(f => f !== 'confirmPassword'))
+                      setAddStaffInvalidFields(prev => prev.filter(f => f !== 'confirmPassword'))
+                    }}
+                    placeholder="Re-enter password"
+                    className={`w-full px-4 py-2.5 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      addStaffMissingFields.includes('confirmPassword') || addStaffInvalidFields.includes('confirmPassword')
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-[var(--color-border)]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddConfirmPassword(!showAddConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  >
+                    {showAddConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -627,17 +804,18 @@ export default function OwnerStaff() {
                 </label>
                 <input
                   type="date"
-                  required
                   value={newStaff.birthdate}
                   onChange={(e) => {
                     setNewStaff({ ...newStaff, birthdate: e.target.value })
-                    setAddStaffError("") // Clear error when user changes birthdate
+                    setAddStaffMissingFields(prev => prev.filter(f => f !== 'birthdate'))
+                    setAddStaffInvalidFields(prev => prev.filter(f => f !== 'birthdate'))
                   }}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    addStaffMissingFields.includes('birthdate') || addStaffInvalidFields.includes('birthdate')
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-[var(--color-border)]'
+                  }`}
                 />
-                {addStaffError && (addStaffError.toLowerCase().includes('18') || addStaffError.toLowerCase().includes('birth') || addStaffError.toLowerCase().includes('age') || addStaffError.toLowerCase().includes('old')) && (
-                  <p className="text-red-500 text-sm mt-1 font-medium">{addStaffError}</p>
-                )}
               </div>
 
               <div>
@@ -646,10 +824,20 @@ export default function OwnerStaff() {
                 </label>
                 <input
                   type="tel"
-                  required
+                  maxLength={11}
                   value={newStaff.phone}
-                  onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, "")
+                    setNewStaff({ ...newStaff, phone: value })
+                    setAddStaffMissingFields(prev => prev.filter(f => f !== 'phone'))
+                    setAddStaffInvalidFields(prev => prev.filter(f => f !== 'phone'))
+                  }}
+                  placeholder="09XXXXXXXXX"
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    addStaffMissingFields.includes('phone') || addStaffInvalidFields.includes('phone')
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-[var(--color-border)]'
+                  }`}
                 />
               </div>
 
@@ -658,11 +846,17 @@ export default function OwnerStaff() {
                   Address <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  required
                   rows={3}
                   value={newStaff.address}
-                  onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, address: e.target.value })
+                    setAddStaffMissingFields(prev => prev.filter(f => f !== 'address'))
+                  }}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    addStaffMissingFields.includes('address')
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-[var(--color-border)]'
+                  }`}
                 />
               </div>
 
@@ -671,10 +865,16 @@ export default function OwnerStaff() {
                   Role <span className="text-red-500">*</span>
                 </label>
                 <select
-                  required
                   value={newStaff.role}
-                  onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, role: e.target.value })
+                    setAddStaffMissingFields(prev => prev.filter(f => f !== 'role'))
+                  }}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                    addStaffMissingFields.includes('role')
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-[var(--color-border)]'
+                  }`}
                 >
                   <option value="">Select a role...</option>
                   <option value="receptionist">Receptionist</option>
@@ -682,14 +882,17 @@ export default function OwnerStaff() {
                 </select>
               </div>
 
-              {addStaffError && !addStaffError.includes('match') && !(addStaffError.toLowerCase().includes('18') || addStaffError.toLowerCase().includes('birth') || addStaffError.toLowerCase().includes('age') || addStaffError.toLowerCase().includes('old')) && (
-                <p className="text-red-500 text-sm font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-3">{addStaffError}</p>
-              )}
-
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false)
+                    setAddStaffError("")
+                    setAddStaffMissingFields([])
+                    setAddStaffInvalidFields([])
+                    setShowAddPassword(false)
+                    setShowAddConfirmPassword(false)
+                  }}
                   className="flex-1 px-6 py-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors font-medium"
                 >
                   Cancel

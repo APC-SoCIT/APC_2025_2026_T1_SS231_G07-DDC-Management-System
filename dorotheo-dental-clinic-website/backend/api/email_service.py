@@ -130,19 +130,13 @@ class EmailService:
             .button {{
                 display: inline-block;
                 padding: 14px 32px;
-                background: linear-gradient(135deg, #0f4c3a 0%, #1a7a5e 100%);
+                background-color: #0f4c3a;
                 color: #ffffff !important;
                 text-decoration: none;
                 border-radius: 8px;
                 font-weight: 600;
                 text-align: center;
                 margin: 20px 0;
-                box-shadow: 0 4px 6px rgba(15, 76, 58, 0.2);
-                transition: all 0.3s ease;
-            }}
-            .button:hover {{
-                box-shadow: 0 6px 8px rgba(15, 76, 58, 0.3);
-                transform: translateY(-2px);
             }}
             .note {{
                 background-color: #fff9e6;
@@ -220,9 +214,9 @@ class EmailService:
                         <strong>Phone:</strong> (02) 1234-5678
                     </div>
                     <div class="footer-links">
-                        <a href="#">Book Appointment</a> | 
-                        <a href="#">Our Services</a> | 
-                        <a href="#">Contact Us</a>
+                        <a href="{frontend_url}/patient/appointments">Book Appointment</a> | 
+                        <a href="{frontend_url}/patient/services">Our Services</a> | 
+                        <a href="{frontend_url}">Contact Us</a>
                     </div>
                     <div style="margin-top: 20px; font-size: 12px; color: #adb5bd;">
                         &copy; {year} Dorotheo Dental Clinic. All rights reserved.
@@ -234,6 +228,21 @@ class EmailService:
     </html>
     """
     
+    @staticmethod
+    def _get_frontend_url():
+        """Get the production frontend URL, never returning localhost."""
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
+        if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
+            frontend_url = 'https://dorotheodentalclinic.com'
+        return frontend_url.rstrip('/')
+
+    @staticmethod
+    def _render_template(**kwargs):
+        """Render EMAIL_TEMPLATE_BASE with automatic frontend_url injection."""
+        if 'frontend_url' not in kwargs:
+            kwargs['frontend_url'] = EmailService._get_frontend_url()
+        return EmailService.EMAIL_TEMPLATE_BASE.format(**kwargs)
+
     @staticmethod
     def _send_email(subject, recipient_list, html_content, text_content=None, send_to_admin=True):
         """
@@ -359,7 +368,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Appointment Confirmed",
             content=content,
             accent_color="#28a745",
@@ -440,7 +449,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Appointment Reminder",
             content=content,
             accent_color="#ffc107",
@@ -512,7 +521,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Appointment Cancelled",
             content=content,
             accent_color="#dc3545",
@@ -586,7 +595,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Reschedule Approved",
             content=content,
             accent_color="#28a745",
@@ -663,7 +672,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Reschedule Request Update",
             content=content,
             accent_color="#ffc107",
@@ -754,7 +763,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title=f"Invoice #{billing.id}",
             content=content,
             accent_color="#0f4c3a",
@@ -833,7 +842,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Payment Received",
             content=content,
             accent_color="#28a745",
@@ -918,7 +927,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Payment Reminder",
             content=content,
             accent_color="#ffc107",
@@ -999,7 +1008,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Low Stock Alert",
             content=content,
             accent_color="#dc3545",
@@ -1098,7 +1107,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="New Appointment Request",
             content=content,
             accent_color="#0f4c3a",
@@ -1274,7 +1283,7 @@ class EmailService:
                 </p>
             """
             
-            html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+            html_content = EmailService._render_template(
                 title="Payment Receipt",
                 content=content,
                 accent_color="#28a745",
@@ -1362,7 +1371,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Password Reset Request",
             content=content,
             accent_color="#0f4c3a",
@@ -1441,7 +1450,7 @@ class EmailService:
             </p>
         """
         
-        html_content = EmailService.EMAIL_TEMPLATE_BASE.format(
+        html_content = EmailService._render_template(
             title="Password Changed Successfully",
             content=content,
             accent_color="#28a745",
@@ -1488,11 +1497,8 @@ class EmailService:
             payment_instructions = getattr(invoice.clinic, 'payment_instructions', 'Please pay via bank transfer or at the clinic reception.')
             bank_account = getattr(invoice.clinic, 'bank_account', 'Please contact the clinic for bank account details.')
             
-            # Get frontend URL - use production URL or fallback
-            frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'https://dorotheodentalclinic.com'
-            # Don't use localhost in emails - use production URL
-            if 'localhost' in frontend_url or '127.0.0.1' in frontend_url:
-                frontend_url = 'https://dorotheodentalclinic.com'
+            # Get frontend URL - use centralized helper
+            frontend_url = EmailService._get_frontend_url()
             
             context = {
                 'patient_name': invoice.patient.first_name,
@@ -1600,7 +1606,7 @@ class EmailService:
                 'invoice_items': invoice_items,
                 'clinic_name': invoice.clinic.name,
                 'clinic_address': invoice.clinic.address,
-                'staff_portal_url': f"{settings.FRONTEND_URL}/staff/billing" if hasattr(settings, 'FRONTEND_URL') else None,
+                'staff_portal_url': f"{EmailService._get_frontend_url()}/staff/billing",
             }
             
             # Render email HTML

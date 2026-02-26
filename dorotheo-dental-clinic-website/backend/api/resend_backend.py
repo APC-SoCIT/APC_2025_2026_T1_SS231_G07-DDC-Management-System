@@ -94,6 +94,37 @@ class ResendEmailBackend(BaseEmailBackend):
                 # Plain text only
                 email_data["text"] = message.body
 
+            # Handle file attachments (e.g. PDF invoices)
+            if hasattr(message, 'attachments') and message.attachments:
+                resend_attachments = []
+                for attachment in message.attachments:
+                    if isinstance(attachment, tuple) and len(attachment) >= 2:
+                        # Django EmailMessage stores attachments as (filename, content, mimetype)
+                        att_filename = attachment[0] or 'attachment'
+                        att_content = attachment[1]
+                        att_mimetype = attachment[2] if len(attachment) > 2 else 'application/octet-stream'
+
+                        # Resend expects content as list of byte values
+                        if isinstance(att_content, bytes):
+                            content_list = list(att_content)
+                        elif isinstance(att_content, str):
+                            content_list = list(att_content.encode('utf-8'))
+                        else:
+                            content_list = list(att_content)
+
+                        resend_attachment = {
+                            "filename": att_filename,
+                            "content": content_list,
+                        }
+                        if att_mimetype:
+                            resend_attachment["content_type"] = att_mimetype
+
+                        resend_attachments.append(resend_attachment)
+                        logger.info(f"Attaching file to Resend email: {att_filename} ({att_mimetype})")
+
+                if resend_attachments:
+                    email_data["attachments"] = resend_attachments
+
             # Send email via Resend API
             response = resend.Emails.send(email_data)
 

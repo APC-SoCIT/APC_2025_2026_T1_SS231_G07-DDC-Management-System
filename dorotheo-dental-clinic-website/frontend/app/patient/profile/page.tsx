@@ -1,9 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Edit2, Download, CheckCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
+import { usePhLocations } from "@/hooks/use-ph-locations"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function PatientProfile() {
   const { user, token, setUser } = useAuth()
@@ -17,7 +25,13 @@ export default function PatientProfile() {
     phone: "",
     birthday: "",
     age: 0,
-    address: "",
+    addressStreet: "",
+    addressProvince: "",
+    addressProvinceCode: "",
+    addressCity: "",
+    addressCityCode: "",
+    addressBarangay: "",
+    addressZip: "",
   })
   const [originalProfile, setOriginalProfile] = useState({
     firstName: "",
@@ -26,12 +40,47 @@ export default function PatientProfile() {
     phone: "",
     birthday: "",
     age: 0,
-    address: "",
+    addressStreet: "",
+    addressProvince: "",
+    addressProvinceCode: "",
+    addressCity: "",
+    addressCityCode: "",
+    addressBarangay: "",
+    addressZip: "",
   })
+
+  const { provinces, getCities, getBarangays } = usePhLocations()
+  const cities = useMemo(
+    () => getCities(profile.addressProvinceCode),
+    [profile.addressProvinceCode, getCities]
+  )
+  const barangays = useMemo(
+    () => getBarangays(profile.addressCityCode),
+    [profile.addressCityCode, getBarangays]
+  )
 
   // Load real user data from auth context
   useEffect(() => {
     if (user) {
+      const savedProvince = (user as any).address_province || ""
+      const savedCity = (user as any).address_city || ""
+
+      // Resolve province code from name
+      const matchedProvince = provinces.find(
+        (p) => p.name.toLowerCase() === savedProvince.toLowerCase()
+      )
+      const provinceCode = matchedProvince?.code ?? ""
+
+      // Resolve city code from name (needs province code first)
+      let cityCode = ""
+      if (provinceCode) {
+        const cityList = getCities(provinceCode)
+        const matchedCity = cityList.find(
+          (c) => c.name.toLowerCase() === savedCity.toLowerCase()
+        )
+        cityCode = matchedCity?.code ?? ""
+      }
+
       const profileData = {
         firstName: user.first_name || "",
         lastName: user.last_name || "",
@@ -39,12 +88,18 @@ export default function PatientProfile() {
         phone: (user as any).phone || "",
         birthday: (user as any).birthday || "",
         age: (user as any).age || 0,
-        address: (user as any).address || "",
+        addressStreet: (user as any).address_street || "",
+        addressProvince: savedProvince,
+        addressProvinceCode: provinceCode,
+        addressCity: savedCity,
+        addressCityCode: cityCode,
+        addressBarangay: (user as any).address_barangay || "",
+        addressZip: (user as any).address_zip || "",
       }
       setProfile(profileData)
       setOriginalProfile(profileData)
     }
-  }, [user])
+  }, [user, provinces, getCities])
 
   const documents: any[] = [
     // No sample documents - will be populated from real data
@@ -57,11 +112,15 @@ export default function PatientProfile() {
     }
 
     // Check if there are any changes
-    const hasChanges = 
+    const hasChanges =
       profile.email !== originalProfile.email ||
       profile.phone !== originalProfile.phone ||
       profile.birthday !== originalProfile.birthday ||
-      profile.address !== originalProfile.address
+      profile.addressStreet !== originalProfile.addressStreet ||
+      profile.addressProvince !== originalProfile.addressProvince ||
+      profile.addressCity !== originalProfile.addressCity ||
+      profile.addressBarangay !== originalProfile.addressBarangay ||
+      profile.addressZip !== originalProfile.addressZip
 
     if (!hasChanges) {
       setIsEditing(false)
@@ -76,16 +135,20 @@ export default function PatientProfile() {
         email: profile.email,
         phone: profile.phone,
         birthday: profile.birthday,
-        address: profile.address,
+        address_street: profile.addressStreet,
+        address_province: profile.addressProvince,
+        address_city: profile.addressCity,
+        address_barangay: profile.addressBarangay,
+        address_zip: profile.addressZip,
       }
 
       const updatedUser = await api.updateProfile(token, updateData)
-      
+
       // Update the user in auth context
       if (setUser) {
         setUser(updatedUser)
       }
-      
+
       // Update original profile to reflect saved changes
       setOriginalProfile(profile)
       setIsEditing(false)
@@ -195,12 +258,141 @@ export default function PatientProfile() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Address</label>
-              <textarea
-                value={profile.address}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Street Address</label>
+              <input
+                type="text"
+                value={profile.addressStreet}
+                onChange={(e) => setProfile({ ...profile, addressStreet: e.target.value })}
                 disabled={!isEditing}
-                rows={3}
+                placeholder="House/Unit No., Street, Subdivision"
+                className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Province</label>
+              {isEditing ? (
+                <Select
+                  value={profile.addressProvinceCode}
+                  onValueChange={(code) => {
+                    const prov = provinces.find((p) => p.code === code)
+                    setProfile({
+                      ...profile,
+                      addressProvinceCode: code,
+                      addressProvince: prov?.name ?? "",
+                      addressCityCode: "",
+                      addressCity: "",
+                      addressBarangay: "",
+                    })
+                  }}
+                >
+                  <SelectTrigger className="w-full px-4 py-2.5 h-auto border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                    <SelectValue placeholder="Select province" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {provinces.map((p) => (
+                      <SelectItem key={p.code} value={p.code}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <input
+                  type="text"
+                  value={profile.addressProvince}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-2">City / Municipality</label>
+              {isEditing ? (
+                <Select
+                  value={profile.addressCityCode}
+                  onValueChange={(code) => {
+                    const city = cities.find((c) => c.code === code)
+                    setProfile({
+                      ...profile,
+                      addressCityCode: code,
+                      addressCity: city?.name ?? "",
+                      addressBarangay: "",
+                    })
+                  }}
+                  disabled={!profile.addressProvinceCode}
+                >
+                  <SelectTrigger
+                    className={`w-full px-4 py-2.5 h-auto border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      !profile.addressProvinceCode ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    <SelectValue placeholder="Select city / municipality" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {cities.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <input
+                  type="text"
+                  value={profile.addressCity}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Barangay</label>
+              {isEditing ? (
+                <Select
+                  value={profile.addressBarangay}
+                  onValueChange={(name) => setProfile({ ...profile, addressBarangay: name })}
+                  disabled={!profile.addressCityCode}
+                >
+                  <SelectTrigger
+                    className={`w-full px-4 py-2.5 h-auto border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      !profile.addressCityCode ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    <SelectValue placeholder="Select barangay" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {barangays.map((b) => (
+                      <SelectItem key={b.code} value={b.name}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <input
+                  type="text"
+                  value={profile.addressBarangay}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg bg-gray-50"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text)] mb-2">Zip Code</label>
+              <input
+                type="text"
+                value={profile.addressZip}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "")
+                  setProfile({ ...profile, addressZip: value })
+                }}
+                disabled={!isEditing}
+                maxLength={4}
+                placeholder="e.g. 1234"
                 className="w-full px-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-50"
               />
             </div>
@@ -209,7 +401,7 @@ export default function PatientProfile() {
           {isEditing && (
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setIsEditing(false)}
+                onClick={() => { setProfile(originalProfile); setIsEditing(false) }}
                 disabled={isSaving}
                 className="px-6 py-2.5 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-background)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
