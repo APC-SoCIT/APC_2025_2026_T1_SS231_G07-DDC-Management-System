@@ -94,7 +94,8 @@ FORMATTING:
 - Use **bold** for key data (names, dates, times).
 - When listing options (clinics, dentists, dates, times), use markdown bullets (-).
 - Do NOT use section headers (### ) or wizard-style titles.
-- Maximum 6 items in any list.
+- For time slots, list ALL available slots — NEVER truncate or say "more available". Show the complete list.
+- For other lists (clinics, dentists, dates) keep to a reasonable length.
 - Do NOT repeat information the patient already provided.
 
 SERVICES (IMPORTANT):
@@ -569,6 +570,17 @@ def _check_time_field(clinic, clinic_ok, dentist, dentist_ok,
     """Validate time. Returns structured FieldValidation."""
     if not (clinic_ok and dentist_ok and date_ok):
         if time_val:
+            # Eagerly catch past times for today even before clinic/dentist are
+            # confirmed — this prevents the AI from echoing a stale time as if
+            # it were valid and asking the patient to confirm it.
+            if date_val is not None:
+                now_local = tz.localtime(tz.now())
+                if date_val == now_local.date() and time_val <= now_local.time():
+                    return FieldValidation(
+                        "invalid", value=time_val,
+                        display_name=bsvc.fmt_time(time_val),
+                        error=f"{bsvc.fmt_time(time_val)} has already passed for today. Please choose a later time.",
+                    )
             return FieldValidation("missing", value=time_val,
                                    display_name=bsvc.fmt_time(time_val))
         return FieldValidation("missing")
@@ -799,7 +811,11 @@ def _build_ai_context(validation: BookingValidation) -> str:
         # the value and we shouldn't suggest alternatives to something they
         # already specified.
         if field.options and not (field.status == "missing" and field.display_name):
-            lines.append(f"  {name}: {', '.join(field.options[:8])}")
+            # For time slots, pass every option so the AI can show the full list.
+            # For other fields (clinics, dentists, dates) a reasonable cap is fine.
+            cap = None if name == "Time slots" else 8
+            opts = field.options if cap is None else field.options[:cap]
+            lines.append(f"  {name}: {', '.join(opts)}")
             if field.recommendation:
                 lines.append(f"    Tip: {field.recommendation}")
 
@@ -815,9 +831,14 @@ def _get_quick_replies(validation: BookingValidation) -> List[str]:
             # upstream validation) and don't need quick-reply options shown.
             if field.status == "missing" and field.value is not None:
                 continue
-            # Return clean option names (strip availability annotations)
+            # Return clean option names (strip availability annotations).
+            # For time slots show all of them; for other fields cap at 6 to
+            # keep the quick-reply bar usable.
+            is_time_field = (field is validation.time)
+            cap = None if is_time_field else 6
+            raw = field.options if cap is None else field.options[:cap]
             clean = []
-            for opt in field.options[:6]:
+            for opt in raw:
                 # Remove things like " (2 dentists available)" annotations
                 cleaned = re.sub(r"\s*\(.*?\)\s*$", "", opt).strip()
                 if cleaned:
@@ -923,7 +944,10 @@ def _build_fallback_response(
                 intro = (_option_intro_tl if is_tl else _option_intro_en).get(_name, "")
                 if intro:
                     parts.append(intro)
-                parts.append("\n".join(f"- **{o}**" for o in field.options[:6]))
+                # Show all time slots; cap other lists at 8
+                cap = None if _name == "time" else 8
+                opts = field.options if cap is None else field.options[:cap]
+                parts.append("\n".join(f"- **{o}**" for o in opts))
             if field.recommendation:
                 parts.append(f"_{field.recommendation}_")
 
@@ -936,7 +960,10 @@ def _build_fallback_response(
             if intro and not error_fields:
                 # Only add intro if we didn't already show a list above
                 parts.append(intro)
-            parts.append("\n".join(f"- **{o}**" for o in first_missing_field.options[:6]))
+            # Show all time slots; cap other lists at 8
+            cap = None if first_missing_name == "time" else 8
+            opts = first_missing_field.options if cap is None else first_missing_field.options[:cap]
+            parts.append("\n".join(f"- **{o}**" for o in opts))
         if first_missing_field.recommendation:
             parts.append(f"_{first_missing_field.recommendation}_")
 
