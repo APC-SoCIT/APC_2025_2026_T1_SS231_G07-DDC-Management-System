@@ -163,8 +163,11 @@ export default function ChatbotWidget() {
     setInputMessage("")
     setIsTyping(true)
 
-    // Update conversation history
-    const newHistory = [...conversationHistory, { role: "user", content: messageText }]
+    // Update conversation history — keep only the most recent messages to
+    // prevent stale context from old sessions accumulating and confusing the
+    // booking flow detection on the backend.
+    const MAX_HISTORY = 20
+    const newHistory = [...conversationHistory, { role: "user", content: messageText }].slice(-MAX_HISTORY)
     setConversationHistory(newHistory)
 
     try {
@@ -184,7 +187,7 @@ export default function ChatbotWidget() {
       setMessages((prev) => [...prev, botMessage])
       
       // Update conversation history with bot response
-      setConversationHistory([...newHistory, { role: "assistant", content: response.response }])
+      setConversationHistory([...newHistory, { role: "assistant", content: response.response }].slice(-MAX_HISTORY))
       
     } catch (error: any) {
       console.error("Chatbot error:", error)

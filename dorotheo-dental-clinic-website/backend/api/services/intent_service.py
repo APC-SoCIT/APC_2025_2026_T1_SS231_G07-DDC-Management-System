@@ -853,6 +853,23 @@ def detect_active_flow(history: list) -> Optional[str]:
     Returns:
         'booking', 'reschedule', 'cancel', or None.
     """
+    # Quick-path: if the VERY LAST assistant message has a flow tag,
+    # the flow is clearly still active — skip the termination check
+    # entirely. This handles the common case where accumulated old
+    # history contains [FLOW_COMPLETE] from a previous session but
+    # the most recent response is from a new, active flow.
+    last_msgs = _last_assistant(history, 2)
+    for last_content in last_msgs:
+        for tag, flow in (
+            ('[CANCEL_FLOW]', 'cancel'), ('[CANCEL_CONFIRM]', 'cancel'),
+            ('[RESCHED_FLOW]', 'reschedule'), ('[RESCHED_CONFIRM]', 'reschedule'),
+            ('[BOOKING_FLOW]', 'booking'), ('[BOOKING_CONFIRM]', 'booking'),
+            ('[CANCEL_STEP_', 'cancel'), ('[RESCHED_STEP_', 'reschedule'),
+            ('[BOOK_STEP_', 'booking'),
+        ):
+            if tag in last_content:
+                return flow
+
     if _flow_is_terminated(history):
         return None
 
@@ -921,6 +938,13 @@ def _flow_is_terminated(history: list) -> bool:
     pushing the [FLOW_COMPLETE] tag out of the last-message position.
     """
     termination_tags = ('[FLOW_COMPLETE]', '[PENDING_BLOCK]', '[APPROVAL_WELCOME]')
+    # New-style + legacy flow step tags that indicate a NEW flow was started
+    _new_flow_tags = (
+        '[BOOKING_FLOW]', '[BOOKING_CONFIRM]',
+        '[CANCEL_FLOW]', '[CANCEL_CONFIRM]',
+        '[RESCHED_FLOW]', '[RESCHED_CONFIRM]',
+        '[BOOK_STEP_', '[RESCHED_STEP_', '[CANCEL_STEP_',
+    )
     recent_msgs = _last_assistant(history, 6)
     if not recent_msgs:
         return False
@@ -931,7 +955,7 @@ def _flow_is_terminated(history: list) -> bool:
             for newer_msg in recent_msgs:
                 if newer_msg == msg_content:
                     break  # reached the termination tag — no newer flow
-                if any(t in newer_msg for t in ('[BOOK_STEP_', '[RESCHED_STEP_', '[CANCEL_STEP_')):
+                if any(t in newer_msg for t in _new_flow_tags):
                     return False  # a new flow was started after termination
             return True
     return False
