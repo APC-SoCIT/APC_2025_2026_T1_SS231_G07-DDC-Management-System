@@ -28,16 +28,17 @@
             letter-spacing: 1px;
         }
         
-        .header {
-            display: table;
+        .layout-table {
             width: 100%;
+            border-collapse: collapse;
             margin-bottom: 30px;
         }
         
-        .customer-info, .company-info {
-            display: table-cell;
-            width: 50%;
+        .layout-table td {
+            border: none;
+            padding: 0;
             vertical-align: top;
+            width: 50%;
         }
         
         .company-info {
@@ -50,18 +51,18 @@
         }
         
         .info-section {
-            display: table;
             width: 100%;
+            border-collapse: collapse;
             margin-bottom: 20px;
-            padding: 15px 0;
             border-top: 2px solid #2d5a3f;
             border-bottom: 2px solid #2d5a3f;
         }
         
-        .info-left, .info-right {
-            display: table-cell;
-            width: 50%;
+        .info-section td {
+            border: none;
+            padding: 15px 0;
             vertical-align: top;
+            width: 50%;
         }
         
         .info-right {
@@ -87,7 +88,8 @@
             padding: 10px;
         }
         
-        tr:nth-child(even) {
+        /* Alternating row colors - compatible with both engines */
+        tr.even-row {
             background-color: #f9f9f9;
         }
         
@@ -145,15 +147,16 @@
             margin-bottom: 20px;
         }
         
-        .remittance-content {
-            display: table;
+        .remittance-table {
             width: 100%;
+            border-collapse: collapse;
         }
         
-        .remittance-left, .remittance-right {
-            display: table-cell;
-            width: 50%;
+        .remittance-table td {
+            border: none;
+            padding: 0;
             vertical-align: top;
+            width: 50%;
         }
         
         .remittance-right {
@@ -177,32 +180,36 @@
 <body>
     <div class="title">Statement of Account</div>
     
-    <div class="header">
-        <div class="customer-info">
-            <strong>To:</strong><br>
-            {{ patient_name }}<br>
-            {{ patient_address }}<br>
-            {{ patient_city }}<br>
-            {{ patient_area_code }}
-        </div>
-        <div class="company-info">
-            <strong>{{ clinic_name }}</strong><br>
-            {{ clinic_address }}<br>
-            {{ clinic_city }}<br>
-            {{ clinic_area_code }}
-        </div>
-    </div>
+    <table class="layout-table">
+        <tr>
+            <td class="customer-info">
+                <strong>To:</strong><br>
+                {{ patient_name }}<br>
+                {{ patient_address }}<br>
+                {{ patient_city }}<br>
+                {{ patient_area_code }}
+            </td>
+            <td class="company-info">
+                <strong>{{ clinic_name }}</strong><br>
+                {{ clinic_address }}<br>
+                {{ clinic_city }}<br>
+                {{ clinic_area_code }}
+            </td>
+        </tr>
+    </table>
     
-    <div class="info-section">
-        <div class="info-left">
-            <strong>Date:</strong> {{ invoice_date }}<br>
-            <strong>Due Date:</strong> {{ due_date }}
-        </div>
-        <div class="info-right">
-            <strong>Reference:</strong> {{ reference_number }}<br>
-            <strong>Opening Balance:</strong> ₱0.00
-        </div>
-    </div>
+    <table class="info-section">
+        <tr>
+            <td class="info-left">
+                <strong>Date:</strong> {{ invoice_date }}<br>
+                <strong>Due Date:</strong> {{ due_date }}
+            </td>
+            <td class="info-right">
+                <strong>Reference:</strong> {{ reference_number }}<br>
+                <strong>Opening Balance:</strong> &#8369;0.00
+            </td>
+        </tr>
+    </table>
     
     <table>
         <thead>
@@ -219,7 +226,7 @@
                 <td>{{ appointment_date }}</td>
                 <td>{{ invoice_number }}</td>
                 <td>{{ service_name }}</td>
-                <td style="text-align: right;">₱{{ service_charge }}</td>
+                <td style="text-align: right;">&#8369;{{ service_charge }}</td>
                 <td></td>
             </tr>
             {% for item in invoice_items %}
@@ -227,7 +234,7 @@
                 <td>{{ appointment_date }}</td>
                 <td>ITEM-{{ forloop.counter }}</td>
                 <td>{{ item.item_name }} (x{{ item.quantity }})</td>
-                <td style="text-align: right;">₱{{ item.total_price }}</td>
+                <td style="text-align: right;">&#8369;{{ item.total_price }}</td>
                 <td></td>
             </tr>
             {% endfor %}
@@ -235,11 +242,11 @@
     </table>
     
     <div class="totals">
-        <div><strong>Subtotal:</strong> ₱{{ subtotal }}</div>
+        <div><strong>Subtotal:</strong> &#8369;{{ subtotal }}</div>
         {% if interest_amount and interest_amount != '0.00' %}
-        <div><strong>Interest:</strong> ₱{{ interest_amount }}</div>
+        <div><strong>Interest:</strong> &#8369;{{ interest_amount }}</div>
         {% endif %}
-        <div class="total-due"><strong>Total Due:</strong> ₱{{ total_due }}</div>
+        <div class="total-due"><strong>Total Due:</strong> &#8369;{{ total_due }}</div>
     </div>
     
     <div class="payment-info">
@@ -252,26 +259,28 @@
     
     <div class="remittance">
         <h3>Remittance</h3>
-        <div class="remittance-content">
-            <div class="remittance-left">
-                <p><strong>My Customer:</strong> {{ patient_name }}</p>
-                <br>
-                <p>
-                    {{ clinic_name }}<br>
-                    {{ clinic_address }}<br>
-                    {{ clinic_city }}<br>
-                    {{ clinic_area_code }}
-                </p>
-            </div>
-            <div class="remittance-right">
-                <p><strong>Invoice No:</strong> {{ invoice_number }}</p>
-                <p><strong>Amount Paid:</strong> <span class="payment-line"></span></p>
-                <br>
-                <p><strong>Total Paid:</strong> <span class="payment-line"></span></p>
-                <br>
-                <p><strong>Reference:</strong> {{ reference_number }}</p>
-            </div>
-        </div>
+        <table class="remittance-table">
+            <tr>
+                <td>
+                    <p><strong>My Customer:</strong> {{ patient_name }}</p>
+                    <br>
+                    <p>
+                        {{ clinic_name }}<br>
+                        {{ clinic_address }}<br>
+                        {{ clinic_city }}<br>
+                        {{ clinic_area_code }}
+                    </p>
+                </td>
+                <td class="remittance-right">
+                    <p><strong>Invoice No:</strong> {{ invoice_number }}</p>
+                    <p><strong>Amount Paid:</strong> <span class="payment-line"></span></p>
+                    <br>
+                    <p><strong>Total Paid:</strong> <span class="payment-line"></span></p>
+                    <br>
+                    <p><strong>Reference:</strong> {{ reference_number }}</p>
+                </td>
+            </tr>
+        </table>
     </div>
 </body>
 </html>

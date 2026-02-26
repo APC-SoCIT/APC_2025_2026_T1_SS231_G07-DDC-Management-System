@@ -138,15 +138,23 @@ RAG_SIMILARITY_THRESHOLD = 0.45
 RAG_MAX_CONTEXT_TOKENS = 1500
 CHARS_PER_TOKEN = 4
 
-# Safe fallback — directs to clinic contact, never returns fake data
+# Safe fallback — guides user to be more specific, then directs to clinic contact
 SAFE_FALLBACK_EN = (
-    "I'm sorry, I don't have specific information about that right now. "
-    "Please contact our clinic directly or visit us in person for assistance."
+    "I wasn't able to find specific information for that. "
+    "Could you try being a bit more specific? For example, you can ask about:\n\n"
+    "- Dentist availability at a specific branch\n"
+    "- Our dental services\n"
+    "- Clinic hours and locations\n\n"
+    "Or you can contact our clinic directly for assistance."
 )
 
 SAFE_FALLBACK_TL = (
-    "Pasensya na po, wala akong tiyak na impormasyon tungkol dyan sa ngayon. "
-    "Mangyaring makipag-ugnayan sa aming klinika o bisitahin kami para sa tulong."
+    "Pasensya na po, hindi ko nahanap ang tiyak na impormasyon para dyan. "
+    "Maaari po bang mas i-specify ninyo ang tanong? Halimbawa:\n\n"
+    "- Availability ng dentista sa specific na branch\n"
+    "- Mga dental services namin\n"
+    "- Oras at lokasyon ng clinic\n\n"
+    "O kaya po ay makipag-ugnayan sa aming klinika para sa tulong."
 )
 
 CONTACT_CLINIC_FALLBACK_EN = "Please contact our clinic directly or visit us in person for assistance."

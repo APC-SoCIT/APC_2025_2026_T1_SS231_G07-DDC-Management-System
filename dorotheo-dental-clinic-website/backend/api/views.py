@@ -3339,7 +3339,7 @@ class InvoiceViewSet(AuditContextMixin, viewsets.ModelViewSet):
         GET /api/invoices/{id}/download-pdf/
         """
         from django.http import HttpResponse
-        from .invoice_generator import generate_invoice_pdf, WEASYPRINT_AVAILABLE
+        from .invoice_generator import generate_invoice_pdf, PDF_AVAILABLE
         
         try:
             invoice = self.get_object()
@@ -3351,8 +3351,8 @@ class InvoiceViewSet(AuditContextMixin, viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # Check if WeasyPrint is available
-            if not WEASYPRINT_AVAILABLE:
+            # Check if any PDF engine is available
+            if not PDF_AVAILABLE:
                 return Response(
                     {'error': 'PDF generation is not available on this server'},
                     status=status.HTTP_503_SERVICE_UNAVAILABLE

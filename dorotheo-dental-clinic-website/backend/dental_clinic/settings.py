@@ -272,6 +272,11 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+CORS_EXPOSE_HEADERS = [
+    'content-disposition',
+    'content-type',
+    'content-length',
+]
 CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight requests for 24 hours
 
 # Allow media files to be embedded in iframes

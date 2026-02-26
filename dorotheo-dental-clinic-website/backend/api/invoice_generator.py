@@ -1,27 +1,60 @@
 """
 Invoice PDF Generation Module
 Handles the creation of PDF invoices from HTML templates.
+Supports WeasyPrint (preferred) with xhtml2pdf as fallback.
 """
 from django.template.loader import render_to_string
 from django.conf import settings
 import os
 import logging
 from datetime import datetime
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
-# Try to import WeasyPrint, but don't fail if it's not available (e.g., on Windows without GTK)
+# Try to import WeasyPrint first (preferred, but requires GTK)
+WEASYPRINT_AVAILABLE = False
 try:
-    from weasyprint import HTML
+    from weasyprint import HTML as WeasyHTML
     WEASYPRINT_AVAILABLE = True
+    logger.info("WeasyPrint is available for PDF generation")
 except Exception as e:
-    WEASYPRINT_AVAILABLE = False
-    print(f"WeasyPrint not available: {str(e)}. PDF generation will be disabled.")
+    logger.warning(f"WeasyPrint not available: {str(e)}. Will try xhtml2pdf fallback.")
+
+# Try xhtml2pdf as fallback (pure Python, no native deps)
+XHTML2PDF_AVAILABLE = False
+try:
+    from xhtml2pdf import pisa
+    XHTML2PDF_AVAILABLE = True
+    logger.info("xhtml2pdf is available as PDF fallback")
+except Exception as e:
+    logger.warning(f"xhtml2pdf not available: {str(e)}.")
+
+# At least one PDF engine must be available
+PDF_AVAILABLE = WEASYPRINT_AVAILABLE or XHTML2PDF_AVAILABLE
+if not PDF_AVAILABLE:
+    print("WARNING: No PDF generation library available. Neither WeasyPrint nor xhtml2pdf could be imported.")
+
+
+def _generate_pdf_weasyprint(html_string):
+    """Generate PDF using WeasyPrint."""
+    html_document = WeasyHTML(string=html_string)
+    return html_document.write_pdf()
+
+
+def _generate_pdf_xhtml2pdf(html_string):
+    """Generate PDF using xhtml2pdf (fallback)."""
+    result_buffer = BytesIO()
+    pisa_status = pisa.CreatePDF(html_string, dest=result_buffer)
+    if pisa_status.err:
+        raise RuntimeError(f"xhtml2pdf encountered {pisa_status.err} errors during PDF generation")
+    return result_buffer.getvalue()
 
 
 def generate_invoice_pdf(invoice):
     """
     Generate a PDF invoice from the invoice object.
+    Uses WeasyPrint if available, falls back to xhtml2pdf.
     
     Args:
         invoice: Invoice model instance
@@ -30,12 +63,12 @@ def generate_invoice_pdf(invoice):
         tuple: (pdf_content, filename) where pdf_content is bytes and filename is str
         
     Raises:
-        RuntimeError: If WeasyPrint is not available
+        RuntimeError: If no PDF generation library is available
     """
-    if not WEASYPRINT_AVAILABLE:
+    if not PDF_AVAILABLE:
         raise RuntimeError(
-            "PDF generation is not available. WeasyPrint requires GTK libraries which are not installed. "
-            "On Windows, you need to install GTK for Windows. See: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#windows"
+            "PDF generation is not available. Neither WeasyPrint nor xhtml2pdf could be imported. "
+            "Install xhtml2pdf (pip install xhtml2pdf) for a pure-Python fallback."
         )
     
     # Prepare items data for the template
@@ -102,17 +135,31 @@ def generate_invoice_pdf(invoice):
     # Render HTML template
     html_string = render_to_string('invoice_template.html', context)
     
-    # Generate PDF from HTML string
+    # Generate PDF from HTML string using available engine
+    pdf_file = None
     try:
-        # Create HTML object from string
-        html_document = HTML(string=html_string)
-        # Generate PDF bytes
-        pdf_file = html_document.write_pdf()
+        if WEASYPRINT_AVAILABLE:
+            logger.info("Generating PDF with WeasyPrint")
+            pdf_file = _generate_pdf_weasyprint(html_string)
+        elif XHTML2PDF_AVAILABLE:
+            logger.info("Generating PDF with xhtml2pdf (fallback)")
+            pdf_file = _generate_pdf_xhtml2pdf(html_string)
     except Exception as e:
-        logger.error(f"WeasyPrint PDF generation failed: {type(e).__name__}: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        raise
+        # If WeasyPrint fails at runtime, try xhtml2pdf fallback
+        if WEASYPRINT_AVAILABLE and XHTML2PDF_AVAILABLE:
+            logger.warning(f"WeasyPrint failed ({type(e).__name__}: {str(e)}), falling back to xhtml2pdf")
+            try:
+                pdf_file = _generate_pdf_xhtml2pdf(html_string)
+            except Exception as e2:
+                logger.error(f"Both PDF engines failed. xhtml2pdf error: {type(e2).__name__}: {str(e2)}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                raise
+        else:
+            logger.error(f"PDF generation failed: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            raise
     
     # Create filename
     filename = f"Invoice_{invoice.invoice_number.replace('/', '_')}.pdf"

@@ -20,6 +20,7 @@ no inline entity parsing, no flow logic.
 """
 
 import logging
+import re
 from datetime import timedelta
 
 from django.utils import timezone
@@ -136,6 +137,181 @@ def _handle_greeting(msg: str, detected_lang: str) -> dict:
     )
 
 
+# ── Vague Query Detection ──────────────────────────────────────────────────
+
+def _detect_vague_query(msg: str, detected_lang: str) -> dict | None:
+    """
+    Detect vague/ambiguous questions about availability, dates, services, or
+    dentists that lack enough specifics for a useful answer.
+
+    Instead of letting the LLM fall back to "I don't have that information",
+    we proactively ask clarifying questions with quick-reply buttons so the
+    user can narrow their request.
+
+    Returns a build_reply dict if the query is vague, or None if it's
+    specific enough to proceed to the LLM.
+    """
+    low = msg.lower().strip()
+    is_tl = detected_lang in ('tl', 'tl-mix', 'tl_en')
+
+    # --- Specificity signals: if the user already provided details, skip ---
+    # Clinic names
+    from api.models import ClinicLocation
+    has_clinic = False
+    try:
+        for cl in ClinicLocation.objects.all():
+            if cl.name.lower() in low:
+                has_clinic = True
+                break
+    except Exception:
+        pass
+
+    # Dentist names
+    has_dentist_name = False
+    try:
+        from .services.booking_service import get_dentists_qs
+        for d in get_dentists_qs():
+            fn = (d.first_name or '').lower()
+            ln = (d.last_name or '').lower()
+            if (fn and fn in low) or (ln and ln in low):
+                has_dentist_name = True
+                break
+    except Exception:
+        pass
+
+    # Date specifics
+    has_date = bool(re.search(
+        r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday'
+        r'|lunes|martes|miyerkules|huwebes|biyernes|sabado|linggo'
+        r'|today|tomorrow|bukas|ngayon'
+        r'|january|february|march|april|may|june|july|august|september|october|november|december'
+        r'|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec'
+        r'|next week|next month|this week|this month'
+        r'|\d{1,2}/\d{1,2}|\d{1,2}-\d{1,2})\b',
+        low
+    ))
+
+    # Service specifics
+    has_service = bool(re.search(
+        r'\b(cleaning|extraction|whitening|braces|implant|veneer|crown|filling'
+        r'|retainer|denture|root canal|checkup|consultation|oral surgery'
+        r'|bunot|linis|pustiso|pasta|orthodontic|periodontal|x-?ray)\b',
+        low
+    ))
+
+    # --- Vague availability patterns ---
+    vague_availability_patterns = [
+        # "what dates are available", "what are the dates available"
+        r'(what|which|ano|anong).{0,15}(date|dates|araw).{0,15}(available|open|pwede|free)',
+        # "what are the available dates"
+        r'(what|which|ano|anong).{0,15}available.{0,15}(date|dates|araw|time|slot)',
+        # "which dentist and dates are available"
+        r'(which|what|sino|ano).{0,20}(dentist|doctor).{0,20}(available|date|time)',
+        # "when are dentists available" (no specific dentist)
+        r'when.{0,15}(dentist|doctor|they).{0,10}available',
+        # "who is available" (no date/clinic specified)
+        r'(who|sino).{0,10}(is|are|ang)?.{0,10}available',
+        # "what time is available" / "available time"
+        r'(what|anong).{0,10}(time|oras).{0,15}(available|open|free)',
+        # bare "available dates" / "available slots"
+        r'^available\s+(date|dates|slot|slots|time|times|oras|araw)',
+        # "dates available" / "slots available"
+        r'^(date|dates|slot|slots|time|times|oras|araw)\s+available',
+    ]
+
+    is_vague_availability = any(
+        re.search(p, low) for p in vague_availability_patterns
+    )
+
+    # Only trigger if the query is GENUINELY vague — i.e. missing at least
+    # 2 out of 3 key details (clinic, date, dentist)
+    specificity_count = sum([has_clinic, has_date, has_dentist_name])
+
+    if is_vague_availability and specificity_count < 1:
+        # Fetch clinic names for quick replies
+        try:
+            clinic_names = list(
+                ClinicLocation.objects.values_list('name', flat=True).order_by('name')
+            )
+        except Exception:
+            clinic_names = []
+
+        if is_tl:
+            reply_text = (
+                "Para mas makatulong ako sa inyo, maaari po ba ninyong sabihin ang ilan sa mga sumusunod:\n\n"
+                "- **Aling clinic branch** ang gusto ninyong puntahan?\n"
+                "- **Anong araw o petsa** ang hinahanap ninyo?\n"
+                "- **May specific na dentist** po ba kayong gusto?\n\n"
+                "Halimbawa: \"Available ba si Dr. Marvin sa Bacoor bukas?\" "
+                "o \"Anong available slots sa February?\""
+            )
+        else:
+            reply_text = (
+                "I'd love to help you find available dates! Could you give me a bit more detail? "
+                "For example:\n\n"
+                "- **Which clinic branch** are you interested in?\n"
+                "- **What date or time frame** are you looking at?\n"
+                "- **Do you have a preferred dentist?**\n\n"
+                "For example: \"Who's available at the Bacoor branch tomorrow?\" "
+                "or \"What slots are open in February?\""
+            )
+
+        quick = clinic_names[:3] + ['Our Dentists', 'Book Appointment']
+        return build_reply(reply_text, quick)
+
+    # --- Vague service query patterns ---
+    vague_service_patterns = [
+        # "what services do you have" — already handled well by existing code
+        # "what can you do" / "what do you offer" — very generic
+        r'^what (can you|do you) (do|offer)\??$',
+        # "tell me about your services" with nothing else
+        r'^tell me about.{0,10}(your|the|mga)?.{0,10}service',
+    ]
+
+    is_vague_service = any(re.search(p, low) for p in vague_service_patterns)
+    if is_vague_service and not has_service:
+        # This is okay — let it fall through to the normal Q&A which already
+        # handles service listing well. Only intercept if truly useless.
+        pass
+
+    # --- Vague dentist patterns (no specifics at all) ---
+    vague_dentist_patterns = [
+        # "which dentist is available" with nothing else
+        r'^(which|what|sino|ano).{0,10}(dentist|doctor|dentista).{0,10}(is|are|ang)?.{0,10}(available|free|open)\??$',
+    ]
+    is_vague_dentist = any(re.search(p, low) for p in vague_dentist_patterns)
+
+    if is_vague_dentist and not has_clinic and not has_date:
+        try:
+            clinic_names = list(
+                ClinicLocation.objects.values_list('name', flat=True).order_by('name')
+            )
+        except Exception:
+            clinic_names = []
+
+        if is_tl:
+            reply_text = (
+                "Marami po kaming dentista! Para maipakita ko ang availability nila, "
+                "maaari po bang sabihin ninyo:\n\n"
+                "- **Aling branch** ang gusto ninyo?\n"
+                "- **Anong araw o linggo** ang hinahanap ninyo?\n\n"
+                "Halimbawa: \"Sino available sa Bacoor this week?\""
+            )
+        else:
+            reply_text = (
+                "We have several dentists across our clinics! To show you their availability, "
+                "could you let me know:\n\n"
+                "- **Which branch** are you interested in?\n"
+                "- **What date or week** are you looking at?\n\n"
+                "For example: \"Who's available at Bacoor this week?\""
+            )
+
+        quick = clinic_names[:3] + ['Our Dentists']
+        return build_reply(reply_text, quick)
+
+    return None
+
+
 def _sanitize(text: str) -> str:
     """Sanitize LLM output to prevent credential/system info leakage."""
     leak_patterns = [
@@ -170,8 +346,13 @@ ARCHITECTURE — LLM-FIRST STRATEGY:
 - If database context is provided below, use it as the source of truth for
   availability, appointments, services, and clinic details.
 - If you are confident in your answer, respond directly.
-- If information is truly missing and you cannot answer, say:
-  "I don't have that information right now. Let me check that for you."
+- If the user's question is vague or lacks specifics (e.g., asking about availability
+  without mentioning a clinic, date, or dentist), ASK a clarifying follow-up question
+  to help narrow down what they need. Suggest specific options like clinic branches,
+  date ranges, or dentist names.
+- ONLY say "I don't have that information" if the user has been specific and the
+  data is genuinely missing. NEVER give up on a vague question — always try to
+  guide the user toward a more specific query.
 
 DATE & TIME QUESTIONS:
 - You ARE allowed to answer date and time questions relevant to scheduling
@@ -189,7 +370,11 @@ LANGUAGE MATCHING (CRITICAL - MOST IMPORTANT RULE):
 RESPONSE STYLE (MANDATORY):
 - Write like a human, not a template. Vary your phrasing every time.
 - Natural, friendly, like a real receptionist. No robotic step-by-step scripts.
-- Ask clarifying questions when needed.
+- PROACTIVELY ASK CLARIFYING QUESTIONS when the user's query is vague or ambiguous.
+  For example, if they ask "what dates are available?" without specifying a clinic or
+  dentist, ask which branch or dentist they're interested in. If they ask about services
+  without specifics, ask what type of treatment they need. NEVER just say "I don't have
+  that information" when you could ask a follow-up question instead.
 - NEVER use rigid section headers like "### 📍 Clinic Locations" or "### 👨‍⚕️ Our Dentists".
 - Do NOT use emojis in section headers. Minimal emoji use overall (0-1 per response max).
 - Present information naturally woven into sentences and short paragraphs.
@@ -235,8 +420,11 @@ AVAILABILITY SOURCE OF TRUTH:
 NO HALLUCINATION RULE:
 - NEVER invent dentist names, appointment slots, services, clinic policies,
   insurance coverage, prices, or availability.
-- If information is missing and you cannot answer, say:
-  "I don't have that information yet. Let me check that for you."
+- If the user's question is vague, ASK FOR MORE DETAILS instead of saying
+  you don't have the information. For example, ask which clinic branch,
+  which date, or which dentist they're interested in.
+- ONLY say "I don't have that information" as a LAST RESORT when the user
+  has already been specific and the data is genuinely not available.
 - For clinic-specific facts (policies, dentist backgrounds, service details),
   rely ONLY on provided context — do not guess.
 
@@ -574,6 +762,12 @@ class DentalChatbotService:
 
             # ── General Q&A (or question asked mid-flow) ──
             if intent_result.intent == isvc.INTENT_CLINIC_INFO:
+                # Check if the question is too vague — ask for clarification
+                vague = _detect_vague_query(user_message, detected_lang)
+                if vague:
+                    logger.info("Vague query detected — asking for clarification (user=%s)",
+                                self.user.id if self.user else 'anon')
+                    return vague
                 return self._handle_qa(user_message, hist, skip_rag)
 
             # ── Dental health / symptom advice (uses LLM knowledge, no RAG needed) ──
@@ -581,6 +775,12 @@ class DentalChatbotService:
                 return self._handle_dental_advice(user_message, hist)
 
             # ── Fallback: general Q&A ──
+            # Also check for vague queries in fallback
+            vague = _detect_vague_query(user_message, detected_lang)
+            if vague:
+                logger.info("Vague query detected (fallback) — asking for clarification (user=%s)",
+                            self.user.id if self.user else 'anon')
+                return vague
             return self._handle_qa(user_message, hist, skip_rag)
 
         except Exception as e:
@@ -836,8 +1036,13 @@ class DentalChatbotService:
                 "CONFIDENCE RULE: If you can confidently answer using the information "
                 "provided (database context, system knowledge, or general dental knowledge), "
                 "respond directly and naturally. "
-                "If the question requires clinic-specific data you don't have, say: "
-                "\"I don't have that information right now. Let me check that for you.\" "
+                "If the user's question is vague or ambiguous (e.g. they ask about availability "
+                "but don't specify a clinic, date, or dentist), ASK A CLARIFYING QUESTION to "
+                "help narrow it down. For example: 'Which clinic branch are you interested in?' "
+                "or 'Do you have a preferred date or dentist in mind?' "
+                "NEVER just say 'I don't have that information' if you can ask for more context. "
+                "Only say 'I don't have that information right now' if the data is truly missing "
+                "even after the user has been specific. "
                 "NEVER fabricate dentist names, time slots, services, or availability.\n\n"
             )
 

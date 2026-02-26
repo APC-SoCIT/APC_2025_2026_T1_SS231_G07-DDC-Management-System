@@ -454,7 +454,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
               <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Birthday</label>
               <div
                 className={`grid gap-2 rounded-lg ${missingFields.includes('birthday') || invalidFields.includes('birthday') ? 'p-2 border-2 border-red-500 bg-red-50' : ''}`}
-                style={{ gridTemplateColumns: '2.2fr 1.3fr 1.6fr' }}
+                style={{ gridTemplateColumns: '2.8fr 1fr 1.5fr' }}
               >
                 <select
                   required
@@ -545,7 +545,7 @@ export default function RegisterModal({ isOpen, onClose }: RegisterModalProps) {
                       }
                     }
                   }}
-                  className="w-full px-3 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full min-w-0 px-2 py-2.5 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
                   <option value="">Month</option>
                   {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, index) => (
