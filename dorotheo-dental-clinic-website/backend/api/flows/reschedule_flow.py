@@ -173,6 +173,57 @@ def handle_reschedule(user, msg: str, hist: list, detected_lang: str) -> dict:
     new_date = _find_new_date(msg, hist, appt, today)
     new_time = _find_new_time(msg, hist) if new_date else None
 
+    # ── Bare weekday resolution ────────────────────────────────────────
+    # If the user typed a bare day name (e.g. "wednesday") the generic
+    # parse_date picks the *next* occurrence of that weekday. But the
+    # dentist may not have availability on that specific date. Resolve
+    # against the available-date list so we pick a date the dentist
+    # actually works on, or disambiguate when there are multiple.
+    if new_date is not None:
+        weekday_num = bsvc.parse_weekday_name(msg)
+        if weekday_num is not None:
+            avail_dates = _get_available_dates(appt, today)
+            matching = [d for d in avail_dates if d.weekday() == weekday_num]
+            if len(matching) == 1:
+                new_date = matching[0]
+            elif len(matching) > 1:
+                # Multiple matching weekdays — ask for disambiguation
+                day_name = msg.strip().capitalize()
+                date_list = '\n'.join(
+                    f"- **{bsvc.fmt_date(d)}**" for d in matching
+                )
+                qr = [d.strftime('%B %d') for d in matching]
+                if is_tl:
+                    text = (
+                        f"May ilang {day_name} na available "
+                        f"— alin po ang gusto ninyo?\n\n{date_list}"
+                    )
+                else:
+                    text = (
+                        f"There are a few {day_name}s available "
+                        f"— which one did you have in mind?\n\n{date_list}"
+                    )
+                return build_reply(text, qr, tag=_TAG_FLOW)
+            elif not matching:
+                # The weekday has no available dates at all — tell the user
+                day_name = msg.strip().capitalize()
+                if is_tl:
+                    override = (
+                        f"Walang available na {day_name} para kay "
+                        f"Dr. {appt.dentist.get_full_name()}. "
+                        "Pakipili po ng ibang petsa."
+                    )
+                else:
+                    override = (
+                        f"There are no available {day_name}s for "
+                        f"Dr. {appt.dentist.get_full_name()}. "
+                        "Please pick a different date."
+                    )
+                return _ask_new_date(
+                    appt, today, is_tl, detected_lang,
+                    override_msg=override,
+                )
+
     # -------------------------------------------------------------------------
     # Validate everything at once — collect ALL issues before responding
     # -------------------------------------------------------------------------

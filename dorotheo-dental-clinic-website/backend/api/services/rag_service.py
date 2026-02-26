@@ -1,23 +1,22 @@
 """
-RAG Service with Hybrid Retrieval
-──────────────────────────────────
-Provides context retrieval for clinic information queries.
+RAG Service — Fallback-Only with Database Context Builder
+─────────────────────────────────────────────────────────
+Architecture:
+  PRIMARY  : Gemini LLM + live DB context (build_db_context) — always used first
+  FALLBACK : RAG vector search (get_rag_context) — only when Gemini is DOWN
+
+The chatbot ALWAYS builds live DB context and sends it to Gemini.
+RAG (PageChunk vector search) is NEVER used in the primary path.
+It only activates when the LLM circuit breaker is open (quota/timeout).
 
 Features:
-- Vector search (existing PageChunk embeddings)
 - Database context builder (services, dentists, clinics) — ALL from DB
-- RAG validation: system NEVER silently skips RAG
+- Vector search fallback (existing PageChunk embeddings)
+- Pronoun resolution from conversation history
 - Source attribution logging for every response
-- Fallback hierarchy: RAG → DB context → direct contact message
+- Fallback hierarchy: DB context format → RAG → safe contact message
 - All retrieval failures return safe fallback — NEVER crash
 - NO hardcoded service/dentist lists — everything from database
-
-RAG Prompt:
-    "You are a dental clinic assistant.
-    Answer ONLY using the provided context.
-    If answer is not in context, say:
-    'Please contact our clinic directly for more information.'
-    Be concise and professional."
 """
 
 import logging
@@ -386,6 +385,38 @@ def build_db_context(msg: str, user=None, conversation_history=None) -> str:
         except Exception:
             pass
 
+    # ── Pronoun resolution ────────────────────────────────────────────────
+    # If the message uses a pronoun (he/she/him/her/they/the doctor/the
+    # dentist) without any dentist name, resolve it from conversation
+    # history so we can filter to the correct dentist later.
+    _pronoun_resolved_name: Optional[str] = None  # first_name resolved via pronoun
+    if not asking_about_dentist and conversation_history:
+        _has_pronoun = bool(re.search(
+            r'\b(he|she|him|her|his|they|the doctor|the dentist|that doctor|that dentist|siya|niya)\b',
+            low, re.IGNORECASE,
+        ))
+        if _has_pronoun:
+            # Scan history (newest first) for a dentist name
+            _all_dentists = list(get_dentists_qs())
+            for entry in reversed(conversation_history):
+                _entry_text = (entry.get('content') or entry.get('message') or '').lower()
+                if not _entry_text:
+                    continue
+                for _d in _all_dentists:
+                    _fn = (_d.first_name or '').lower()
+                    _ln = (_d.last_name or '').lower()
+                    if (_fn and _fn in _entry_text) or (_ln and _ln in _entry_text):
+                        asking_about_dentist = True
+                        _pronoun_resolved_name = _d.first_name
+                        logger.info(
+                            "Pronoun '%s' resolved to Dr. %s from conversation history",
+                            re.search(r'\b(he|she|him|her|his|they|the doctor|the dentist|that doctor|that dentist|siya|niya)\b', low, re.IGNORECASE).group(),
+                            _d.get_full_name(),
+                        )
+                        break
+                if _pronoun_resolved_name:
+                    break
+
     # Check if user mentions a specific clinic name from the DB
     _mentions_clinic_name = False
     for cl in ClinicLocation.objects.all():
@@ -499,6 +530,9 @@ def build_db_context(msg: str, user=None, conversation_history=None) -> str:
             if lname and lname in low:
                 name_filtered_dents = dents.filter(last_name__iexact=d.last_name)
                 break
+        # Fallback: use pronoun-resolved name when no explicit name in message
+        if name_filtered_dents is None and _pronoun_resolved_name:
+            name_filtered_dents = dents.filter(first_name__iexact=_pronoun_resolved_name)
         if name_filtered_dents is not None:
             dents = name_filtered_dents
 
@@ -543,6 +577,18 @@ def build_db_context(msg: str, user=None, conversation_history=None) -> str:
                 r'date.*time|time.*date|what.*time.*available|what.*date.*time)\b',
                 low, re.IGNORECASE
             ))
+            # Also detect "available at <time>" pattern (e.g. "available at 2pm")
+            if not asking_about_time_slots:
+                asking_about_time_slots = bool(re.search(
+                    r'available.{0,30}\d{1,2}(:\d{2})?\s*(am|pm)',
+                    low, re.IGNORECASE,
+                ))
+            # Also detect "at <time>" when asking about a specific dentist
+            if not asking_about_time_slots and (name_filtered_dents is not None or _pronoun_resolved_name):
+                asking_about_time_slots = bool(re.search(
+                    r'\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)\b',
+                    low, re.IGNORECASE,
+                ))
 
             if re.search(r'\bnext week\b|\bsusunod na linggo\b', low):
                 start_date = today + timedelta(days=(7 - today.weekday()))

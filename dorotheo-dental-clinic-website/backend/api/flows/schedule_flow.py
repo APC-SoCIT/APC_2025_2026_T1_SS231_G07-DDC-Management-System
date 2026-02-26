@@ -410,6 +410,14 @@ def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="", reques
     if requested_date is not None:
         date_dentists = bsvc.get_alt_dentists_on_date(clinic, requested_date)
         if date_dentists:
+            # AUTO-SELECT when only one dentist is available — don't force
+            # the patient to confirm the obvious. This prevents endless
+            # "yes/ok/sure" loops where the system asks to pick a dentist
+            # but the user's affirmative doesn't contain the dentist's name.
+            if len(date_dentists) == 1:
+                sole = date_dentists[0]
+                return FieldValidation("valid", value=sole,
+                                       display_name=f"Dr. {sole.get_full_name()}")
             options = [f"Dr. {d.get_full_name()}" for d in date_dentists]
             # Smart recommendation
             rec = ""
@@ -440,7 +448,14 @@ def _check_dentist_field(user, clinic, clinic_ok, dentist, today, msg="", reques
         return FieldValidation("blocked",
                                error=f"None of our dentists have openings at {clinic.name} right now.")
 
-    available_dentists = bsvc.get_dentists_qs().filter(id__in=dentist_ids)
+    available_dentists = list(bsvc.get_dentists_qs().filter(id__in=dentist_ids))
+
+    # AUTO-SELECT single dentist — see date branch above for rationale.
+    if len(available_dentists) == 1:
+        sole = available_dentists[0]
+        return FieldValidation("valid", value=sole,
+                               display_name=f"Dr. {sole.get_full_name()}")
+
     options = [f"Dr. {d.get_full_name()}" for d in available_dentists]
 
     # Smart recommendation
