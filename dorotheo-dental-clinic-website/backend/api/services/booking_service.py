@@ -625,7 +625,8 @@ def _has_unmatched_service_mention(msg: str) -> Optional[str]:
         r'\bwant\s+([a-zA-Z][a-zA-Z\s]{2,28}?)\s+(?:service|appointment)\b',
         r'\bbook.*?for\s+([a-zA-Z][a-zA-Z\s]{2,20}?)\s+(?:at|po|please|with|\Z)',
         # "book appointment <service> <date/time/clinic>" pattern
-        r'\bbook\s+(?:an?\s+)?(?:appointment\s+)?(?:for\s+)?([a-zA-Z][a-zA-Z\s]{2,25}?)\s+(?:on|at|in|sa|with|for|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|\d)',
+        # Added optional (me|my) to handle "book my an appointment for..."
+        r'\bbook\s+(?:(?:me|my)\s+)?(?:an?\s+)?(?:appointment\s+)?(?:for\s+)?([a-zA-Z][a-zA-Z\s]{2,25}?)\s+(?:on|at|in|sa|with|for|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|\d)',
     ]
 
     candidate = None
@@ -652,6 +653,13 @@ def _has_unmatched_service_mention(msg: str) -> Optional[str]:
     if candidate in MONTHS or candidate in DAYS_OF_WEEK:
         return None
 
+    # Skip stop words / filler words that are clearly not service names.
+    # e.g. "book my an appointment for tomorrow" → after noise strip → "appointment"
+    # or "tomorrow instead same" → none of these are services.
+    _candidate_words = set(candidate.split())
+    if _candidate_words <= _STOP_WORDS:
+        return None
+
     # If the candidate itself matches any known alias, it's recognised — let normal flow handle it
     for svc_name, aliases in SERVICE_ALIASES.items():
         if any(alias in candidate or candidate in alias for alias in aliases):
@@ -669,6 +677,16 @@ def _has_unmatched_service_mention(msg: str) -> Optional[str]:
     return candidate.title()
 
 
+# Stop-words that should never be treated as a doctor name or service name.
+# e.g. "same doctor and same service" → "and" is NOT a doctor name.
+_STOP_WORDS = frozenset({
+    'and', 'or', 'the', 'a', 'an', 'is', 'at', 'in', 'on', 'to', 'for',
+    'but', 'not', 'my', 'me', 'same', 'with', 'from', 'that', 'this',
+    'it', 'of', 'also', 'instead', 'please', 'po', 'naman', 'ko',
+    'appointment', 'tomorrow', 'today', 'instead',
+})
+
+
 def _has_unmatched_doctor_hint(msg: str) -> Optional[str]:
     """
     Return the raw candidate name (original case) if the message mentions a
@@ -679,6 +697,7 @@ def _has_unmatched_doctor_hint(msg: str) -> Optional[str]:
         "book with doc gabriel"   → "gabriel"  (if no Gabriel in DB)
         "see dr. santos"          → None        (Santos found in DB)
         "i need a dentist"        → None        (no doctor keyword + name)
+        "same doctor and ..."     → None        ("and" is a stop word)
 
     Used to produce an "invalid" FieldValidation instead of a silent
     "missing" when the user clearly named a non-existent dentist.
@@ -687,6 +706,10 @@ def _has_unmatched_doctor_hint(msg: str) -> Optional[str]:
     if not m:
         return None
     candidate = m.group(1).lower()
+    # Skip common stop words that appear after "doctor" in natural speech
+    # e.g. "same doctor and same service" → "and" is not a doctor name
+    if candidate in _STOP_WORDS:
+        return None
     for d in get_dentists_qs():
         if (candidate in d.last_name.lower() or
                 candidate in d.first_name.lower()):
@@ -730,6 +753,53 @@ def find_service(msg: str, patient_only: bool = True) -> Optional[Service]:
 
 # ── Booking Context Gathering ──────────────────────────────────────────────
 
+# ── "same doctor / same service" back-reference detection ─────────────────
+_SAME_DOCTOR_RE = re.compile(
+    r'\b(?:same\s+(?:doctor|dentist|doc|dr)|'
+    r'same\s+(?:doc|dr)\.?|'
+    r'(?:doctor|dentist|doc|dr)\.?\s+(?:din|rin|pa(?:rin)?|ulit))\b',
+    re.IGNORECASE,
+)
+_SAME_SERVICE_RE = re.compile(
+    r'\b(?:same\s+service|service\s+(?:din|rin|pa(?:rin)?|ulit))\b',
+    re.IGNORECASE,
+)
+_SAME_CLINIC_RE = re.compile(
+    r'\b(?:same\s+(?:clinic|branch|location)|'
+    r'(?:clinic|branch)\s+(?:din|rin|pa(?:rin)?|ulit))\b',
+    re.IGNORECASE,
+)
+
+
+def _resolve_same_references(
+    msg: str, hist: list,
+) -> Dict[str, Any]:
+    """
+    When the user says "same doctor", "same service", or "same clinic",
+    look up the referenced entity from conversation history.
+    Returns a dict with keys: dentist, service, clinic (each Optional).
+    """
+    result: Dict[str, Any] = {'dentist': None, 'service': None, 'clinic': None}
+    if not hist:
+        return result
+
+    filtered = _filter_stale_history(hist)
+    combined_user = ' '.join(
+        m['content'] for m in filtered if m['role'] == 'user'
+    )
+
+    if _SAME_DOCTOR_RE.search(msg):
+        result['dentist'] = find_dentist(combined_user)
+    if _SAME_SERVICE_RE.search(msg):
+        result['service'] = (
+            find_service(combined_user)
+            or find_service(combined_user, patient_only=False)
+        )
+    if _SAME_CLINIC_RE.search(msg):
+        result['clinic'] = find_clinic(combined_user)
+    return result
+
+
 def gather_booking_context(
     msg: str,
     hist: list,
@@ -739,6 +809,8 @@ def gather_booking_context(
     Extract structured booking entities from current message and history.
 
     If is_fresh=True, only uses current message (avoids stale context).
+    However, "same doctor" / "same service" / "same clinic" always
+    back-reference from history regardless of is_fresh.
 
     Returns a dict with keys:
         clinic, dentist, date, time, service,
@@ -749,17 +821,27 @@ def gather_booking_context(
 
     invalid_service_name: Optional[str] = None
 
+    # Resolve "same doctor / same service / same clinic" from history FIRST.
+    # These apply regardless of is_fresh because the user is explicitly
+    # referencing a previously-discussed entity.
+    same_refs = _resolve_same_references(msg, hist)
+
     if is_fresh:
-        clinic = find_clinic(msg)
-        dentist = find_dentist(msg)
+        clinic = find_clinic(msg) or same_refs['clinic']
+        dentist = find_dentist(msg) or same_refs['dentist']
         _raw_date = parse_date(msg)
         time_val = parse_time(msg)
-        _unmatched_svc_name_fresh = _has_unmatched_service_mention(msg)
-        if _unmatched_svc_name_fresh:
-            service = None
-            invalid_service_name = _unmatched_svc_name_fresh
+        # If the user said "same service", honour that over _has_unmatched_service_mention.
+        if same_refs['service']:
+            service = same_refs['service']
+            invalid_service_name = None
         else:
-            service = find_service(msg) or find_service(msg, patient_only=False)
+            _unmatched_svc_name_fresh = _has_unmatched_service_mention(msg)
+            if _unmatched_svc_name_fresh:
+                service = None
+                invalid_service_name = _unmatched_svc_name_fresh
+            else:
+                service = find_service(msg) or find_service(msg, patient_only=False)
     else:
         # Filter out stale data from before flow resets
         filtered_hist = _filter_stale_history(hist)
@@ -784,10 +866,23 @@ def gather_booking_context(
         # already scrubs anything before a FLOW_COMPLETE reset.
         dentist = find_dentist(msg) or find_dentist(combined_user)
 
+        # For date and time, search history messages NEWEST-FIRST so the most
+        # recent user message wins.  Using combined_user concatenation caused
+        # stale times (e.g. "1am" from message #1) to overshadow newer ones
+        # (e.g. "3pm" from message #5) because re.search finds the first match.
         _raw_date = parse_date(msg)
         if _raw_date is None:
-            _raw_date = parse_date(combined_user)
-        time_val = parse_time(msg) or parse_time(combined_user)
+            for _h_msg in reversed([m['content'] for m in filtered_hist if m['role'] == 'user']):
+                _raw_date = parse_date(_h_msg)
+                if _raw_date is not None:
+                    break
+
+        time_val = parse_time(msg)
+        if time_val is None:
+            for _h_msg in reversed([m['content'] for m in filtered_hist if m['role'] == 'user']):
+                time_val = parse_time(_h_msg)
+                if time_val is not None:
+                    break
 
         # --- Service extraction (history-bleed guard) ---
         # First check the current message for an UNRECOGNISED service mention
