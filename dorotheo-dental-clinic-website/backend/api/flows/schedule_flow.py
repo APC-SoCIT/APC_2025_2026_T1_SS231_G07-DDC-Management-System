@@ -73,6 +73,12 @@ CRITICAL FIELD STATUS RULES:
 CRITICAL RULES:
 - Use ONLY the data provided in the BOOKING CONTEXT below.
 - NEVER invent clinics, dentists, time slots, services, or availability.
+- NEVER invent, guess, or extrapolate dates. The ONLY valid dates are those
+  explicitly listed under "Dates:" in the BOOKING CONTEXT. If a date is not
+  in that list, it does NOT exist — do NOT mention it, do NOT say "there are
+  more dates", and do NOT calculate dates from patterns (e.g. do NOT assume
+  every Wednesday is available just because some Wednesdays appear in the list).
+- If you are about to mention a date, verify it appears in the provided list FIRST.
 - NEVER show step numbers, wizard headers, or form-like formatting.
 - NEVER say "Please select…" — always speak naturally and conversationally.
 - You must explain ALL issues at once, not one at a time.
@@ -94,9 +100,11 @@ FORMATTING:
 - Use **bold** for key data (names, dates, times).
 - When listing options (clinics, dentists, dates, times), use markdown bullets (-).
 - Do NOT use section headers (### ) or wizard-style titles.
-- For time slots, list ALL available slots — NEVER truncate or say "more available". Show the complete list.
-- For other lists (clinics, dentists, dates) keep to a reasonable length.
+- For time slots AND dates, list ALL available options — NEVER truncate, summarize, or say "more available".
+  Show the COMPLETE list. NEVER invent or guess additional dates beyond what is provided.
+- For other lists (clinics, dentists) keep to a reasonable length.
 - Do NOT repeat information the patient already provided.
+- NEVER say "there are X more dates" or "additional dates are available" — if a date is not in the list, it does NOT exist.
 
 SERVICES (IMPORTANT):
 - Online self-booking is restricted by the clinic owner to **Cleaning** and **Consultation** only.
@@ -554,8 +562,6 @@ def _check_date_field(user, clinic, clinic_ok, dentist, dentist_ok,
     for av in avails:
         if bsvc.get_available_slots(dentist, av.date, clinic):
             dates_with_slots.append(av.date)
-        if len(dates_with_slots) >= 8:
-            break
 
     if not dates_with_slots:
         alt_dentists = [
@@ -575,7 +581,8 @@ def _check_date_field(user, clinic, clinic_ok, dentist, dentist_ok,
         )
 
     options = [bsvc.fmt_date(d) for d in dates_with_slots]
-    return FieldValidation("missing", options=options)
+    return FieldValidation("missing", options=options,
+                           recommendation=f"These are ALL {len(options)} available dates — there are no others.")
 
 
 # -- Time --
@@ -826,11 +833,19 @@ def _build_ai_context(validation: BookingValidation) -> str:
         # the value and we shouldn't suggest alternatives to something they
         # already specified.
         if field.options and not (field.status == "missing" and field.display_name):
-            # For time slots, pass every option so the AI can show the full list.
-            # For other fields (clinics, dentists, dates) a reasonable cap is fine.
-            cap = None if name == "Time slots" else 8
+            # For time slots AND dates, pass ALL options so the AI sees the
+            # complete list and never hallucinates extra dates.
+            # For other fields (clinics, dentists) a reasonable cap is fine.
+            no_cap = name in ("Time slots", "Dates")
+            cap = None if no_cap else 8
             opts = field.options if cap is None else field.options[:cap]
+            total = len(field.options)
+            shown = len(opts)
             lines.append(f"  {name}: {', '.join(opts)}")
+            if no_cap:
+                lines.append(f"    (This is the COMPLETE list — exactly {total} options. Do NOT invent more.)")
+            elif shown < total:
+                lines.append(f"    (Showing {shown} of {total} — only mention these {shown}.)")
             if field.recommendation:
                 lines.append(f"    Tip: {field.recommendation}")
 
