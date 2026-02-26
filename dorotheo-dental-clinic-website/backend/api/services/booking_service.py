@@ -271,8 +271,28 @@ def patient_has_appointment_this_week(patient: User, ref_date: date_obj) -> bool
     ).exists()
 
 
-def infer_clinic_from_dentist(dentist: User) -> Optional[ClinicLocation]:
-    """Infer clinic from dentist's assigned clinic or availability records."""
+def infer_clinic_from_dentist(
+    dentist: User,
+    target_date=None,
+) -> Optional[ClinicLocation]:
+    """
+    Infer which clinic to use for a dentist.
+
+    Priority order:
+    1. If a target_date is given, find a clinic where the dentist actually has
+       availability on that specific date (avoids assuming a default clinic when
+       the dentist only has availability elsewhere on that day).
+    2. Fall back to dentist.assigned_clinic.
+    3. Fall back to the dentist's most-recent availability record.
+    4. Last resort: first clinic in the database.
+    """
+    if target_date:
+        date_av = DentistAvailability.objects.filter(
+            dentist=dentist, date=target_date, is_available=True,
+            clinic__isnull=False,
+        ).select_related('clinic').first()
+        if date_av:
+            return date_av.clinic
     if dentist.assigned_clinic:
         return dentist.assigned_clinic
     av = DentistAvailability.objects.filter(
@@ -609,9 +629,23 @@ def _has_unmatched_service_mention(msg: str) -> Optional[str]:
     if len(candidate) < 3:
         return None
 
-    # If it matches any known alias, it's recognised — let normal flow handle it
+    # If the candidate is a month or day name it's a date component, not a service.
+    # e.g. "book march 2 consultation" must not flag "march" as an unknown service.
+    if candidate in MONTHS or candidate in DAYS_OF_WEEK:
+        return None
+
+    # If the candidate itself matches any known alias, it's recognised — let normal flow handle it
     for svc_name, aliases in SERVICE_ALIASES.items():
         if any(alias in candidate or candidate in alias for alias in aliases):
+            return None
+
+    # If any valid service alias appears ANYWHERE in the full message, the user
+    # did name a real service — just not immediately after "book".
+    # e.g. "book with marvin in bacoor 1pm consultation" → "consultation" is valid.
+    # e.g. "book marvin march 3 1pm cleaning"            → "cleaning" is valid.
+    # In these cases, don't flag the pre-service words as an invalid service.
+    for aliases in SERVICE_ALIASES.values():
+        if any(alias in low for alias in aliases):
             return None
 
     return candidate.title()
@@ -782,9 +816,12 @@ def gather_booking_context(
     else:
         date = _raw_date
 
-    # Infer clinic from dentist if dentist is known but not clinic
+    # Infer clinic from dentist if dentist is known but not clinic.
+    # Pass the requested date so we pick the clinic where the dentist is
+    # actually available on that day, instead of blindly defaulting to their
+    # assigned clinic.
     if dentist and not clinic:
-        clinic = infer_clinic_from_dentist(dentist)
+        clinic = infer_clinic_from_dentist(dentist, target_date=date)
 
     return {
         'clinic': clinic,

@@ -61,6 +61,15 @@ CRITICAL DATE RULE:
 - NEVER invent date-range errors. Only mention a date problem if BOOKING CONTEXT says
   "INVALID Date: ..." or "NEEDED Date: not yet selected".
 
+CRITICAL FIELD STATUS RULES:
+- OK [Field]: value       — validated and confirmed. Do NOT ask for it.
+- NOTED [Field]: value    — patient already provided this value earlier in the conversation.
+                            It is waiting for another field to be confirmed first.
+                            Do NOT ask the patient for it again. Treat it as given.
+- INVALID [Field]: error  — patient provided an invalid value. Explain the issue.
+- NEEDED [Field]: ...     — patient has NOT provided this yet. Ask for it naturally.
+- BLOCKED [Field]: error  — a system constraint prevents this field. Explain it.
+
 CRITICAL RULES:
 - Use ONLY the data provided in the BOOKING CONTEXT below.
 - NEVER invent clinics, dentists, time slots, services, or availability.
@@ -185,7 +194,7 @@ def handle_booking(user, msg: str, hist: list, detected_lang: str) -> dict:
                 bsvc.parse_date(msg) is not None,
             ])
             if has_correction:
-                session.state = bmem.ConversationState.COLLECTING
+                session.state = bmem.ConversationState.BOOKING_COLLECTING
                 # Fall through to normal booking flow below
             else:
                 return _handle_confirmation(user, low, session, detected_lang)
@@ -488,9 +497,29 @@ def _check_date_field(user, clinic, clinic_ok, dentist, dentist_ok,
         if has_record:
             error_msg = f"Dr. {dentist.get_full_name()} is fully booked on {bsvc.fmt_date(date_val)}."
         else:
+            # Check if the dentist is available at a DIFFERENT clinic on this date.
+            # This handles the case where the clinic was wrongly inferred (e.g. the
+            # dentist has no Alabang schedule on that date but does have Poblacion).
+            alt_clinic_av = DentistAvailability.objects.filter(
+                dentist=dentist, date=date_val, is_available=True,
+                clinic__isnull=False,
+            ).exclude(clinic=clinic).select_related('clinic').first()
+            if alt_clinic_av:
+                alt_clinic_name = alt_clinic_av.clinic.name
+                error_msg = (
+                    f"Dr. {dentist.get_full_name()} doesn't have availability at "
+                    f"{clinic.name} on {bsvc.fmt_date(date_val)}, but they're "
+                    f"available at {alt_clinic_name} on that date!"
+                )
+                return FieldValidation(
+                    "invalid", value=date_val,
+                    error=error_msg,
+                    options=[alt_clinic_name],
+                    recommendation=f"Would you like to book at {alt_clinic_name} instead?",
+                )
             error_msg = (
                 f"Dr. {dentist.get_full_name()} doesn't have availability set for "
-                f"{bsvc.fmt_date(date_val)}. They haven't opened their schedule for that date yet."
+                f"{bsvc.fmt_date(date_val)} yet."
             )
         return FieldValidation(
             "invalid", value=date_val,
@@ -749,6 +778,11 @@ def _build_ai_context(validation: BookingValidation) -> str:
             lines.append(f"  INVALID {name}: {field.error}")
         elif field.status == "blocked":
             lines.append(f"  BLOCKED {name}: {field.error}")
+        elif field.status == "missing" and field.display_name:
+            # Patient provided this value but it can't be fully validated yet
+            # because an upstream field (clinic/dentist) is still missing.
+            # Show as NOTED so the AI does NOT ask for it again.
+            lines.append(f"  NOTED {name}: {field.display_name} (patient already specified this — do NOT ask for it again)")
         else:
             lines.append(f"  NEEDED {name}: not yet selected")
 
@@ -761,7 +795,10 @@ def _build_ai_context(validation: BookingValidation) -> str:
         ("Services", validation.service),
         ("Weekly", validation.weekly_rule),
     ]:
-        if field.options:
+        # Don't list options for NOTED fields — the patient already provided
+        # the value and we shouldn't suggest alternatives to something they
+        # already specified.
+        if field.options and not (field.status == "missing" and field.display_name):
             lines.append(f"  {name}: {', '.join(field.options[:8])}")
             if field.recommendation:
                 lines.append(f"    Tip: {field.recommendation}")
@@ -774,6 +811,10 @@ def _get_quick_replies(validation: BookingValidation) -> List[str]:
     for field in [validation.clinic, validation.dentist, validation.date,
                   validation.time, validation.service, validation.weekly_rule]:
         if field.status in ("missing", "invalid") and field.options:
+            # Skip fields the patient already provided — they are NOTED (pending
+            # upstream validation) and don't need quick-reply options shown.
+            if field.status == "missing" and field.value is not None:
+                continue
             # Return clean option names (strip availability annotations)
             clean = []
             for opt in field.options[:6]:
@@ -854,9 +895,15 @@ def _build_fallback_response(
             valid_fields.append((name, field))
         elif field.status in ("invalid", "blocked"):
             error_fields.append((name, field))
-        elif field.status == "missing" and first_missing_name is None:
-            first_missing_name = name
-            first_missing_field = field
+        elif field.status == "missing":
+            if field.value is not None:
+                # NOTED field: patient already provided this value; treat it
+                # like a valid field for acknowledgment purposes so we don't
+                # ask for something we already know.
+                valid_fields.append((name, field))
+            elif first_missing_name is None:
+                first_missing_name = name
+                first_missing_field = field
 
     # ── Step 2: build the response parts ──────────────────────────────────
     parts: List[str] = []
