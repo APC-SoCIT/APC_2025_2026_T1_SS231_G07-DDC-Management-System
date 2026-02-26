@@ -394,6 +394,24 @@ def parse_date(msg: str):
         except ValueError:
             return INVALID_DATE
 
+    # Weekday + Month — e.g. "wednesday april", "friday march", "april wednesday"
+    # Must come BEFORE the bare day-of-week check so the month qualifier is respected.
+    # Returns the FIRST occurrence of that weekday in the given month/year.
+    for mname, mnum in MONTHS.items():
+        if re.search(rf'\b{mname}\b', low):
+            for dname, dnum in DAYS_OF_WEEK.items():
+                if re.search(r'\b' + re.escape(dname) + r'\b', low):
+                    year = explicit_year if explicit_year else today.year
+                    first_of_month = date_obj(year, mnum, 1)
+                    days_ahead = (dnum - first_of_month.weekday()) % 7
+                    candidate = first_of_month + timedelta(days=days_ahead)
+                    # If that date has passed (and no explicit year), try next year
+                    if not explicit_year and candidate < today:
+                        first_of_month = date_obj(today.year + 1, mnum, 1)
+                        days_ahead = (dnum - first_of_month.weekday()) % 7
+                        candidate = first_of_month + timedelta(days=days_ahead)
+                    return _validate_and_return(candidate)
+
     # Day of week — use word-boundary match to prevent 'month' triggering 'mon'
     for dname, dnum in DAYS_OF_WEEK.items():
         if re.search(r'\b' + re.escape(dname) + r'\b', low):
