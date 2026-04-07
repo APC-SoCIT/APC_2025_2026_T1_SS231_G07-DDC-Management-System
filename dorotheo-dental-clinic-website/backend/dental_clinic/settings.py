@@ -217,7 +217,10 @@ SIMPLE_JWT = {
 REFRESH_COOKIE_NAME = 'refresh_token'
 REFRESH_COOKIE_PATH = '/api/auth/'           # Scoped only to auth endpoints (CSRF mitigation)
 REFRESH_COOKIE_HTTPONLY = True               # Not accessible to JavaScript (XSS mitigation)
-REFRESH_COOKIE_SAMESITE = 'None'            # Required for cross-origin: Vercel → Azure
+# In production cross-origin deployments (Vercel → Azure), use SameSite=None + Secure=True.
+# In local development over HTTP, browsers reject SameSite=None unless Secure=True,
+# so we use Lax to ensure the refresh cookie is stored and sent.
+REFRESH_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
 REFRESH_COOKIE_SECURE = not DEBUG           # True in production (HTTPS only), False in dev
 REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days — matches REFRESH_TOKEN_LIFETIME
 REFRESH_COOKIE_DOMAIN = os.environ.get('REFRESH_COOKIE_DOMAIN', None)  # None = auto-detect

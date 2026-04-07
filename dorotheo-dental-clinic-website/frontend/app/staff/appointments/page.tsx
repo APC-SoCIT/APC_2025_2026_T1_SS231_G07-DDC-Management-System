@@ -1197,52 +1197,93 @@ export default function StaffAppointments() {
     })
   )
 
+  const todayIso = new Date().toISOString().split("T")[0]
+  const appointmentStats = {
+    total: appointments.length,
+    waiting: appointments.filter((apt) => getEffectiveStatus(apt) === "waiting").length,
+    ongoing: appointments.filter((apt) => getEffectiveStatus(apt) === "ongoing").length,
+    completed: appointments.filter((apt) => getEffectiveStatus(apt) === "completed").length,
+    today: appointments.filter((apt) => apt.date === todayIso).length,
+  }
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto mb-4"></div>
-          <p className="text-[var(--color-text-muted)]">Loading appointments...</p>
+      <div className="rounded-2xl border border-[var(--color-border)] bg-white p-8">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)]" />
+          <div>
+            <p className="text-base font-semibold text-[var(--color-text)]">Loading appointments</p>
+            <p className="text-sm text-[var(--color-text-muted)]">Preparing schedules and patient statuses...</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-[var(--color-primary)] mb-2">Appointments</h1>
-          <p className="text-[var(--color-text-muted)]">Manage patient appointments and schedules</p>
-        </div>
-        <div className="flex gap-3">
+    <div className="space-y-5 lg:space-y-6">
+      <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-display font-bold tracking-tight text-[var(--color-primary)] sm:text-3xl">Appointments</h1>
+            <p className="text-sm text-[var(--color-text-muted)] sm:text-base">Manage patient appointments and schedules</p>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:gap-3">
           <button
             onClick={() => setShowBlockTimeModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
-            <Ban className="w-5 h-5" />
+            <Ban className="h-4 w-4" />
             Block Time
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-4 w-4" />
             Add Appointment
           </button>
+          </div>
         </div>
-      </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Total</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--color-text)]">{appointmentStats.total}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Today</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--color-text)]">{appointmentStats.today}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Waiting</p>
+            <p className="mt-1 text-xl font-semibold text-purple-700">{appointmentStats.waiting}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Ongoing</p>
+            <p className="mt-1 text-xl font-semibold text-blue-700">{appointmentStats.ongoing}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Completed</p>
+            <p className="mt-1 text-xl font-semibold text-teal-700">{appointmentStats.completed}</p>
+          </div>
+        </div>
+      </section>
 
       {/* Search */}
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-4 sm:p-5">
+        <label htmlFor="staff-appointments-search" className="mb-2 block text-sm font-medium text-[var(--color-text)]">
+          Search appointments
+        </label>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-muted)]" />
           <input
+            id="staff-appointments-search"
             type="text"
             placeholder="Search by patient, treatment, or dentist..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="w-full rounded-lg border border-[var(--color-border)] bg-white py-2.5 pl-10 pr-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
           />
         </div>
       </div>
@@ -1322,76 +1363,80 @@ export default function StaffAppointments() {
       )}
 
       {/* Status Filter Tabs */}
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-2">
-        <div className="flex gap-2 overflow-x-auto">
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-2 sm:p-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
               statusFilter === "all"
                 ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-700 hover:bg-[var(--color-background)]"
             }`}
           >
-            All Patients
+            All Patients ({appointmentStats.total})
           </button>
           <button
             onClick={() => setStatusFilter("waiting")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
               statusFilter === "waiting"
                 ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-700 hover:bg-[var(--color-background)]"
             }`}
           >
-            Waiting
+            Waiting ({appointmentStats.waiting})
           </button>
           <button
             onClick={() => setStatusFilter("ongoing")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
               statusFilter === "ongoing"
                 ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-700 hover:bg-[var(--color-background)]"
             }`}
           >
-            Ongoing
+            Ongoing ({appointmentStats.ongoing})
           </button>
           <button
             onClick={() => setStatusFilter("missed")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
               statusFilter === "missed"
                 ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-700 hover:bg-[var(--color-background)]"
             }`}
           >
             Missed
           </button>
           <button
             onClick={() => setStatusFilter("cancelled")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
               statusFilter === "cancelled"
                 ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-700 hover:bg-[var(--color-background)]"
             }`}
           >
             Cancelled
           </button>
           <button
             onClick={() => setStatusFilter("completed")}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
               statusFilter === "completed"
                 ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-700 hover:bg-[var(--color-background)]"
             }`}
           >
-            Completed
+            Completed ({appointmentStats.completed})
           </button>
         </div>
       </div>
 
       {/* Appointments Table */}
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="overflow-x-auto overflow-y-auto max-h-[500px] sm:max-h-[600px] lg:max-h-[70vh]">
+        <div className="border-b border-[var(--color-border)] px-4 py-3 sm:px-6">
+          <p className="text-sm font-medium text-[var(--color-text)]">Showing {filteredAppointments.length} appointments</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Click any row to view details, notes, and request actions.</p>
+        </div>
+        <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)]">
+            <thead className="sticky top-0 z-10 bg-[var(--color-background)] border-b border-[var(--color-border)]">
               <tr className="border-b border-[var(--color-border)]">
                 <th 
                   className="px-3 py-3 text-left text-xs font-semibold text-[var(--color-text)] cursor-pointer hover:bg-gray-100 transition-colors"
@@ -1458,7 +1503,16 @@ export default function StaffAppointments() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border)]">
-              {filteredAppointments.map((apt) => (
+              {filteredAppointments.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-14 text-center">
+                    <p className="text-base font-semibold text-[var(--color-text)]">No appointments found</p>
+                    <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                      Try adjusting search terms or status filters to find matching appointments.
+                    </p>
+                  </td>
+                </tr>
+              ) : filteredAppointments.map((apt) => (
                 <Fragment key={apt.id}>
                   {/* Main Row - Clickable */}
                   <tr

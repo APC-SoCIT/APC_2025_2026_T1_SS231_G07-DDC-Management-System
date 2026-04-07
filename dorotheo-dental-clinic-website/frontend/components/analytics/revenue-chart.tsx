@@ -62,12 +62,12 @@ export default function RevenueChart({ data, period }: RevenueChartProps) {
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-          <h2 className="text-xl font-bold text-[var(--color-primary)]">Revenue & Expenses</h2>
-          <p className="text-sm text-[var(--color-text-muted)]">Revenue and expenses over time</p>
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+          <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Revenue & Expenses</h2>
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Revenue and expenses over time</p>
         </div>
-        <div className="flex items-center justify-center h-[300px] text-[var(--color-text-muted)]">
-          No data available for this period
+        <div className="flex items-center justify-center h-[320px] px-6 text-center text-sm text-[var(--color-text-muted)]">
+          No revenue and expense data available for this period.
         </div>
       </div>
     )
@@ -80,12 +80,12 @@ export default function RevenueChart({ data, period }: RevenueChartProps) {
 
   return (
     <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <h2 className="text-xl font-bold text-[var(--color-primary)]">Revenue & Expenses</h2>
-        <p className="text-sm text-[var(--color-text-muted)]">Revenue and expenses over time</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+        <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Revenue & Expenses</h2>
+        <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Revenue and expenses over time</p>
       </div>
-      <div className="p-4 sm:p-6">
-        <ResponsiveContainer width="100%" height={300}>
+      <div className="p-4 sm:p-5 lg:p-6">
+        <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <defs>
               <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">

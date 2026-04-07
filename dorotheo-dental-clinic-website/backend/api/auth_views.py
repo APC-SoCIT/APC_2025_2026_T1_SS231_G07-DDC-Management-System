@@ -274,12 +274,13 @@ def jwt_token_refresh(request):
         new_refresh = str(new_refresh_obj)
     except TokenError as exc:
         logger.warning("[JWT] Token refresh failed: %s", exc)
-        error_response = Response(
+        # Do not clear the cookie here: concurrent refreshes can race (one request
+        # rotates successfully while another stale request fails). Clearing the cookie
+        # on the stale failure can log out an otherwise valid session.
+        return Response(
             {'detail': 'Refresh token is invalid, expired, or has been blacklisted'},
             status=status.HTTP_401_UNAUTHORIZED
         )
-        clear_refresh_cookie(error_response)
-        return error_response
 
     response = Response({'access': new_access})
     set_refresh_cookie(response, new_refresh)

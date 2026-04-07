@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Edit2, Download, CheckCircle } from "lucide-react"
+import { Edit2, Download } from "lucide-react"
+import SuccessModal from "@/components/success-modal"
 import { useAuth } from "@/lib/auth"
 import { api } from "@/lib/api"
 import { usePhLocations } from "@/hooks/use-ph-locations"
@@ -164,25 +165,12 @@ export default function PatientProfile() {
   return (
     <>
       {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <CheckCircle className="w-10 h-10 text-green-600" />
-              </div>
-              <h2 className="text-xl font-semibold text-[var(--color-text)] mb-2">Success!</h2>
-              <p className="text-[var(--color-text-muted)] mb-6">Profile updated successfully.</p>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="px-6 py-2.5 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors w-full"
-              >
-                Ok
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title="Success!"
+        message="Profile updated successfully."
+      />
 
       <div className="space-y-6">
         <div className="flex items-center justify-between">

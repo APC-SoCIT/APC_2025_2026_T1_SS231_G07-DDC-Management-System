@@ -30,12 +30,12 @@ export default function TopServicesTable({ data }: TopServicesTableProps) {
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-          <h2 className="text-xl font-bold text-[var(--color-primary)]">Top Services</h2>
-          <p className="text-sm text-[var(--color-text-muted)]">Most popular services by appointment count</p>
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+          <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Top Services</h2>
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Most popular services by appointment count</p>
         </div>
-        <div className="flex items-center justify-center h-[300px] text-[var(--color-text-muted)]">
-          No service data available
+        <div className="flex items-center justify-center h-[320px] px-6 text-center text-sm text-[var(--color-text-muted)]">
+          No service usage data available.
         </div>
       </div>
     )
@@ -43,33 +43,33 @@ export default function TopServicesTable({ data }: TopServicesTableProps) {
 
   return (
     <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <h2 className="text-xl font-bold text-[var(--color-primary)]">Top Services</h2>
-        <p className="text-sm text-[var(--color-text-muted)]">Most popular services by appointment count</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+        <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Top Services</h2>
+        <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Most popular services by appointment count</p>
       </div>
-      <div className="overflow-x-auto max-h-96">
+      <div className="overflow-x-auto max-h-[420px]">
         <table className="w-full">
-          <thead className="bg-[var(--color-background)] border-b border-[var(--color-border)] sticky top-0">
+          <thead className="bg-[var(--color-background)]/95 border-b border-[var(--color-border)] sticky top-0 backdrop-blur">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--color-text)] w-12">#</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--color-text)]">Service</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[var(--color-text)]">Category</th>
-              <th className="px-4 py-3 text-right text-sm font-semibold text-[var(--color-text)]">Appointments</th>
+              <th className="px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text)] w-12">#</th>
+              <th className="px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text)]">Service</th>
+              <th className="px-4 py-3.5 text-left text-sm font-semibold text-[var(--color-text)]">Category</th>
+              <th className="px-4 py-3.5 text-right text-sm font-semibold text-[var(--color-text)]">Appointments</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
             {top10.map((service, idx) => {
               const badge = getCategoryBadge(service.category)
               return (
-                <tr key={idx} className="hover:bg-[var(--color-background)] transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-[var(--color-text-muted)]">{idx + 1}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-[var(--color-text)]">{service.service}</td>
-                  <td className="px-4 py-3">
+                <tr key={idx} className="hover:bg-[var(--color-background)]/60 transition-colors">
+                  <td className="px-4 py-3.5 text-sm font-medium text-[var(--color-text-muted)]">{idx + 1}</td>
+                  <td className="px-4 py-3.5 text-sm font-medium text-[var(--color-text)] align-middle">{service.service}</td>
+                  <td className="px-4 py-3.5 align-middle">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${badge.bg} ${badge.text}`}>
                       {service.category}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm font-medium text-right text-[var(--color-primary)]">{service.count}</td>
+                  <td className="px-4 py-3.5 text-sm font-semibold text-right text-[var(--color-primary)]">{service.count}</td>
                 </tr>
               )
             })}

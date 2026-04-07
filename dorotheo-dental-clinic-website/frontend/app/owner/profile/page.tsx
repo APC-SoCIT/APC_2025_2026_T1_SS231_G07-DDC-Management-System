@@ -5,14 +5,16 @@ import { Camera } from "lucide-react"
 import DentistCalendarAvailability from "@/components/dentist-calendar-availability"
 import QuickAvailabilityModal from "@/components/quick-availability-modal"
 import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
+import SuccessModal from "@/components/success-modal"
 import { useAuth } from "@/lib/auth"
-import { api, API_BASE_URL, getAuthHeaderUtil } from "@/lib/api"
+import { api, API_BASE_URL, authenticatedFetch } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
 
 export default function OwnerProfile() {
   const { user, token, setUser } = useAuth()
   const { allClinics, selectedClinic } = useClinic()
   const [isEditing, setIsEditing] = useState(false)
+  const [showProfileSuccess, setShowProfileSuccess] = useState(false)
   const [showQuickAvailability, setShowQuickAvailability] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [quickAvailInitialDates, setQuickAvailInitialDates] = useState<string[] | undefined>(undefined)
@@ -63,14 +65,13 @@ export default function OwnerProfile() {
         birthday: profile.birthday,
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}/`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/users/${user.id}/`, {
         method: "PATCH",
         headers: {
-          Authorization: getAuthHeaderUtil(token!),
           "Content-Type": "application/json",
         },
         body: JSON.stringify(updateData),
-      })
+      }, token)
 
       if (!response.ok) throw new Error("Failed to update profile")
       
@@ -87,7 +88,7 @@ export default function OwnerProfile() {
       })
       
       setIsEditing(false)
-      alert("Profile updated successfully!")
+      setShowProfileSuccess(true)
     } catch (error) {
       console.error("Error updating profile:", error)
       alert("Failed to update profile.")
@@ -287,24 +288,22 @@ export default function OwnerProfile() {
               // First, delete existing availability for the selected date range to avoid duplicates
               const allDates = data.dates!;
               if (allDates.length > 0) {
-                await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
+                await authenticatedFetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
                     dentist_id: user.id,
                     dates: allDates,
                   }),
-                });
+                }, token);
               }
               // Save specific dates
               const promises = data.dates!.map(date =>
-                fetch(`${API_BASE_URL}/dentist-availability/`, {
+                authenticatedFetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -315,7 +314,7 @@ export default function OwnerProfile() {
                     apply_to_all_clinics: data.applyToAllClinics,
                     clinic_id: data.applyToAllClinics ? null : data.clinicId,
                   }),
-                })
+                }, token)
               );
               const responses = await Promise.all(promises);
               
@@ -369,24 +368,22 @@ export default function OwnerProfile() {
 
               // First, delete existing availability for recurring dates to avoid duplicates
               if (dates.length > 0) {
-                await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
+                await authenticatedFetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
                     dentist_id: user.id,
                     dates: dates,
                   }),
-                });
+                }, token);
               }
 
               const promises = dates.map(date =>
-                fetch(`${API_BASE_URL}/dentist-availability/`, {
+                authenticatedFetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -397,7 +394,7 @@ export default function OwnerProfile() {
                     apply_to_all_clinics: data.applyToAllClinics,
                     clinic_id: data.applyToAllClinics ? null : data.clinicId,
                   }),
-                })
+                }, token)
               );
               const responses = await Promise.all(promises);
               
@@ -447,6 +444,14 @@ export default function OwnerProfile() {
         endTime={successData.endTime}
         clinicName={successData.clinicName}
         dates={successData.dates}
+      />
+
+      {/* Profile Update Success Modal */}
+      <SuccessModal
+        isOpen={showProfileSuccess}
+        onClose={() => setShowProfileSuccess(false)}
+        title="Success!"
+        message="Profile updated successfully."
       />
     </div>
   )

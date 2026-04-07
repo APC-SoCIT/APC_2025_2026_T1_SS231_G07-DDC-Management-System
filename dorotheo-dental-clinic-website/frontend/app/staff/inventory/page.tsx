@@ -7,6 +7,7 @@ import { useClinic } from "@/lib/clinic-context"
 import { AddInventoryModal } from "@/components/add-inventory-modal"
 import { InventorySuccessModal } from "@/components/inventory-success-modal"
 import { ClinicBadge } from "@/components/clinic-badge"
+import SuccessModal from "@/components/success-modal"
 
 export default function StaffInventory() {
   const { selectedClinic, allClinics } = useClinic()
@@ -18,6 +19,7 @@ export default function StaffInventory() {
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [inventory, setInventory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<{ title: string; message: string } | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -156,7 +158,7 @@ export default function StaffInventory() {
       setSelectedItem(null)
       await fetchInventory()
       
-      alert("Inventory item updated successfully!")
+      setActionSuccessMsg({ title: "Item Updated!", message: "Inventory item updated successfully." })
     } catch (error: any) {
       console.error("Failed to update inventory item:", error)
       alert(error.message || "Failed to update inventory item")
@@ -179,7 +181,7 @@ export default function StaffInventory() {
       setSelectedItem(null)
       await fetchInventory()
       
-      alert("Inventory item deleted successfully!")
+      setActionSuccessMsg({ title: "Item Deleted!", message: "Inventory item deleted successfully." })
     } catch (error: any) {
       console.error("Failed to delete inventory item:", error)
       alert(error.message || "Failed to delete inventory item")
@@ -520,6 +522,14 @@ export default function StaffInventory() {
           </div>
         </div>
       )}
+
+      {/* Action Success Modal (update/delete) */}
+      <SuccessModal
+        isOpen={!!actionSuccessMsg}
+        onClose={() => setActionSuccessMsg(null)}
+        title={actionSuccessMsg?.title}
+        message={actionSuccessMsg?.message}
+      />
     </div>
   )
 }

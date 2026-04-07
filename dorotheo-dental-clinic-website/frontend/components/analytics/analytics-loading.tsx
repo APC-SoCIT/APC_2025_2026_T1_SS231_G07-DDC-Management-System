@@ -2,16 +2,16 @@
 
 export default function AnalyticsLoading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-5 lg:space-y-6 animate-pulse">
       {/* Header skeleton */}
       <div className="flex flex-col gap-4">
         <div>
           <div className="h-8 w-64 bg-gray-200 rounded mb-2" />
           <div className="h-4 w-48 bg-gray-200 rounded" />
         </div>
-        <div className="flex gap-2 bg-white border border-gray-200 rounded-lg p-1">
+        <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-1.5">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex-1 h-10 bg-gray-200 rounded-md" />
+            <div key={i} className="flex-1 h-9 sm:h-10 bg-gray-200 rounded-md" />
           ))}
         </div>
       </div>
@@ -23,14 +23,14 @@ export default function AnalyticsLoading() {
       </div>
 
       {/* Tab switcher skeleton */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 bg-white border border-gray-200 rounded-xl p-1.5">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-10 w-28 bg-gray-200 rounded-md" />
+          <div key={i} className="h-9 sm:h-10 w-28 bg-gray-200 rounded-md" />
         ))}
       </div>
 
       {/* Summary cards skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
@@ -60,7 +60,7 @@ export default function AnalyticsLoading() {
       </div>
 
       {/* Two-column chart skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
         {[1, 2].map((i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -75,7 +75,7 @@ export default function AnalyticsLoading() {
       </div>
 
       {/* Another two-column chart skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
         {[1, 2].map((i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">

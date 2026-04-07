@@ -5,14 +5,16 @@ import { Camera } from "lucide-react"
 import DentistCalendarAvailability from "@/components/dentist-calendar-availability"
 import QuickAvailabilityModal from "@/components/quick-availability-modal"
 import QuickAvailabilitySuccessModal from "@/components/quick-availability-success-modal"
+import SuccessModal from "@/components/success-modal"
 import { useAuth } from "@/lib/auth"
-import { api, API_BASE_URL, getAuthHeaderUtil } from "@/lib/api"
+import { api, API_BASE_URL, authenticatedFetch } from "@/lib/api"
 import { useClinic } from "@/lib/clinic-context"
 
 export default function StaffProfile() {
   const { user, token, setUser } = useAuth()
   const { allClinics, selectedClinic } = useClinic()
   const [isEditing, setIsEditing] = useState(false)
+  const [showProfileSuccess, setShowProfileSuccess] = useState(false)
   const [showQuickAvailability, setShowQuickAvailability] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [quickAvailInitialDates, setQuickAvailInitialDates] = useState<string[] | undefined>(undefined)
@@ -76,7 +78,7 @@ export default function StaffProfile() {
       } as any)
       
       setIsEditing(false)
-      alert("Profile updated successfully!")
+      setShowProfileSuccess(true)
     } catch (error) {
       console.error("Error updating profile:", error)
       alert("Failed to update profile.")
@@ -280,23 +282,21 @@ export default function StaffProfile() {
               // First, delete existing availability for the selected dates to avoid duplicates
               const allDates = data.dates!;
               if (allDates.length > 0) {
-                await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
+                await authenticatedFetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
                     dentist_id: user.id,
                     dates: allDates,
                   }),
-                });
+                }, token);
               }
               const promises = data.dates!.map(date =>
-                fetch(`${API_BASE_URL}/dentist-availability/`, {
+                authenticatedFetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -307,7 +307,7 @@ export default function StaffProfile() {
                     apply_to_all_clinics: data.applyToAllClinics,
                     clinic_id: data.applyToAllClinics ? null : data.clinicId,
                   }),
-                })
+                }, token)
               );
               const responses = await Promise.all(promises);
               const failedResponses = responses.filter(r => !r.ok);
@@ -345,24 +345,22 @@ export default function StaffProfile() {
 
               // First, delete existing availability for recurring dates to avoid duplicates
               if (dates.length > 0) {
-                await fetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
+                await authenticatedFetch(`${API_BASE_URL}/dentist-availability/bulk_delete/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
                     dentist_id: user.id,
                     dates: dates,
                   }),
-                });
+                }, token);
               }
 
               const promises = dates.map(date =>
-                fetch(`${API_BASE_URL}/dentist-availability/`, {
+                authenticatedFetch(`${API_BASE_URL}/dentist-availability/`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': getAuthHeaderUtil(token!),
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -373,7 +371,7 @@ export default function StaffProfile() {
                     apply_to_all_clinics: data.applyToAllClinics,
                     clinic_id: data.applyToAllClinics ? null : data.clinicId,
                   }),
-                })
+                }, token)
               );
               const responses = await Promise.all(promises);
               const failedResponses = responses.filter(r => !r.ok);
@@ -417,6 +415,14 @@ export default function StaffProfile() {
         endTime={successData.endTime}
         clinicName={successData.clinicName}
         dates={successData.dates}
+      />
+
+      {/* Profile Update Success Modal */}
+      <SuccessModal
+        isOpen={showProfileSuccess}
+        onClose={() => setShowProfileSuccess(false)}
+        title="Success!"
+        message="Profile updated successfully."
       />
     </div>
   )

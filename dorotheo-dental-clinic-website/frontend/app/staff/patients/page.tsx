@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { api, API_BASE_URL } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import SuccessModal from "@/components/success-modal"
 
 interface Patient {
   id: number
@@ -51,6 +52,7 @@ export default function StaffPatients() {
   const [archivedPatients, setArchivedPatients] = useState<Patient[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<{ title: string; message: string } | null>(null)
   const [newPatient, setNewPatient] = useState({
     firstName: "",
     lastName: "",
@@ -215,7 +217,7 @@ export default function StaffPatients() {
       }
       // Remove from current patients
       setPatients(patients.filter(p => p.id !== patientId))
-      alert("Patient archived successfully!")
+      setActionSuccessMsg({ title: "Patient Archived!", message: "Patient archived successfully." })
     } catch (error) {
       console.error("Error archiving patient:", error)
       alert("Failed to archive patient")
@@ -238,7 +240,7 @@ export default function StaffPatients() {
       }
       // Remove from archived
       setArchivedPatients(archivedPatients.filter(p => p.id !== patientId))
-      alert("Patient restored successfully!")
+      setActionSuccessMsg({ title: "Patient Restored!", message: "Patient restored successfully." })
     } catch (error) {
       console.error("Error restoring patient:", error)
       alert("Failed to restore patient")
@@ -354,7 +356,7 @@ export default function StaffPatients() {
       // Remove from both patients and archived patients lists
       setPatients(patients.filter((p) => p.id !== patientId))
       setArchivedPatients(archivedPatients.filter((p) => p.id !== patientId))
-      alert("Patient deleted successfully")
+      setActionSuccessMsg({ title: "Patient Deleted!", message: "Patient deleted successfully." })
     } catch (error: any) {
       console.error("Error deleting patient:", error)
       const errorMessage = error?.message || "Failed to delete patient"
@@ -454,7 +456,7 @@ export default function StaffPatients() {
         address: "",
       })
       setShowAddModal(false)
-      alert("Patient added successfully! They can now log in with their email and password.")
+      setActionSuccessMsg({ title: "Patient Added!", message: "Patient added successfully! They can now log in with their email and password." })
     } catch (error: any) {
       console.error("Error adding patient:", error)
       alert("Failed to add patient: " + (error.message || "Unknown error"))
@@ -860,6 +862,14 @@ export default function StaffPatients() {
           </div>
         </div>
       )}
+
+      {/* Action Success Modal */}
+      <SuccessModal
+        isOpen={!!actionSuccessMsg}
+        onClose={() => setActionSuccessMsg(null)}
+        title={actionSuccessMsg?.title}
+        message={actionSuccessMsg?.message}
+      />
 
     </div>
   )

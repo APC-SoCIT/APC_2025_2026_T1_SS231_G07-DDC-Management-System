@@ -39,12 +39,12 @@ export default function BusiestHoursChart({ data }: BusiestHoursChartProps) {
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-          <h2 className="text-xl font-bold text-[var(--color-primary)]">Busiest Hours</h2>
-          <p className="text-sm text-[var(--color-text-muted)]">Appointment distribution throughout the day</p>
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+          <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Busiest Hours</h2>
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Appointment distribution throughout the day</p>
         </div>
-        <div className="flex items-center justify-center h-[300px] text-[var(--color-text-muted)]">
-          No hourly data available
+        <div className="flex items-center justify-center h-[320px] px-6 text-center text-sm text-[var(--color-text-muted)]">
+          No hourly appointment data available.
         </div>
       </div>
     )
@@ -60,12 +60,12 @@ export default function BusiestHoursChart({ data }: BusiestHoursChartProps) {
 
   return (
     <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <h2 className="text-xl font-bold text-[var(--color-primary)]">Busiest Hours</h2>
-        <p className="text-sm text-[var(--color-text-muted)]">Appointment distribution throughout the day</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+        <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Busiest Hours</h2>
+        <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Appointment distribution throughout the day</p>
       </div>
-      <div className="p-4 sm:p-6">
-        <ResponsiveContainer width="100%" height={300}>
+      <div className="p-4 sm:p-5 lg:p-6">
+        <ResponsiveContainer width="100%" height={320}>
           <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
             <XAxis
@@ -95,7 +95,7 @@ export default function BusiestHoursChart({ data }: BusiestHoursChartProps) {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        <div className="flex items-center justify-center gap-4 mt-2">
+        <div className="flex flex-wrap items-center justify-center gap-4 mt-3">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-full bg-green-500" />
             <span className="text-xs text-[var(--color-text-muted)]">Regular hours</span>

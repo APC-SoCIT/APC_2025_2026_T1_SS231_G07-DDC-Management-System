@@ -43,12 +43,12 @@ export default function AppointmentStatusChart({ data }: AppointmentStatusChartP
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-          <h2 className="text-xl font-bold text-[var(--color-primary)]">Appointment Status</h2>
-          <p className="text-sm text-[var(--color-text-muted)]">Distribution of appointment statuses</p>
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+          <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Appointment Status</h2>
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Distribution of appointment statuses</p>
         </div>
-        <div className="flex items-center justify-center h-[300px] text-[var(--color-text-muted)]">
-          No appointment data available
+        <div className="flex items-center justify-center h-[320px] px-6 text-center text-sm text-[var(--color-text-muted)]">
+          No appointment status data available.
         </div>
       </div>
     )
@@ -58,12 +58,12 @@ export default function AppointmentStatusChart({ data }: AppointmentStatusChartP
 
   return (
     <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <h2 className="text-xl font-bold text-[var(--color-primary)]">Appointment Status</h2>
-        <p className="text-sm text-[var(--color-text-muted)]">Distribution of appointment statuses</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-background)]/80">
+        <h2 className="text-lg sm:text-xl font-bold text-[var(--color-primary)]">Appointment Status</h2>
+        <p className="text-xs sm:text-sm text-[var(--color-text-muted)]">Distribution of appointment statuses</p>
       </div>
-      <div className="p-4 sm:p-6">
-        <ResponsiveContainer width="100%" height={300}>
+      <div className="p-4 sm:p-5 lg:p-6">
+        <ResponsiveContainer width="100%" height={320}>
           <PieChart>
             <Pie
               data={data}
@@ -104,7 +104,7 @@ export default function AppointmentStatusChart({ data }: AppointmentStatusChartP
           </PieChart>
         </ResponsiveContainer>
         {/* Legend */}
-        <div className="flex flex-wrap justify-center gap-3 mt-2">
+        <div className="flex flex-wrap justify-center gap-3 mt-3">
           {data.map((entry, idx) => (
             <div key={idx} className="flex items-center gap-1.5">
               <div

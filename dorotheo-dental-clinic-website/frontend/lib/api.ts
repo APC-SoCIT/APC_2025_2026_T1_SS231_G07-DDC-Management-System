@@ -9,7 +9,6 @@ export const API_BASE_URL = trimmedBase.endsWith("/api") ? trimmedBase : `${trim
 let _accessToken: string | null = null
 let _onRefresh: ((newToken: string) => void) | null = null
 let _onAuthFail: (() => void) | null = null
-let _isRefreshing = false
 let _refreshPromise: Promise<string | null> | null = null
 
 /**
@@ -59,19 +58,7 @@ export async function authenticatedFetch(
 
   // If 401, attempt a silent refresh
   if (response.status === 401 && token) {
-    let newToken: string | null = null
-
-    // Deduplicate concurrent refreshes
-    if (_isRefreshing && _refreshPromise) {
-      newToken = await _refreshPromise
-    } else {
-      _isRefreshing = true
-      _refreshPromise = _jwtRefresh().finally(() => {
-        _isRefreshing = false
-        _refreshPromise = null
-      })
-      newToken = await _refreshPromise
-    }
+    const newToken = await _jwtRefresh()
 
     if (newToken) {
       // Notify callers about the new token
@@ -95,17 +82,37 @@ export async function authenticatedFetch(
  * Returns the new access token string, or null on failure.
  */
 async function _jwtRefresh(): Promise<string | null> {
-  try {
-    const resp = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-    if (!resp.ok) return null
-    const data = await resp.json()
-    return data.access ?? null
-  } catch {
-    return null
+  if (_refreshPromise) {
+    return _refreshPromise
   }
+
+  const requestRefresh = async (): Promise<string | null> => {
+    try {
+      const resp = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!resp.ok) return null
+      const data = await resp.json()
+      return data.access ?? null
+    } catch {
+      return null
+    }
+  }
+
+  _refreshPromise = (async () => {
+    const firstAttempt = await requestRefresh()
+    if (firstAttempt) {
+      return firstAttempt
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    return requestRefresh()
+  })().finally(() => {
+    _refreshPromise = null
+  })
+
+  return _refreshPromise
 }
 
 // ---------------------------------------------------------------------------
@@ -741,9 +748,7 @@ export const api = {
     const queryString = searchParams.toString()
     const url = `${API_BASE_URL}/analytics/${queryString ? `?${queryString}` : ''}`
 
-    const response = await fetch(url, {
-      headers: { Authorization: getAuthHeader(token) },
-    })
+    const response = await authenticatedFetch(url, {}, token)
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       throw new Error(errorData.error || `Analytics request failed with status ${response.status}`)
@@ -1552,16 +1557,11 @@ export const api = {
 
   /** POST /api/auth/token/refresh/ — reads HttpOnly cookie, returns { access } */
   jwtRefresh: async (): Promise<{ access: string } | null> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!response.ok) return null
-      return response.json()
-    } catch {
+    const access = await _jwtRefresh()
+    if (!access) {
       return null
     }
+    return { access }
   },
 
   /** POST /api/auth/logout/ — blacklists refresh token, clears HttpOnly cookie */

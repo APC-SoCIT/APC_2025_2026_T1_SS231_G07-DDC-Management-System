@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Edit2, Trash2, Save, X, Calendar, User } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import SuccessModal from "@/components/success-modal"
 
 interface ClinicalNote {
   id: number
@@ -35,6 +36,7 @@ export default function OwnerPatientNotes() {
   })
   const [editedContent, setEditedContent] = useState("")
   const [patientName, setPatientName] = useState("")
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<{ title: string; message: string } | null>(null)
 
   useEffect(() => {
     fetchNotes()
@@ -83,7 +85,7 @@ export default function OwnerPatientNotes() {
       setNewNote({ content: "", appointment: "" })
       setShowAddModal(false)
       fetchNotes()
-      alert("Clinical note added successfully!")
+      setActionSuccessMsg({ title: "Note Added!", message: "Clinical note added successfully." })
     } catch (error) {
       console.error("Error adding note:", error)
       alert("Failed to add clinical note")
@@ -106,7 +108,7 @@ export default function OwnerPatientNotes() {
       setEditingNote(null)
       setEditedContent("")
       fetchNotes()
-      alert("Note updated successfully!")
+      setActionSuccessMsg({ title: "Note Updated!", message: "Note updated successfully." })
     } catch (error) {
       console.error("Error updating note:", error)
       alert("Failed to update note")
@@ -120,7 +122,7 @@ export default function OwnerPatientNotes() {
     try {
       await api.deleteClinicalNote(noteId, token)
       fetchNotes()
-      alert("Note deleted successfully!")
+      setActionSuccessMsg({ title: "Note Deleted!", message: "Note deleted successfully." })
     } catch (error) {
       console.error("Error deleting note:", error)
       alert("Failed to delete note")
@@ -337,6 +339,14 @@ export default function OwnerPatientNotes() {
           </div>
         </div>
       )}
+
+      {/* Action Success Modal */}
+      <SuccessModal
+        isOpen={!!actionSuccessMsg}
+        onClose={() => setActionSuccessMsg(null)}
+        title={actionSuccessMsg?.title}
+        message={actionSuccessMsg?.message}
+      />
     </div>
   )
 }

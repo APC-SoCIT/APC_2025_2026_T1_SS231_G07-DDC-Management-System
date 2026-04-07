@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import * as api from "@/lib/api"
 import { Save, ArrowLeft, Heart, Phone, Shield, Stethoscope, AlertCircle } from "lucide-react"
+import SuccessModal from "@/components/success-modal"
 
 interface IntakeForm {
   id?: number
@@ -37,6 +38,7 @@ export default function OwnerPatientIntakeFormPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [existingForm, setExistingForm] = useState<IntakeForm | null>(null)
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<{ title: string; message: string } | null>(null)
 
   const [formData, setFormData] = useState<IntakeForm>({
     patient: patientId,
@@ -122,10 +124,10 @@ export default function OwnerPatientIntakeFormPage() {
 
       if (existingForm) {
         await api.updateIntakeForm(existingForm.id!, formData, token)
-        alert("Intake form updated successfully!")
+        setActionSuccessMsg({ title: "Form Updated!", message: "Intake form updated successfully." })
       } else {
         await api.createIntakeForm(formData, token)
-        alert("Intake form created successfully!")
+        setActionSuccessMsg({ title: "Form Created!", message: "Intake form created successfully." })
       }
 
       fetchData()
@@ -400,6 +402,14 @@ export default function OwnerPatientIntakeFormPage() {
           </div>
         </form>
       </div>
+
+      {/* Action Success Modal */}
+      <SuccessModal
+        isOpen={!!actionSuccessMsg}
+        onClose={() => setActionSuccessMsg(null)}
+        title={actionSuccessMsg?.title}
+        message={actionSuccessMsg?.message}
+      />
     </div>
   )
 }

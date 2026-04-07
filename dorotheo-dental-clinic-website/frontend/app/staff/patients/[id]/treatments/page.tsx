@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Edit2, Trash2, Save, X, Calendar, User, CheckCircle, Clock, Play, XCircle } from "lucide-react"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import SuccessModal from "@/components/success-modal"
 
 interface TreatmentAssignment {
   id: number
@@ -50,6 +51,7 @@ export default function StaffPatientTreatments() {
   const [editedData, setEditedData] = useState<any>({})
   const [patientName, setPatientName] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<{ title: string; message: string } | null>(null)
 
   useEffect(() => {
     fetchTreatments()
@@ -119,7 +121,7 @@ export default function StaffPatientTreatments() {
       })
       setShowAddModal(false)
       fetchTreatments()
-      alert("Treatment assigned successfully!")
+      setActionSuccessMsg({ title: "Treatment Assigned!", message: "Treatment assigned successfully." })
     } catch (error) {
       console.error("Error adding treatment:", error)
       alert("Failed to assign treatment")
@@ -146,7 +148,7 @@ export default function StaffPatientTreatments() {
       setEditingTreatment(null)
       setEditedData({})
       fetchTreatments()
-      alert("Treatment updated successfully!")
+      setActionSuccessMsg({ title: "Treatment Updated!", message: "Treatment updated successfully." })
     } catch (error) {
       console.error("Error updating treatment:", error)
       alert("Failed to update treatment")
@@ -159,7 +161,7 @@ export default function StaffPatientTreatments() {
     try {
       await api.updateTreatmentStatus(treatmentId, newStatus, token)
       fetchTreatments()
-      alert("Status updated successfully!")
+      setActionSuccessMsg({ title: "Status Updated!", message: "Status updated successfully." })
     } catch (error) {
       console.error("Error updating status:", error)
       alert("Failed to update status")
@@ -173,7 +175,7 @@ export default function StaffPatientTreatments() {
     try {
       await api.deleteTreatmentAssignment(treatmentId, token)
       fetchTreatments()
-      alert("Treatment deleted successfully!")
+      setActionSuccessMsg({ title: "Treatment Deleted!", message: "Treatment deleted successfully." })
     } catch (error) {
       console.error("Error deleting treatment:", error)
       alert("Failed to delete treatment")
@@ -598,6 +600,14 @@ export default function StaffPatientTreatments() {
           </div>
         </div>
       )}
+
+      {/* Action Success Modal */}
+      <SuccessModal
+        isOpen={!!actionSuccessMsg}
+        onClose={() => setActionSuccessMsg(null)}
+        title={actionSuccessMsg?.title}
+        message={actionSuccessMsg?.message}
+      />
     </div>
   )
 }
