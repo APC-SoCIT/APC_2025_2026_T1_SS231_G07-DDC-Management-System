@@ -49,16 +49,21 @@ function LoginForm() {
         const user = JSON.parse(userStr)
         // Redirect based on user type
         if (user.user_type === "patient") {
-          router.push("/patient/dashboard")
+          router.replace("/patient/dashboard")
+          return
         } else if (user.user_type === "staff") {
-          router.push("/staff/dashboard")
+          router.replace("/staff/dashboard")
+          return
         } else if (user.user_type === "owner") {
-          router.push("/owner/dashboard")
+          router.replace("/owner/dashboard")
+          return
         }
       }
+
+      setError("Unable to determine account type. Please try signing in again.")
+      setIsLoading(false)
     } catch (err) {
       setError("Invalid username or password")
-    } finally {
       setIsLoading(false)
     }
   }
