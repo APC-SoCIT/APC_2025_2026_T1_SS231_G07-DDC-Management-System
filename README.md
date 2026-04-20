@@ -17,6 +17,7 @@ A web-based Dental Clinic Management System with an integrated AI chatbot, servi
 - [Project Documentation](#project-documentation)
 - [Our Team](#our-team)
 - [Getting Started](#getting-started)
+- [First-Time Setup (macOS)](#first-time-setup-macos---recommended)
 - [Starting the Application](#starting-the-application)
 
 ---
@@ -153,9 +154,141 @@ This project is brought to you by the members of **TechTalk**.
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 18+
+- Python 3.11 (recommended for this repository)
+- Node.js 18+ (LTS recommended)
 - pnpm (recommended) or npm
+
+### First-Time Setup (macOS - Recommended)
+
+This section includes the exact commands for first-time setup on macOS.
+
+#### 1) Install required system tools
+
+```bash
+# Xcode Command Line Tools (required for many Python package builds)
+xcode-select --install
+
+# Install Homebrew (if not installed)
+which brew || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Python 3.11 and Node.js
+brew update
+brew install python@3.11 node
+
+# Verify installations
+python3.11 --version
+node --version
+npm --version
+```
+
+#### 2) Install pnpm
+
+Try Corepack first:
+
+```bash
+corepack enable
+corepack prepare pnpm@latest --activate
+pnpm --version
+```
+
+If you get `zsh: command not found: corepack`, run:
+
+```bash
+npm install -g corepack
+corepack enable
+corepack prepare pnpm@latest --activate
+pnpm --version
+```
+
+If Corepack still does not work, install pnpm directly:
+
+```bash
+npm install -g pnpm
+pnpm --version
+```
+
+#### 3) Backend setup (Django)
+
+```bash
+cd dorotheo-dental-clinic-website/backend
+
+# Create local environment file
+cp .env.example .env
+```
+
+Open `.env` and set these minimum local values:
+
+```env
+DEBUG=True
+FRONTEND_URL=http://localhost:3000
+```
+
+Notes:
+- Keep `DATABASE_URL` commented out to use SQLite locally.
+- Add `GEMINI_API_KEY` only if you want AI features immediately.
+
+Now create and use a Python 3.11 virtual environment:
+
+```bash
+# If an old/broken venv exists, remove it first
+deactivate 2>/dev/null || true
+rm -rf venv
+
+# IMPORTANT: use Python 3.11 explicitly
+python3.11 -m venv venv
+source venv/bin/activate
+
+# Confirm venv Python version
+python --version
+
+# Install dependencies
+python -m pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+
+# Initialize local database + seed data
+python manage.py migrate
+python manage.py create_clinics
+python create_initial_accounts.py
+```
+
+#### 4) Frontend setup (Next.js)
+
+Open a second terminal:
+
+```bash
+cd dorotheo-dental-clinic-website/frontend
+
+# Point frontend to backend API
+printf "NEXT_PUBLIC_API_URL=http://localhost:8000/api\n" > .env.local
+
+# Install and run
+pnpm install
+pnpm dev
+```
+
+Frontend should run at `http://localhost:3000`.
+
+#### 5) Start backend server
+
+In the backend terminal:
+
+```bash
+cd dorotheo-dental-clinic-website/backend
+source venv/bin/activate
+python manage.py runserver
+```
+
+Backend should run at `http://localhost:8000`.
+
+#### 6) Optional: Build chatbot RAG index
+
+Run this if you are enabling AI/RAG features locally:
+
+```bash
+cd dorotheo-dental-clinic-website/backend
+source venv/bin/activate
+python manage.py index_pages
+```
 
 ### Quick Start (Windows PowerShell)
 
@@ -181,12 +314,12 @@ cd dorotheo-dental-clinic-website/backend
 chmod +x setup.sh && ./setup.sh
 ```
 
-> Note: `.bat` and `.sh` scripts set up the backend only. You will need to run `pnpm install` in the frontend directory separately.
+> Note for macOS users: manual setup above is the most reliable path because it pins Python 3.11 and installs dependencies exactly from `requirements.txt`.
 
 </details>
 
 <details>
-<summary><strong>Manual setup (if scripts fail)</strong></summary>
+<summary><strong>Manual setup (all platforms, if scripts fail)</strong></summary>
 
 ```powershell
 # Backend
@@ -204,9 +337,87 @@ cd dorotheo-dental-clinic-website\frontend
 pnpm install
 ```
 
-> `psycopg2-binary` may fail locally — this is expected. SQLite is used for local development; PostgreSQL is only needed in production.
+```bash
+# Backend (macOS/Linux recommended)
+cd dorotheo-dental-clinic-website/backend
+python3.11 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py create_clinics
+python create_initial_accounts.py
+
+# Frontend (new terminal)
+cd dorotheo-dental-clinic-website/frontend
+pnpm install
+pnpm dev
+```
 
 </details>
+
+### Common macOS Setup Errors and Fixes
+
+#### Error: `zsh: command not found: corepack`
+
+```bash
+npm install -g corepack
+corepack enable
+corepack prepare pnpm@latest --activate
+```
+
+Fallback:
+
+```bash
+npm install -g pnpm
+```
+
+#### Error during `pip install -r requirements.txt`: `Error: pg_config executable not found`
+
+Cause: you are likely using Python 3.14, which may force a source build for `psycopg2-binary` on your platform.
+
+Fix:
+
+```bash
+deactivate 2>/dev/null || true
+rm -rf venv
+python3.11 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+```
+
+#### Error: `ImportError: Couldn't import Django`
+
+Cause: dependency installation failed before Django was installed.
+
+Fix: resolve the pip install error first, then reinstall in a fresh Python 3.11 venv (same commands above).
+
+#### Error: `zsh: command not found: setuptools`
+
+Cause: `setuptools` is a Python package, not a shell command.
+
+Fix:
+
+```bash
+python -m pip install --upgrade pip setuptools wheel
+```
+
+#### Error from `create_initial_accounts.py`: `ValueError ... fields do not exist ... address`
+
+Cause: old script version was using removed field `address`.
+
+Fix:
+
+```bash
+# Get latest code where script is updated
+git pull
+
+# Re-run account setup
+cd dorotheo-dental-clinic-website/backend
+source venv/bin/activate
+python create_initial_accounts.py
+```
 
 ### Default Login Credentials
 
@@ -224,6 +435,16 @@ pnpm install
 Both servers must be running simultaneously.
 
 **Backend** (in `dorotheo-dental-clinic-website/backend/`):
+
+macOS/Linux:
+
+```bash
+source venv/bin/activate
+python manage.py runserver
+```
+
+Windows PowerShell:
+
 ```powershell
 .\venv\Scripts\Activate.ps1
 python manage.py runserver
